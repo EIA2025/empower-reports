@@ -240,6 +240,10 @@ class User(Base):
     class_teacher_for = Column(String)
     gender = Column(String)
     phone_number = Column(String)
+    # Recovery fields for account recovery flows
+    recovery_nickname = Column(String, nullable=True)
+    recovery_phone = Column(String, nullable=True)
+    recovery_city = Column(String, nullable=True)
 
 class Student(Base):
     __tablename__ = 'students'
@@ -474,6 +478,32 @@ def update_database_schema():
     # Check if messages table exists
     if 'messages' not in inspector.get_table_names():
         Message.__table__.create(ENGINE)
+
+    # Ensure users table has recovery columns (for older DBs)
+    if 'users' in inspector.get_table_names():
+        existing_cols = [c['name'] for c in inspector.get_columns('users')]
+        # Add missing columns via ALTER TABLE for SQLite and other DBs
+        missing_cols = []
+        if 'recovery_nickname' not in existing_cols:
+            missing_cols.append(("recovery_nickname", "TEXT"))
+        if 'recovery_phone' not in existing_cols:
+            missing_cols.append(("recovery_phone", "TEXT"))
+        if 'recovery_city' not in existing_cols:
+            missing_cols.append(("recovery_city", "TEXT"))
+
+        if missing_cols:
+            try:
+                from sqlalchemy import text as sql_text
+                with ENGINE.begin() as conn:
+                    for col_name, col_type in missing_cols:
+                        try:
+                            conn.execute(sql_text(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}"))
+                        except Exception:
+                            # ignore errors adding column (may already exist on some DBs)
+                            pass
+            except Exception:
+                # If ALTER fails (e.g., insufficient permissions), continue silently
+                pass
 
 Base.metadata.create_all(ENGINE)
 update_database_schema()
