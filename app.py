@@ -433,6 +433,48 @@ class ClassroomBehavior(Base):
     
     evaluated_at = Column(String, default=lambda: datetime.now().isoformat())
 
+# NEW: Admin-manageable behavior components
+class BehaviorComponent(Base):
+    __tablename__ = 'behavior_components'
+    id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True)
+    display_label = Column(String)
+    display_order = Column(Integer, default=0)
+    active = Column(Boolean, default=True)
+
+
+def get_component_label_safe(session, comp_or_id):
+    """Return a safe display label for a BehaviorComponent instance or id string.
+    This avoids accessing attributes on ORM instances that may have been deleted/expired.
+    """
+    try:
+        # If passed an instance, try to read attribute safely
+        if hasattr(comp_or_id, 'display_label'):
+            return getattr(comp_or_id, 'display_label') or getattr(comp_or_id, 'name', f"id:{getattr(comp_or_id, 'id', 'unknown')}")
+        # Otherwise assume it's an id
+        comp_row = session.query(BehaviorComponent).get(int(comp_or_id))
+        if comp_row:
+            return comp_row.display_label or comp_row.name
+    except Exception:
+        try:
+            return f"id:{int(comp_or_id)}"
+        except Exception:
+            return "component"
+    return f"id:{comp_or_id}"
+
+
+# NEW: Responses keyed by component so teachers can record only enabled components
+class ClassroomBehaviorResponse(Base):
+    __tablename__ = 'classroom_behavior_responses'
+    id = Column(Integer, primary_key=True)
+    student_id = Column(Integer, ForeignKey('students.id'))
+    term_id = Column(Integer, ForeignKey('academic_terms.id'))
+    component_id = Column(Integer, ForeignKey('behavior_components.id'))
+    value = Column(String)
+    evaluated_by = Column(Integer, ForeignKey('users.id'))
+    evaluated_at = Column(String, default=lambda: datetime.now().isoformat())
+
+
 # NEW: StudentDecision model for term 3 decisions
 class StudentDecision(Base):
     __tablename__ = 'student_decisions'
@@ -477,9 +519,57 @@ def update_database_schema():
         ComponentMark.__table__.create(ENGINE)
         log_debug("Created component_marks table")
 
+    # Behavior components table
+    if 'behavior_components' not in inspector.get_table_names():
+        BehaviorComponent.__table__.create(ENGINE)
+        log_debug("Created behavior_components table")
+
+    # Classroom behavior responses
+    if 'classroom_behavior_responses' not in inspector.get_table_names():
+        ClassroomBehaviorResponse.__table__.create(ENGINE)
+        log_debug("Created classroom_behavior_responses table")
+
 Base.metadata.create_all(ENGINE)
 update_database_schema()
 log_debug("Database initialized successfully")
+
+# Seed default behavior components if none exist so teachers see the original set
+def seed_default_behavior_components():
+    session = Session()
+    try:
+        count = session.query(BehaviorComponent).count()
+        if count == 0:
+            defaults = [
+                ("punctuality", "Punctuality"),
+                ("attendance", "Attendance"),
+                ("manners", "Manners"),
+                ("general_behavior", "General Behavior"),
+                ("organisational_skills", "Organisational Skills"),
+                ("adherence_to_uniform", "Adherence to Uniform"),
+                ("leadership_skills", "Leadership Skills"),
+                ("commitment_to_school", "Commitment to School"),
+                ("cooperation_with_peers", "Cooperation with Peers"),
+                ("cooperation_with_staff", "Cooperation with Staff"),
+                ("participation_in_lessons", "Participation in Lessons"),
+                ("completion_of_homework", "Completion of Homework")
+            ]
+            for i, (name, label) in enumerate(defaults):
+                comp = BehaviorComponent(
+                    name=name,
+                    display_label=label,
+                    display_order=i,
+                    active=True
+                )
+                session.add(comp)
+            session.commit()
+            log_debug("Seeded default behavior components")
+    finally:
+        try:
+            session.close()
+        except Exception:
+            pass
+
+seed_default_behavior_components()
 
 # -------------------------------
 # 2. GRADING SYSTEM
@@ -1168,6 +1258,95 @@ def generate_pdf_report(student_data, term_data, marks, design, behavior_data=No
     doc.build(story)
     return buffer.getvalue()
 
+
+def generate_discipline_pdf(student_data, reports_df, design):
+    """Generate a simple PDF summary of discipline reports for a student."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                           topMargin=0.3*inch, bottomMargin=0.3*inch,
+                           leftMargin=0.4*inch, rightMargin=0.4*inch)
+    story = []
+    styles = getSampleStyleSheet()
+
+    # Header
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=14, alignment=TA_CENTER, fontName='Helvetica-Bold')
+    header_style = ParagraphStyle('Header', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER)
+
+    if design.logo_data:
+        try:
+            if design.logo_data.startswith('http'):
+                logo_bytes = requests.get(design.logo_data).content
+            else:
+                logo_bytes = base64.b64decode(design.logo_data)
+            logo_img = Image(io.BytesIO(logo_bytes), width=0.9*inch, height=0.9*inch)
+            logo_img.hAlign = 'CENTER'
+            story.append(logo_img)
+            story.append(Spacer(1, 0.05*inch))
+        except Exception:
+            pass
+
+    story.append(Paragraph(f"<b>{design.school_name}</b>", title_style))
+    if design.school_address:
+        story.append(Paragraph(design.school_address, header_style))
+    story.append(Spacer(1, 0.1*inch))
+
+    story.append(Paragraph(f"<b>Discipline Report Summary</b>", ParagraphStyle('SubTitle', parent=styles['Heading2'], alignment=TA_CENTER, fontSize=11)))
+    story.append(Spacer(1, 0.08*inch))
+
+    # Student info
+    student_info = [
+        ['Name:', student_data.get('name', ''), 'Class:', student_data.get('class_name', '')],
+        ['Reg No:', student_data.get('registration_number', ''), 'Generated:', datetime.now().strftime('%Y-%m-%d')]
+    ]
+    stbl = Table(student_info, colWidths=[0.8*inch, 2.6*inch, 0.8*inch, 2.6*inch])
+    stbl.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4)
+    ]))
+    story.append(stbl)
+    story.append(Spacer(1, 0.1*inch))
+
+    # Reports table
+    if reports_df is None or reports_df.empty:
+        story.append(Paragraph('No discipline reports available for this student.', styles['Normal']))
+    else:
+        tbl_data = [['Date', 'Type', 'Description', 'Action Taken', 'Status', 'Admin Notes']]
+        for _, r in reports_df.iterrows():
+            desc = Paragraph((r.get('description') or '')[:300], ParagraphStyle('Small', fontSize=8))
+            action = Paragraph((r.get('action_taken') or '')[:200], ParagraphStyle('Small', fontSize=8))
+            admin_notes = Paragraph((r.get('admin_notes') or '')[:200], ParagraphStyle('Small', fontSize=8))
+            tbl_data.append([
+                r.get('incident_date') or '',
+                r.get('incident_type') or '',
+                desc,
+                action,
+                r.get('status') or '',
+                admin_notes
+            ])
+
+        colw = [1.0*inch, 1.0*inch, 2.2*inch, 2.0*inch, 0.7*inch, 1.0*inch]
+        rpt_table = Table(tbl_data, colWidths=colw, repeatRows=1)
+        rpt_table.setStyle(TableStyle([
+            ('GRID', (0,0), (-1,-1), 0.4, colors.black),
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F2F2F2')),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 8),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('TOPPADDING', (0,0), (-1,-1), 3),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 3)
+        ]))
+        story.append(rpt_table)
+
+    # Footer
+    story.append(Spacer(1, 0.1*inch))
+    if design.report_footer:
+        story.append(Paragraph(design.report_footer, ParagraphStyle('Footer', fontSize=8, alignment=TA_CENTER)))
+
+    doc.build(story)
+    return buffer.getvalue()
+
 # -------------------------------
 # 7. APP SETUP
 # -------------------------------
@@ -1623,6 +1802,171 @@ elif page == "Storage Management" and st.session_state.user_role == 'admin':
                 st.success(f"Deleted {deleted_count} old backups")
             else:
                 st.info("No old backups to delete")
+
+# NEW PAGE: Report Design (for customizing report appearance)
+elif page == "Report Design" and st.session_state.user_role == 'admin':
+    st.header("🎨 Customize Report Design")
+    
+    st.info(" Customize how your school reports look. All changes will be reflected in newly generated reports.")
+    
+    tab1, tab2, tab3 = st.tabs(["School Information", "Logo & Colors", "Preview"])
+    
+    # Create session for each tab to avoid stale sessions
+    session = Session()
+    design = session.query(ReportDesign).first()
+    
+    with tab1:
+        st.subheader("School Details")
+        
+        with st.form("school_info"):
+            school_name = st.text_input("School Name*", value=design.school_name)
+            school_subtitle = st.text_input("School Subtitle", value=design.school_subtitle or "")
+            school_address = st.text_input("School Address", value=design.school_address or "")
+            school_po_box = st.text_input("P.O. Box", value=design.school_po_box or "")
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                school_phone = st.text_input("Phone Number", value=design.school_phone or "")
+            with col2:
+                school_email = st.text_input("Email", value=design.school_email or "")
+            with col3:
+                school_website = st.text_input("Website", value=design.school_website or "")
+            
+            report_footer = st.text_area("Report Footer (optional)", 
+                                        value=design.report_footer or "",
+                                        help="Add any additional text to appear at bottom of reports")
+            
+            if st.form_submit_button(" Save School Information", use_container_width=True):
+                try:
+                    # Get fresh session and design object
+                    save_session = Session()
+                    save_design = save_session.query(ReportDesign).first()
+                    
+                    save_design.school_name = school_name
+                    save_design.school_subtitle = school_subtitle
+                    save_design.school_address = school_address
+                    save_design.school_po_box = school_po_box
+                    save_design.school_phone = school_phone
+                    save_design.school_email = school_email
+                    save_design.school_website = school_website
+                    save_design.report_footer = report_footer
+                    
+                    save_session.commit()
+                    log_audit(save_session, st.session_state.user_id, "update_report_design", "School information")
+                    save_session.close()
+                    
+                    st.success(" School information updated!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f" Error saving: {str(e)}")
+                    if 'save_session' in locals():
+                        save_session.rollback()
+                        save_session.close()
+    
+    with tab2:
+        st.subheader("Logo & Visual Design")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Upload School Logo**")
+            uploaded_file = st.file_uploader("Choose an image file", type=["jpg", "jpeg", "png"])
+            
+            if uploaded_file is not None:
+                try:
+                    # Convert to base64
+                    bytes_data = uploaded_file.getvalue()
+                    b64 = base64.b64encode(bytes_data).decode()
+                    
+                    # Save to database
+                    design.logo_data = b64
+                    session.commit()
+                    st.success(" Logo uploaded successfully!")
+                    st.image(uploaded_file, width=300)
+                except Exception as e:
+                    st.error(f" Error uploading logo: {str(e)}")
+            elif design.logo_data:
+                try:
+                    if design.logo_data.startswith('http'):
+                        # It's a URL
+                        st.image(design.logo_data, width=300)
+                    else:
+                        # It's base64
+                        logo_bytes = base64.b64decode(design.logo_data)
+                        st.image(logo_bytes, width=300)
+                except:
+                    st.error("Error displaying existing logo")
+            
+            # NEW: Quick insert Empower logo
+            st.markdown("---")
+            st.markdown("**🚀 Quick Insert Empower Logo**")
+            if st.button("Use Empower Academy Logo", use_container_width=True):
+                empower_logo_url = "https://z-cdn-media.chatglm.cn/files/a7ca3e7c-8f26-410d-94e5-84b20d17eaed_empower-logo.png?auth_key=1863023354-290424df56d14d3b9f2ee211186220cf-0-e728679b39cedb32228a3c796ca046cf"
+                logo_b64 = download_logo_from_url(empower_logo_url)
+                if logo_b64:
+                    design.logo_data = logo_b64
+                    session.commit()
+                    st.success(" Empower Academy logo added successfully!")
+                    st.rerun()
+        
+        with col2:
+            st.markdown("**Or Enter Logo URL**")
+            logo_url = st.text_input("Enter logo URL:", 
+                                     value=design.logo_data if design.logo_data and design.logo_data.startswith('http') else "",
+                                     help="Enter direct URL to your logo image")
+            
+            if st.button("Load Logo from URL", use_container_width=True):
+                if logo_url:
+                    logo_b64 = download_logo_from_url(logo_url)
+                    if logo_b64:
+                        design.logo_data = logo_url  # Store URL directly
+                        session.commit()
+                        st.success(" Logo URL saved successfully!")
+                        st.rerun()
+            
+            st.markdown("**Primary Color**")
+            st.write("Choose main color for headers and tables")
+            
+            primary_color = st.color_picker("Primary Color", value=design.primary_color)
+            
+            if st.button(" Save Color", use_container_width=True):
+                design.primary_color = primary_color
+                session.commit()
+                log_audit(session, st.session_state.user_id, "update_report_design", f"Color: {primary_color}")
+                st.success(" Color updated!")
+                st.rerun()
+            
+            st.markdown("**Preview:**")
+            st.markdown(f"<div style='background-color: {design.primary_color}; color: white; padding: 15px; border-radius: 5px; text-align: center; font-weight: bold;'>Sample Header Text</div>", unsafe_allow_html=True)
+    
+    with tab3:
+        st.subheader("Report Preview")
+        st.write("This is how your report header will look:")
+        
+        st.markdown("---")
+        
+        if design.logo_data:
+            try:
+                if design.logo_data.startswith('http'):
+                    # It's a URL
+                    st.image(design.logo_data, width=150)
+                else:
+                    # It's base64
+                    logo_bytes = base64.b64decode(design.logo_data)
+                    st.image(logo_bytes, width=150)
+            except:
+                st.error("Error loading logo")
+        
+        st.markdown(f"<h2 style='text-align: center; color: {design.primary_color};'>{design.school_name}</h2>", unsafe_allow_html=True)
+        
+        if design.school_subtitle:
+            st.markdown(f"<p style='text-align: center;'>{design.school_subtitle}</p>", unsafe_allow_html=True)
+        if design.school_address:
+            st.markdown(f"<p style='text-align: center;'>{design.school_address}</p>", unsafe_allow_html=True)
+        if design.school_po_box:
+            st.markdown(f"<p style='text-align: center;'>{design.school_po_box}</p>", unsafe_allow_html=True)
+    
+    session.close()
 
 # NEW PAGE: Visitation Day Management (for VD reports)
 elif page == "Visitation Day Management" and st.session_state.user_role == 'admin':
