@@ -1611,6 +1611,66 @@ if not st.session_state.logged_in:
                 else:
                     st.error("Invalid username or password")
                     session.close()
+        # Forgotten password / recovery flow
+        with st.expander("Forgot password?", expanded=False):
+            with st.form("forgot_password_form"):
+                recover_email = st.text_input("Enter your account email for recovery")
+                recover_method = st.selectbox("Recovery method", ["Phone number", "City of birth", "Nickname / Pet name"], index=0)
+                recover_answer = st.text_input("Enter your answer (case-insensitive)")
+                new_password = st.text_input("New password", type="password")
+                confirm_new = st.text_input("Confirm new password", type="password")
+                recover_submit = st.form_submit_button("Reset Password")
+
+                if recover_submit:
+                    if not recover_email or not recover_answer or not new_password:
+                        st.error("Please provide your email, recovery answer and a new password")
+                    elif new_password != confirm_new:
+                        st.error("New passwords do not match")
+                    else:
+                        rs = Session()
+                        user_row = rs.query(User).filter_by(email=recover_email).first()
+                        if not user_row:
+                            st.error("No account found with that email")
+                            rs.close()
+                        else:
+                            # choose field to validate
+                            answer_ok = False
+                            ans = recover_answer.strip().lower()
+                            try:
+                                if recover_method == "Phone number":
+                                    stored = (user_row.recovery_phone or "").strip().lower()
+                                    answer_ok = (stored != "" and stored == ans)
+                                elif recover_method == "City of birth":
+                                    stored = (user_row.recovery_city or "").strip().lower()
+                                    answer_ok = (stored != "" and stored == ans)
+                                else:
+                                    stored = (user_row.recovery_nickname or "").strip().lower()
+                                    answer_ok = (stored != "" and stored == ans)
+                            except Exception:
+                                answer_ok = False
+
+                            if not answer_ok:
+                                st.error("Recovery information did not match our records. If you do not remember any recovery details, contact the Master Admin.")
+                                rs.close()
+                            else:
+                                # update password
+                                user_row.password_hash = hashlib.sha256(new_password.encode()).hexdigest()
+                                rs.add(user_row)
+                                try:
+                                    rs.commit()
+                                    st.success("Password reset successfully. You can now login with your new password.")
+                                    # Optionally auto-login the user
+                                    st.session_state.logged_in = True
+                                    st.session_state.user_role = user_row.role
+                                    st.session_state.user_id = user_row.id
+                                    st.session_state.username = user_row.name
+                                    rs.close()
+                                    time.sleep(1)
+                                    st.rerun()
+                                except Exception as e:
+                                    rs.rollback()
+                                    st.error(f"Could not update password: {str(e)}")
+                                    rs.close()
     
     with recovery_tab:
         st.warning("⚠️ Master Admin Recovery - Use only if you forgot your password!")
@@ -5421,6 +5481,12 @@ elif page == "Change Login Details":
         current_pass = st.text_input("Current Password*", type="password")
         new_pass = st.text_input("New Password (leave blank to keep current)", type="password")
         confirm_pass = st.text_input("Confirm New Password", type="password")
+        st.markdown("---")
+        st.subheader("Recovery Details (used to recover account if you forget your password)")
+        st.info("Provide at least one recovery detail. Keep it memorable but private.")
+        new_recovery_phone = st.text_input("Phone number (digits)", value=user.recovery_phone or "")
+        new_recovery_city = st.text_input("City of birth", value=user.recovery_city or "")
+        new_recovery_nickname = st.text_input("Nickname / Pet or spouse name", value=user.recovery_nickname or "")
         
         if st.form_submit_button("Update Login Details", use_container_width=True):
             if hashlib.sha256(current_pass.encode()).hexdigest() != user.password_hash:
@@ -5430,15 +5496,23 @@ elif page == "Change Login Details":
             elif session.query(User).filter(User.email == new_email, User.id != user.id).first():
                 st.error(" Email already taken by another user")
             else:
-                user.email = new_email
-                if new_pass:
-                    user.password_hash = hashlib.sha256(new_pass.encode()).hexdigest()
-                session.commit()
-                log_audit(session, st.session_state.user_id, "change_login", new_email)
-                st.success(" Login details updated! Please login again with new credentials.")
-                st.session_state.logged_in = False
-                session.close()
-                st.rerun()
+                # Require at least one recovery detail
+                if not (new_recovery_phone.strip() or new_recovery_city.strip() or new_recovery_nickname.strip()):
+                    st.error("Please provide at least one recovery detail (phone, city of birth, or nickname/pet). These are needed to recover your account if you forget your password.")
+                else:
+                    user.email = new_email
+                    if new_pass:
+                        user.password_hash = hashlib.sha256(new_pass.encode()).hexdigest()
+                    # Save recovery details
+                    user.recovery_phone = new_recovery_phone.strip() or None
+                    user.recovery_city = new_recovery_city.strip() or None
+                    user.recovery_nickname = new_recovery_nickname.strip() or None
+                    session.commit()
+                    log_audit(session, st.session_state.user_id, "change_login", new_email)
+                    st.success(" Login details updated! Please login again with new credentials.")
+                    st.session_state.logged_in = False
+                    session.close()
+                    st.rerun()
     
     session.close()
 
