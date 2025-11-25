@@ -885,7 +885,7 @@ def generate_pdf_report(student_data, term_data, marks, design, behavior_data=No
             story.append(logo)
             story.append(Spacer(1, 0.05*inch))
         except Exception as e:
-            log_debug(f"Could not load logo in PDF: {str(e)}", "WARNING")
+            st.warning(f"Could not load logo in PDF: {str(e)}")
     
     story.append(Paragraph(f"<b>{design.school_name}</b>", title_style))
     if design.school_subtitle:
@@ -1293,7 +1293,6 @@ if not st.session_state.logged_in:
                 st.session_state.user_id = user.id
                 st.session_state.username = user.name
                 session.close()
-                log_debug(f"User {username} logged in successfully")
                 st.rerun()
             else:
                 st.error("Invalid username or password")
@@ -1333,7 +1332,8 @@ if st.session_state.user_role == 'admin':
         "Data Export",
         "Change Login Details",
         "Visitation Day Management",  # New menu item for VD reports
-        "Storage Management"  # New menu item for storage management
+        "Storage Management",  # New menu item for storage management
+        "Master Admin"  # Master admin database reset panel
     ])
 else:
     page = st.sidebar.selectbox("Menu", [
@@ -3032,3 +3032,132 @@ if st.session_state.user_role == 'admin':
     
     if total_students > 0 or total_marks > 0:
         st.sidebar.warning("📌 **Reminder**: Export your data regularly!\n\nGo to **Data Export** to backup.")
+
+# MASTER ADMIN SECTION: Database Reset Panel
+elif page == "Master Admin":
+    st.header("🔐 Master Admin Panel")
+    
+    st.warning("⚠️ **WARNING**: This section allows resetting the entire database. Use with extreme caution!")
+    
+    # Authentication
+    st.subheader("Authentication Required")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        username = st.text_input("Username", placeholder="Enter master username")
+    with col2:
+        password = st.text_input("Password", type="password", placeholder="Enter master password")
+    
+    # Check credentials
+    master_username = "MikaelJ46"
+    master_password_hash = hashlib.sha256("@mikaelJ46".encode()).hexdigest()
+    
+    if st.button("Authenticate", use_container_width=True):
+        entered_password_hash = hashlib.sha256(password.encode()).hexdigest()
+        
+        if username == master_username and entered_password_hash == master_password_hash:
+            st.success("✅ Authentication successful!")
+            st.session_state.master_admin_authenticated = True
+        else:
+            st.error("❌ Invalid credentials!")
+            st.session_state.master_admin_authenticated = False
+    
+    if st.session_state.get("master_admin_authenticated", False):
+        st.divider()
+        st.subheader("Database Management")
+        
+        tab1, tab2 = st.tabs(["Delete All Users", "Reset Database"])
+        
+        with tab1:
+            st.warning("⚠️ **Delete All Users**: This will remove all users from the system except admin. The default admin (username: 'admin', password: 'admin123') will be recreated.")
+            
+            st.write("Users that will be deleted:")
+            session = Session()
+            try:
+                users_df = pd.read_sql("SELECT id, name, email, role FROM users WHERE email != 'admin'", ENGINE)
+                if not users_df.empty:
+                    st.dataframe(users_df, use_container_width=True)
+                    
+                    if st.button("🗑️ DELETE ALL USERS", use_container_width=True, key="delete_users"):
+                        try:
+                            # Delete all users except admin
+                            session.query(User).filter(User.email != 'admin').delete()
+                            session.commit()
+                            
+                            # Recreate default admin
+                            init_admin()
+                            
+                            st.success("✅ All users deleted successfully! Default admin has been recreated.")
+                            st.info("Default credentials:\n- Username: admin\n- Password: admin123")
+                        except Exception as e:
+                            st.error(f"❌ Error deleting users: {str(e)}")
+                            session.rollback()
+                else:
+                    st.info("No users to delete (only admin exists)")
+            finally:
+                session.close()
+        
+        with tab2:
+            st.warning("⚠️ **RESET DATABASE**: This will completely reset the database to its default state, deleting ALL data including students, marks, reports, etc. This action cannot be undone!")
+            
+            st.write("**Data that will be deleted:**")
+            st.write("- All users (except default admin)")
+            st.write("- All students")
+            st.write("- All marks and grades")
+            st.write("- All academic terms")
+            st.write("- All classroom behavior records")
+            st.write("- All discipline reports")
+            st.write("- All student decisions")
+            st.write("- All visitation day records")
+            st.write("- All audit logs")
+            
+            st.markdown("---")
+            
+            confirm_text = st.text_input(
+                "Type 'RESET DATABASE' to confirm reset:",
+                placeholder="Type the confirmation text...",
+                help="This is a safety measure to prevent accidental resets"
+            )
+            
+            if st.button("🔄 RESET DATABASE TO DEFAULT", use_container_width=True, key="reset_db"):
+                if confirm_text == "RESET DATABASE":
+                    try:
+                        session = Session()
+                        
+                        # Delete all data
+                        session.query(AuditLog).delete()
+                        session.query(ClassroomBehaviorResponse).delete()
+                        session.query(ClassroomBehavior).delete()
+                        session.query(BehaviorComponent).delete()
+                        session.query(StudentDecision).delete()
+                        session.query(VisitationDay).delete()
+                        session.query(DisciplineReport).delete()
+                        session.query(Mark).delete()
+                        session.query(ComponentMark).delete()
+                        session.query(Student).delete()
+                        session.query(AcademicTerm).delete()
+                        session.query(User).delete()
+                        session.query(ReportDesign).delete()
+                        
+                        session.commit()
+                        session.close()
+                        
+                        # Reinitialize default data
+                        init_admin()
+                        init_report_design()
+                        seed_default_behavior_components()
+                        
+                        st.success("✅ Database reset successfully!")
+                        st.info("All data has been cleared and default settings restored.")
+                        st.info("**Default admin credentials:**\n- Username: admin\n- Password: admin123")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error resetting database: {str(e)}")
+                        session.rollback()
+                        session.close()
+                else:
+                    if confirm_text:
+                        st.error(f"❌ Confirmation text does not match. You entered: '{confirm_text}'")
+    else:
+        if username or password:
+            st.info("Please enter valid credentials to proceed.")
