@@ -46,6 +46,9 @@ UPLOADS_DIR.mkdir(exist_ok=True)
 EXPORTS_DIR = BASE_DIR / 'exports'
 EXPORTS_DIR.mkdir(exist_ok=True)
 
+# Debug mode flag
+show_debug = False
+
 st.sidebar.info(" Local Storage Mode")
 
 # Store paths in session state for easy access
@@ -213,6 +216,33 @@ if not os.path.exists(EXPORTS_DIR):
 
 # Check for periodic backup
 check_and_create_periodic_backup()
+
+# Database info helper function
+def get_database_info():
+    """Get database file information"""
+    try:
+        if DB_PATH.exists():
+            size_bytes = os.path.getsize(DB_PATH)
+            size_mb = size_bytes / (1024 * 1024)
+            return {
+                'exists': True,
+                'path': str(DB_PATH),
+                'size_bytes': size_bytes,
+                'size_mb': round(size_mb, 2)
+            }
+        else:
+            return {
+                'exists': False,
+                'path': str(DB_PATH),
+                'size_bytes': 0,
+                'size_mb': 0
+            }
+    except Exception as e:
+        return {
+            'exists': False,
+            'path': str(DB_PATH),
+            'error': str(e)
+        }
 
 # -------------------------------
 # 1. DATABASE & MODELS
@@ -3191,6 +3221,348 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                 st.rerun()
             except Exception as e:
                 st.error(f"❌ Error updating marks: {str(e)}")
+    
+    session.close()
+
+# ========================
+# PAGE: Classroom Behavior
+# ========================
+elif page == "Classroom Behavior":
+    st.header("👥 Classroom Behavior Reports")
+    session = Session()
+    
+    user = session.query(User).get(st.session_state.user_id)
+    active_term = session.query(AcademicTerm).filter_by(is_active=True).first()
+    
+    if not active_term:
+        st.warning("No active term set. Please contact administrator.")
+        session.close()
+        st.stop()
+    
+    st.info(f"📅 Current Term: **{active_term.term_name}**")
+    
+    if st.session_state.user_role == 'teacher':
+        if not user.class_teacher_for:
+            st.warning("You are not assigned as a class teacher.")
+            session.close()
+            st.stop()
+        
+        st.subheader(f"Classroom Behavior Reports for {user.class_teacher_for}")
+        
+        # Get students in class
+        students = pd.read_sql(
+            f"SELECT id, name, registration_number FROM students WHERE class_name = '{user.class_teacher_for}' ORDER BY name",
+            ENGINE
+        )
+        
+        if students.empty:
+            st.info(f"No students in {user.class_teacher_for}")
+            session.close()
+            st.stop()
+        
+        selected_student = st.selectbox("Select Student", students['name'].tolist())
+        student_id = students[students['name'] == selected_student].iloc[0]['id']
+        
+        st.subheader(f"Behavior Evaluation for {selected_student}")
+        
+        # Get existing behavior record
+        existing_behavior = session.query(ClassroomBehavior).filter_by(
+            student_id=student_id,
+            term_id=active_term.id
+        ).first()
+        
+        behavior_values = {}
+        if existing_behavior:
+            behavior_values = {
+                'punctuality': existing_behavior.punctuality,
+                'attendance': existing_behavior.attendance,
+                'manners': existing_behavior.manners,
+                'general_behavior': existing_behavior.general_behavior,
+                'organisational_skills': existing_behavior.organisational_skills,
+                'adherence_to_uniform': existing_behavior.adherence_to_uniform,
+                'leadership_skills': existing_behavior.leadership_skills,
+                'commitment_to_school': existing_behavior.commitment_to_school,
+                'cooperation_with_peers': existing_behavior.cooperation_with_peers,
+                'cooperation_with_staff': existing_behavior.cooperation_with_staff,
+                'participation_in_lessons': existing_behavior.participation_in_lessons,
+                'completion_of_homework': existing_behavior.completion_of_homework,
+            }
+        
+        with st.form("classroom_behavior"):
+            st.write("Rate the student on each behavior aspect:")
+            rating_options = ["Excellent", "Good", "Satisfactory", "Cause of Concern"]
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                punctuality = st.selectbox("Punctuality", rating_options, 
+                    index=rating_options.index(behavior_values.get('punctuality', 'Good')) if behavior_values.get('punctuality') else 1)
+                attendance = st.selectbox("Attendance", rating_options,
+                    index=rating_options.index(behavior_values.get('attendance', 'Good')) if behavior_values.get('attendance') else 1)
+                manners = st.selectbox("Manners", rating_options,
+                    index=rating_options.index(behavior_values.get('manners', 'Good')) if behavior_values.get('manners') else 1)
+                general_behavior = st.selectbox("General Behavior", rating_options,
+                    index=rating_options.index(behavior_values.get('general_behavior', 'Good')) if behavior_values.get('general_behavior') else 1)
+                organisational = st.selectbox("Organisational Skills", rating_options,
+                    index=rating_options.index(behavior_values.get('organisational_skills', 'Good')) if behavior_values.get('organisational_skills') else 1)
+                uniform = st.selectbox("Adherence to Uniform", rating_options,
+                    index=rating_options.index(behavior_values.get('adherence_to_uniform', 'Good')) if behavior_values.get('adherence_to_uniform') else 1)
+            
+            with col2:
+                leadership = st.selectbox("Leadership Skills", rating_options,
+                    index=rating_options.index(behavior_values.get('leadership_skills', 'Good')) if behavior_values.get('leadership_skills') else 1)
+                commitment = st.selectbox("Commitment to School", rating_options,
+                    index=rating_options.index(behavior_values.get('commitment_to_school', 'Good')) if behavior_values.get('commitment_to_school') else 1)
+                cooperation_peers = st.selectbox("Cooperation with Peers", rating_options,
+                    index=rating_options.index(behavior_values.get('cooperation_with_peers', 'Good')) if behavior_values.get('cooperation_with_peers') else 1)
+                cooperation_staff = st.selectbox("Cooperation with Staff", rating_options,
+                    index=rating_options.index(behavior_values.get('cooperation_with_staff', 'Good')) if behavior_values.get('cooperation_with_staff') else 1)
+                participation = st.selectbox("Participation in Lessons", rating_options,
+                    index=rating_options.index(behavior_values.get('participation_in_lessons', 'Good')) if behavior_values.get('participation_in_lessons') else 1)
+                homework = st.selectbox("Homework Completion", rating_options,
+                    index=rating_options.index(behavior_values.get('completion_of_homework', 'Good')) if behavior_values.get('completion_of_homework') else 1)
+            
+            if st.form_submit_button("💾 Save Behavior Evaluation", use_container_width=True):
+                try:
+                    if existing_behavior:
+                        existing_behavior.punctuality = punctuality
+                        existing_behavior.attendance = attendance
+                        existing_behavior.manners = manners
+                        existing_behavior.general_behavior = general_behavior
+                        existing_behavior.organisational_skills = organisational
+                        existing_behavior.adherence_to_uniform = uniform
+                        existing_behavior.leadership_skills = leadership
+                        existing_behavior.commitment_to_school = commitment
+                        existing_behavior.cooperation_with_peers = cooperation_peers
+                        existing_behavior.cooperation_with_staff = cooperation_staff
+                        existing_behavior.participation_in_lessons = participation
+                        existing_behavior.completion_of_homework = homework
+                        existing_behavior.evaluated_at = datetime.now().isoformat()
+                    else:
+                        new_behavior = ClassroomBehavior(
+                            student_id=student_id,
+                            term_id=active_term.id,
+                            evaluated_by=st.session_state.user_id,
+                            punctuality=punctuality,
+                            attendance=attendance,
+                            manners=manners,
+                            general_behavior=general_behavior,
+                            organisational_skills=organisational,
+                            adherence_to_uniform=uniform,
+                            leadership_skills=leadership,
+                            commitment_to_school=commitment,
+                            cooperation_with_peers=cooperation_peers,
+                            cooperation_with_staff=cooperation_staff,
+                            participation_in_lessons=participation,
+                            completion_of_homework=homework
+                        )
+                        session.add(new_behavior)
+                    
+                    session.commit()
+                    log_audit(session, st.session_state.user_id, "submit_behavior", f"{selected_student} - {active_term.term_name}")
+                    st.success(f"✅ Behavior evaluation saved for {selected_student}!")
+                    st.balloons()
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    session.rollback()
+                    st.error(f"❌ Error saving behavior: {str(e)}")
+    
+    else:
+        st.info("As an administrator, you can view behavior evaluations for all classes.")
+    
+    session.close()
+
+# ========================
+# PAGE: Discipline Reports
+# ========================
+elif page == "Discipline Reports":
+    st.header("📝 Discipline Reports")
+    session = Session()
+    
+    active_term = session.query(AcademicTerm).filter_by(is_active=True).first()
+    
+    if st.session_state.user_role == 'teacher':
+        st.subheader("Submit Discipline Report")
+        
+        students = pd.read_sql("SELECT id, name, class_name FROM students ORDER BY class_name, name", ENGINE)
+        
+        if not students.empty:
+            with st.form("discipline_report"):
+                student_name = st.selectbox("Student", students['name'].tolist())
+                student_id = students[students['name'] == student_name].iloc[0]['id']
+                
+                incident_date = st.date_input("Incident Date")
+                incident_type = st.selectbox("Incident Type", ["Absenteeism", "Lateness", "Rudeness", "Fighting", "Cheating", "Other"])
+                description = st.text_area("Description")
+                action_taken = st.text_area("Action Taken")
+                
+                if st.form_submit_button("Submit Report", use_container_width=True):
+                    report = DisciplineReport(
+                        student_id=student_id,
+                        reported_by=st.session_state.user_id,
+                        incident_date=str(incident_date),
+                        incident_type=incident_type,
+                        description=description,
+                        action_taken=action_taken,
+                        status="Pending"
+                    )
+                    session.add(report)
+                    session.commit()
+                    log_audit(session, st.session_state.user_id, "submit_discipline_report", f"{student_name}")
+                    st.success("✅ Discipline report submitted!")
+    
+    else:
+        st.subheader("View Discipline Reports")
+        
+        reports = pd.read_sql("""
+            SELECT dr.*, s.name as student_name, u.name as reported_by_name
+            FROM discipline_reports dr
+            JOIN students s ON dr.student_id = s.id
+            JOIN users u ON dr.reported_by = u.id
+            ORDER BY dr.created_at DESC
+        """, ENGINE)
+        
+        if not reports.empty:
+            st.dataframe(reports[['student_name', 'incident_type', 'incident_date', 'status', 'reported_by_name']], use_container_width=True)
+        else:
+            st.info("No discipline reports yet")
+    
+    session.close()
+
+# ========================
+# PAGE: My Classes (for teachers)
+# ========================
+elif page == "My Classes" and st.session_state.user_role == 'teacher':
+    st.header("📚 My Classes")
+    session = Session()
+    
+    user = session.query(User).get(st.session_state.user_id)
+    
+    if user.subjects_taught:
+        subjects = [s.strip() for s in user.subjects_taught.split(',')]
+        st.subheader(f"Subjects: {', '.join(subjects)}")
+        
+        if user.class_teacher_for:
+            st.subheader(f"Class Teacher for: {user.class_teacher_for}")
+            
+            students = pd.read_sql(
+                f"SELECT * FROM students WHERE class_name = '{user.class_teacher_for}'",
+                ENGINE
+            )
+            
+            st.write(f"**Total Students: {len(students)}**")
+            st.dataframe(students[['name', 'registration_number', 'year']], use_container_width=True)
+        else:
+            st.info("You are not assigned as a class teacher.")
+    else:
+        st.warning("No subjects assigned to you. Contact administrator.")
+    
+    session.close()
+
+# ========================
+# PAGE: Admin Management (missing implementation)
+# ========================
+elif page == "Admin Management" and st.session_state.user_role == 'admin':
+    st.header("👨‍💼 Admin Management")
+    session = Session()
+    
+    st.info("Admin management page - feature under development")
+    
+    # Show current admins
+    admins = pd.read_sql("SELECT id, name, email FROM users WHERE role = 'admin'", ENGINE)
+    st.subheader("Current Admins")
+    st.dataframe(admins, use_container_width=True)
+    
+    session.close()
+
+# ========================
+# PAGE: Staff Management (missing implementation)
+# ========================
+elif page == "Staff Management" and st.session_state.user_role == 'admin':
+    st.header("👨‍🏫 Staff Management")
+    session = Session()
+    
+    st.info("Staff management page - feature under development")
+    
+    # Show current staff
+    staff = pd.read_sql("SELECT id, name, email, subjects_taught, class_teacher_for FROM users WHERE role = 'teacher'", ENGINE)
+    st.subheader("Current Staff")
+    if not staff.empty:
+        st.dataframe(staff, use_container_width=True)
+    else:
+        st.info("No staff members yet")
+    
+    session.close()
+
+# ========================
+# PAGE: Student Enrollment (missing implementation)
+# ========================
+elif page == "Student Enrollment" and st.session_state.user_role == 'admin':
+    st.header("🎓 Student Enrollment")
+    session = Session()
+    
+    st.info("Student enrollment page - feature under development")
+    
+    # Show current students
+    students = pd.read_sql("SELECT id, name, class_name, year FROM students", ENGINE)
+    st.subheader("Current Students")
+    if not students.empty:
+        st.dataframe(students, use_container_width=True)
+    else:
+        st.info("No students enrolled yet")
+    
+    session.close()
+
+# ========================
+# PAGE: Academic Calendar (missing implementation)
+# ========================
+elif page == "Academic Calendar" and st.session_state.user_role == 'admin':
+    st.header("📅 Academic Calendar")
+    session = Session()
+    
+    st.info("Academic calendar page - feature under development")
+    
+    # Show current terms
+    terms = pd.read_sql("SELECT * FROM academic_terms ORDER BY year DESC, term_number DESC", ENGINE)
+    st.subheader("Academic Terms")
+    if not terms.empty:
+        st.dataframe(terms, use_container_width=True)
+    else:
+        st.info("No academic terms yet")
+    
+    session.close()
+
+# ========================
+# PAGE: Data Export (missing implementation)
+# ========================
+elif page == "Data Export" and st.session_state.user_role == 'admin':
+    st.header("📊 Data Export")
+    session = Session()
+    
+    st.info("Data export page - feature under development")
+    
+    if st.button("Export All Data"):
+        st.info("Export functionality - to be implemented")
+    
+    session.close()
+
+# ========================
+# PAGE: Generate Reports (missing implementation)
+# ========================
+elif page == "Generate Reports" and st.session_state.user_role == 'admin':
+    st.header("📄 Generate Reports")
+    session = Session()
+    
+    st.info("Generate reports page - feature under development")
+    
+    students = pd.read_sql("SELECT id, name, class_name FROM students", ENGINE)
+    
+    if not students.empty:
+        selected_student = st.selectbox("Select Student", students['name'].tolist())
+        if st.button("Generate Report"):
+            st.info("Report generation - to be implemented")
+    else:
+        st.info("No students available")
     
     session.close()
 
