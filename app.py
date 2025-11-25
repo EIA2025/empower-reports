@@ -33,99 +33,30 @@ from sqlalchemy import inspect
 # It uses a SEPARATE database: empower_second.db
 # =========================================
 
-# Configure logging for VS Code debugging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('empower_reports_second.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+# Local development setup
+BASE_DIR = Path(__file__).resolve().parent
+STORAGE_DIR = BASE_DIR
+DB_PATH = BASE_DIR / 'empower_second.db'
+BACKUP_DIR = BASE_DIR / 'backups'
+BACKUP_DIR.mkdir(exist_ok=True)
 
-# VS Code friendly paths
-def get_project_root():
-    """Get the project root directory for VS Code"""
-    return Path(__file__).parent.absolute()
+UPLOADS_DIR = BASE_DIR / 'uploads'
+UPLOADS_DIR.mkdir(exist_ok=True)
 
-def get_data_dir():
-    """Get or create data directory"""
-    data_dir = get_project_root() / 'data_second'
-    data_dir.mkdir(exist_ok=True)
-    return data_dir
+EXPORTS_DIR = BASE_DIR / 'exports'
+EXPORTS_DIR.mkdir(exist_ok=True)
 
-# Initialize paths
-PROJECT_ROOT = get_project_root()
-DATA_DIR = get_data_dir()
-DB_PATH = DATA_DIR / 'empower_second.db'
-BACKUP_DIR = DATA_DIR / 'backups'
-UPLOADS_DIR = DATA_DIR / 'uploads'
-EXPORTS_DIR = DATA_DIR / 'exports'
-LOGS_DIR = DATA_DIR / 'logs'
-
-# Create all necessary directories
-for directory in [BACKUP_DIR, UPLOADS_DIR, EXPORTS_DIR, LOGS_DIR]:
-    directory.mkdir(exist_ok=True)
-    logger.info(f"Ensured directory exists: {directory}")
+st.sidebar.info(" Local Storage Mode")
 
 # Store paths in session state for easy access
 if 'storage_paths' not in st.session_state:
     st.session_state.storage_paths = {
-        'project_root': str(PROJECT_ROOT),
-        'data_dir': str(DATA_DIR),
+        'storage_dir': str(STORAGE_DIR),
         'db_path': str(DB_PATH),
         'backup_dir': str(BACKUP_DIR),
         'uploads_dir': str(UPLOADS_DIR),
-        'exports_dir': str(EXPORTS_DIR),
-        'logs_dir': str(LOGS_DIR)
+        'exports_dir': str(EXPORTS_DIR)
     }
-
-# VS Code development mode indicator
-VS_CODE_MODE = True
-logger.info(f"Starting Empower Reports (SECOND INSTANCE) in VS Code mode")
-logger.info(f"Project root: {PROJECT_ROOT}")
-logger.info(f"Database path: {DB_PATH}")
-
-
-# --------- Development Utilities
-
-def log_debug(message, level="INFO"):
-    """Enhanced logging for VS Code development"""
-    if VS_CODE_MODE:
-        logger.log(getattr(logging, level), f"[DEBUG] {message}")
-        # Also show in Streamlit for immediate feedback
-        if st.session_state.get('show_debug', False):
-            st.sidebar.markdown(f"🔍 **Debug:** {message}")
-
-def check_file_permissions():
-    """Check if we have proper file permissions"""
-    try:
-        test_file = DATA_DIR / 'permission_test.txt'
-        test_file.write_text('test')
-        test_file.unlink()
-        return True
-    except Exception as e:
-        log_debug(f"Permission check failed: {e}", "ERROR")
-        return False
-
-def get_database_info():
-    """Get detailed database information for debugging"""
-    try:
-        if DB_PATH.exists():
-            size = DB_PATH.stat().st_size
-            modified = datetime.fromtimestamp(DB_PATH.stat().st_mtime)
-            return {
-                'exists': True,
-                'size_mb': round(size / (1024 * 1024), 2),
-                'modified': modified.strftime('%Y-%m-%d %H:%M:%S'),
-                'path': str(DB_PATH)
-            }
-        else:
-            return {'exists': False, 'path': str(DB_PATH)}
-    except Exception as e:
-        log_debug(f"Error getting DB info: {e}", "ERROR")
-        return {'exists': False, 'error': str(e)}
 
 # -------------------------------
 # BACKUP AND RECOVERY FUNCTIONS
@@ -136,27 +67,20 @@ def backup_database():
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = BACKUP_DIR / f"empower_backup_{timestamp}.db"
         
-        log_debug(f"Creating backup: {backup_path}")
-        
         # Copy database file
         shutil.copy2(DB_PATH, backup_path)
         
         # Log the backup
-        backup_log = {
-            "timestamp": timestamp,
-            "backup_file": str(backup_path),
-            "size": os.path.getsize(backup_path),
-            "created_by": st.session_state.get('user_id', 'system')
-        }
-        
         with open(BACKUP_DIR / "backup_log.json", "a") as f:
-            json.dump(backup_log, f)
+            json.dump({
+                "timestamp": timestamp,
+                "backup_file": str(backup_path),
+                "size": os.path.getsize(backup_path)
+            }, f)
             f.write("\n")
         
-        log_debug(f"Backup created successfully: {backup_path}")
         return True, f"Backup created: {backup_path}"
     except Exception as e:
-        log_debug(f"Backup failed: {str(e)}", "ERROR")
         return False, f"Backup failed: {str(e)}"
 
 def restore_database(backup_file):
@@ -165,15 +89,10 @@ def restore_database(backup_file):
         # Create a backup of current database before restoring
         backup_database()
         
-        log_debug(f"Restoring from: {backup_file}")
-        
         # Restore from selected backup
         shutil.copy2(backup_file, DB_PATH)
-        
-        log_debug(f"Database restored successfully from: {backup_path}")
         return True, "Database restored successfully"
     except Exception as e:
-        log_debug(f"Restore failed: {str(e)}", "ERROR")
         return False, f"Restore failed: {str(e)}"
 
 def list_backups():
@@ -192,10 +111,8 @@ def list_backups():
         
         # Sort by date (newest first)
         backups.sort(key=lambda x: x["date"], reverse=True)
-        log_debug(f"Found {len(backups)} backups")
         return backups
     except Exception as e:
-        log_debug(f"Error listing backups: {str(e)}", "ERROR")
         return []
 
 def auto_backup_before_critical_operation(operation_name):
@@ -204,11 +121,9 @@ def auto_backup_before_critical_operation(operation_name):
     backup_path = BACKUP_DIR / f"auto_backup_{operation_name}_{timestamp}.db"
     
     try:
-        log_debug(f"Auto backup before {operation_name}")
         shutil.copy2(DB_PATH, backup_path)
         return True
     except Exception as e:
-        log_debug(f"Auto backup failed: {str(e)}", "ERROR")
         return False
 
 def check_and_create_periodic_backup():
@@ -230,7 +145,7 @@ def check_and_create_periodic_backup():
         if (datetime.now() - backup_date).days >= 1:
             backup_database()
     except Exception as e:
-        log_debug(f"Error in periodic backup: {str(e)}", "ERROR")
+        pass
 
 # -------------------------------
 # FILE UPLOAD PERSISTENCE
@@ -250,10 +165,8 @@ def persist_uploaded_file(uploaded_file, subfolder=""):
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         
-        log_debug(f"File saved: {file_path}")
         return str(file_path)
     except Exception as e:
-        log_debug(f"Error saving file: {str(e)}", "ERROR")
         return None
 
 def get_persisted_files(subfolder=""):
@@ -281,16 +194,22 @@ def get_persisted_files(subfolder=""):
         
         # Sort by date (newest first)
         files.sort(key=lambda x: x["date"], reverse=True)
-        log_debug(f"Found {len(files)} files in {subfolder or 'root'}")
         return files
     except Exception as e:
-        log_debug(f"Error listing files: {str(e)}", "ERROR")
         return []
 
-# Ensure storage directories exist and check permissions
-if not check_file_permissions():
-    st.error("⚠️ File permission issues detected. Please check your folder permissions.")
-    st.stop()
+# Ensure storage directories exist
+if not os.path.exists(STORAGE_DIR):
+    os.makedirs(STORAGE_DIR)
+
+if not os.path.exists(BACKUP_DIR):
+    os.makedirs(BACKUP_DIR)
+
+if not os.path.exists(UPLOADS_DIR):
+    os.makedirs(UPLOADS_DIR)
+
+if not os.path.exists(EXPORTS_DIR):
+    os.makedirs(EXPORTS_DIR)
 
 # Check for periodic backup
 check_and_create_periodic_backup()
@@ -507,31 +426,25 @@ def update_database_schema():
     # Create new tables if they don't exist
     if 'visitation_days' not in inspector.get_table_names():
         VisitationDay.__table__.create(ENGINE)
-        log_debug("Created visitation_days table")
     
     # Check if student_decisions table exists
     if 'student_decisions' not in inspector.get_table_names():
         StudentDecision.__table__.create(ENGINE)
-        log_debug("Created student_decisions table")
     
     # Check if component_marks table exists
     if 'component_marks' not in inspector.get_table_names():
         ComponentMark.__table__.create(ENGINE)
-        log_debug("Created component_marks table")
 
     # Behavior components table
     if 'behavior_components' not in inspector.get_table_names():
         BehaviorComponent.__table__.create(ENGINE)
-        log_debug("Created behavior_components table")
 
     # Classroom behavior responses
     if 'classroom_behavior_responses' not in inspector.get_table_names():
         ClassroomBehaviorResponse.__table__.create(ENGINE)
-        log_debug("Created classroom_behavior_responses table")
 
 Base.metadata.create_all(ENGINE)
 update_database_schema()
-log_debug("Database initialized successfully")
 
 # Seed default behavior components if none exist so teachers see the original set
 def seed_default_behavior_components():
@@ -562,7 +475,6 @@ def seed_default_behavior_components():
                 )
                 session.add(comp)
             session.commit()
-            log_debug("Seeded default behavior components")
     finally:
         try:
             session.close()
@@ -697,7 +609,6 @@ def log_audit(session, user_id, action, details=""):
     log = AuditLog(user_id=user_id, action=action, details=details)
     session.add(log)
     session.commit()
-    log_debug(f"Audit: {action} by user {user_id}")
 
 def init_report_design():
     session = Session()
@@ -706,7 +617,6 @@ def init_report_design():
         design = ReportDesign()
         session.add(design)
         session.commit()
-        log_debug("Initialized report design")
     session.close()
 
 def init_admin():
@@ -725,7 +635,6 @@ def init_admin():
         )
         session.add(admin)
         session.commit()
-        log_debug("Created default admin user")
     session.close()
 
 # Function to download image from URL and convert to base64
@@ -737,7 +646,7 @@ def download_logo_from_url(url):
         base64_str = base64.b64encode(image_bytes).decode('utf-8')
         return base64_str
     except Exception as e:
-        log_debug(f"Error downloading logo: {str(e)}", "ERROR")
+        st.error(f"Error downloading logo: {str(e)}")
         return None
 
 # Performance analysis functions
@@ -1401,46 +1310,7 @@ with st.sidebar:
         st.session_state.user_role = None
         st.session_state.user_id = None
         st.session_state.username = None
-        log_debug(f"User {st.session_state.username} logged out")
         st.rerun()
-
-# Add VS Code specific info to sidebar
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 💻 VS Code Development")
-
-# Database info
-db_info = get_database_info()
-if db_info.get('exists'):
-    st.sidebar.metric("Database", f"{db_info['size_mb']} MB")
-    st.sidebar.caption(f"📁 {db_info['path']}")
-else:
-    st.sidebar.warning("Database not found")
-    st.sidebar.caption("Will be created on first run")
-
-# Development options
-st.sidebar.markdown("### 🔧 Development Options")
-show_debug = st.sidebar.checkbox("Show Debug Info", value=st.session_state.get('show_debug', False))
-st.session_state.show_debug = show_debug
-
-if show_debug:
-    st.sidebar.markdown("### 📊 Debug Info")
-    st.sidebar.json(st.session_state.storage_paths)
-    
-    # Quick actions
-    if st.sidebar.button("🗑️ Clear Session State"):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.sidebar.success("Session state cleared")
-        st.rerun()
-    
-    if st.sidebar.button("📋 Test Database Connection"):
-        try:
-            session = Session()
-            test_query = session.execute("SELECT 1").fetchone()
-            st.sidebar.success("✅ Database connection OK")
-            session.close()
-        except Exception as e:
-            st.sidebar.error(f"❌ Database error: {e}")
 
 # -------------------------------
 # 9. MAIN MENU
@@ -1463,8 +1333,7 @@ if st.session_state.user_role == 'admin':
         "Data Export",
         "Change Login Details",
         "Visitation Day Management",  # New menu item for VD reports
-        "Storage Management",  # New menu item for storage management
-        "Development Tools"  # VS Code specific
+        "Storage Management"  # New menu item for storage management
     ])
 else:
     page = st.sidebar.selectbox("Menu", [
@@ -1564,140 +1433,6 @@ if page == "Dashboard":
         st.info("No activity logs yet")
     session.close()
 
-# NEW PAGE: Development Tools (VS Code specific)
-elif page == "Development Tools" and st.session_state.user_role == 'admin':
-    st.header("🛠️ Development Tools")
-    
-    st.info("🔧 These tools are specifically for VS Code development and debugging")
-    
-    tab1, tab2, tab3, tab4 = st.tabs(["Database Tools", "File System", "Logs", "System Info"])
-    
-    with tab1:
-        st.subheader("🗄️ Database Tools")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### Database Information")
-            db_info = get_database_info()
-            st.json(db_info)
-            
-            if st.button("🔄 Test Database Connection"):
-                try:
-                    session = Session()
-                    result = session.execute("SELECT COUNT(*) FROM users").fetchone()
-                    st.success(f"✅ Database OK - {result[0]} users found")
-                    session.close()
-                except Exception as e:
-                    st.error(f"❌ Database error: {e}")
-        
-        with col2:
-            st.markdown("#### Quick Actions")
-            
-            if st.button("📊 View All Tables"):
-                try:
-                    session = Session()
-                    inspector = inspect(ENGINE)
-                    tables = inspector.get_table_names()
-                    st.write("Tables in database:")
-                    for table in tables:
-                        st.write(f"- {table}")
-                    session.close()
-                except Exception as e:
-                    st.error(f"Error: {e}")
-            
-            if st.button("🗑️ Reset Database (DANGER!)"):
-                if st.checkbox("⚠️ I understand this will delete ALL data"):
-                    try:
-                        if DB_PATH.exists():
-                            DB_PATH.unlink()
-                        Base.metadata.create_all(ENGINE)
-                        init_admin()
-                        init_report_design()
-                        st.success("✅ Database reset successfully")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error resetting database: {e}")
-    
-    with tab2:
-        st.subheader("📁 File System")
-        
-        st.markdown("#### Directory Structure")
-        structure = {
-            "Project Root": str(PROJECT_ROOT),
-            "Data Directory": str(DATA_DIR),
-            "Database": str(DB_PATH),
-            "Backups": str(BACKUP_DIR),
-            "Uploads": str(UPLOADS_DIR),
-            "Exports": str(EXPORTS_DIR),
-            "Logs": str(LOGS_DIR)
-        }
-        
-        for key, value in structure.items():
-            path = Path(value)
-            exists = path.exists()
-            size = path.stat().st_size if exists else 0
-            
-            col1, col2, col3 = st.columns([2, 1, 1])
-            with col1:
-                st.write(f"**{key}**")
-                st.code(str(value))
-            with col2:
-                st.write("Exists:" if exists else "Missing:")
-                st.write("✅" if exists else "❌")
-            with col3:
-                if exists:
-                    st.write(f"Size: {size} bytes")
-        
-        st.markdown("#### File Permissions")
-        if check_file_permissions():
-            st.success("✅ File permissions are OK")
-        else:
-            st.error("❌ File permission issues detected")
-    
-    with tab3:
-        st.subheader("📋 Logs")
-        
-        log_file = PROJECT_ROOT / 'empower_reports.log'
-        if log_file.exists():
-            st.markdown("#### Recent Log Entries")
-            
-            # Read last 50 lines of log
-            with open(log_file, 'r') as f:
-                lines = f.readlines()[-50:]
-            
-            log_text = ''.join(lines)
-            st.text_area("Log Content", log_text, height=300)
-            
-            if st.button("🗑️ Clear Log"):
-                with open(log_file, 'w') as f:
-                    f.write("")
-                st.success("Log cleared")
-                st.rerun()
-        else:
-            st.info("No log file found")
-    
-    with tab4:
-        st.subheader("💻 System Information")
-        
-        st.markdown("#### Environment")
-        env_info = {
-            "Python Version": os.sys.version,
-            "Working Directory": os.getcwd(),
-            "Platform": os.name,
-            "VS Code Mode": VS_CODE_MODE,
-            "Debug Mode": st.session_state.get('show_debug', False)
-        }
-        
-        for key, value in env_info.items():
-            st.write(f"**{key}:** {value}")
-        
-        st.markdown("#### Session State")
-        session_keys = list(st.session_state.keys())
-        for key in session_keys:
-            if key not in ['storage_paths']:  # Skip long paths
-                st.write(f"**{key}:** {st.session_state[key]}")
-
 # NEW PAGE: Storage Management (for admin)
 elif page == "Storage Management" and st.session_state.user_role == 'admin':
     st.header("💾 Storage Management")
@@ -1721,7 +1456,7 @@ elif page == "Storage Management" and st.session_state.user_role == 'admin':
     
     with col3:
         try:
-            total_size = sum(f.stat().st_size for f in DATA_DIR.rglob('*') if f.is_file()) / (1024 * 1024)  # MB
+            total_size = sum(f.stat().st_size for f in STORAGE_DIR.rglob('*') if f.is_file()) / (1024 * 1024)  # MB
             st.metric("Total Storage", f"{total_size:.2f} MB")
         except:
             st.metric("Total Storage", "Unknown")
