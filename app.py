@@ -232,6 +232,10 @@ class User(Base):
     class_teacher_for = Column(String)
     gender = Column(String)
     phone_number = Column(String)
+    # Recovery fields
+    recovery_nickname = Column(String, nullable=True)
+    recovery_phone = Column(String, nullable=True)
+    recovery_city = Column(String, nullable=True)
 
 class Student(Base):
     __tablename__ = 'students'
@@ -1274,31 +1278,128 @@ if 'logged_in' not in st.session_state:
     st.session_state.user_role = None
     st.session_state.user_id = None
     st.session_state.username = None
+    st.session_state.recovery_mode = False
+    st.session_state.master_admin_mode = False
 
 if not st.session_state.logged_in:
-    st.sidebar.header("Login")
+    st.sidebar.header("🔐 Login")
     
-    with st.sidebar.form("login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        submit = st.form_submit_button("Login")
-        
-        if submit:
-            session = Session()
-            user = session.query(User).filter_by(email=username).first()
+    # Tabs for normal login, recovery login, and master admin
+    tab1, tab2, tab3 = st.sidebar.tabs(["Login", "Forgot Password", "Master Admin"])
+    
+    with tab1:
+        with st.form("login_form"):
+            username = st.text_input("Username/Email")
+            password = st.text_input("Password", type="password")
+            submit = st.form_submit_button("Login", use_container_width=True)
             
-            if user and user.password_hash == hashlib.sha256(password.encode()).hexdigest():
-                st.session_state.logged_in = True
-                st.session_state.user_role = user.role
-                st.session_state.user_id = user.id
-                st.session_state.username = user.name
-                session.close()
-                st.rerun()
-            else:
-                st.error("Invalid username or password")
-                session.close()
+            if submit:
+                session = Session()
+                user = session.query(User).filter_by(email=username).first()
+                
+                if user and user.password_hash == hashlib.sha256(password.encode()).hexdigest():
+                    st.session_state.logged_in = True
+                    st.session_state.user_role = user.role
+                    st.session_state.user_id = user.id
+                    st.session_state.username = user.name
+                    st.session_state.recovery_mode = False
+                    session.close()
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password")
+                    session.close()
+        
+        st.info("**Default login:** admin / admin123")
     
-    st.info("Default login: **admin** / **admin123**")
+    with tab2:
+        st.subheader("Account Recovery")
+        st.write("Verify your identity using your recovery information:")
+        
+        with st.form("recovery_form"):
+            recovery_username = st.text_input("Username/Email")
+            recovery_nickname = st.text_input("Nickname")
+            recovery_phone = st.text_input("Phone Number")
+            recovery_city = st.text_input("City Name")
+            
+            verify_btn = st.form_submit_button("Verify Identity", use_container_width=True)
+            
+            if verify_btn:
+                session = Session()
+                user = session.query(User).filter_by(email=recovery_username).first()
+                
+                if user and (
+                    user.recovery_nickname and user.recovery_nickname.lower() == recovery_nickname.lower() and
+                    user.recovery_phone and user.recovery_phone == recovery_phone and
+                    user.recovery_city and user.recovery_city.lower() == recovery_city.lower()
+                ):
+                    st.session_state.recovery_mode = True
+                    st.session_state.recovery_user_id = user.id
+                    st.session_state.recovery_username = user.name
+                    session.close()
+                    st.success("✅ Identity verified! You can now reset your password.")
+                    st.info("Go to 'Reset Password' option below.")
+                else:
+                    st.error("❌ Recovery information does not match. Please verify your details.")
+                    session.close()
+        
+        st.divider()
+        
+        if st.session_state.recovery_mode:
+            st.subheader("🔄 Reset Your Password")
+            
+            with st.form("reset_password_form"):
+                new_password = st.text_input("New Password", type="password")
+                confirm_password = st.text_input("Confirm Password", type="password")
+                reset_btn = st.form_submit_button("Reset Password", use_container_width=True)
+                
+                if reset_btn:
+                    if not new_password or not confirm_password:
+                        st.error("Please fill in all fields")
+                    elif new_password != confirm_password:
+                        st.error("Passwords do not match")
+                    else:
+                        try:
+                            session = Session()
+                            user = session.query(User).get(st.session_state.recovery_user_id)
+                            if user:
+                                user.password_hash = hashlib.sha256(new_password.encode()).hexdigest()
+                                session.commit()
+                                log_audit(session, user.id, "password_reset_via_recovery", "Password reset using recovery information")
+                                st.success("✅ Password reset successfully! You can now login with your new password.")
+                                st.session_state.recovery_mode = False
+                                session.close()
+                                time.sleep(2)
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Error resetting password: {str(e)}")
+                            session.rollback()
+                            session.close()
+    
+    with tab3:
+        st.subheader("🔧 Master Admin Panel")
+        st.warning("⚠️ Emergency database reset access only. Use only if the system is in a critical state.")
+        
+        with st.form("master_admin_login"):
+            st.write("**Authenticate as Master Admin:**")
+            master_username = st.text_input("Username", placeholder="Master Admin username")
+            master_password = st.text_input("Password", type="password", placeholder="Master Admin password")
+            authenticate_btn = st.form_submit_button("Authenticate", use_container_width=True)
+            
+            if authenticate_btn:
+                master_username_correct = "MikaelJ46"
+                master_password_hash = hashlib.sha256("@mikaelJ46".encode()).hexdigest()
+                entered_password_hash = hashlib.sha256(master_password.encode()).hexdigest()
+                
+                if master_username == master_username_correct and entered_password_hash == master_password_hash:
+                    st.session_state.master_admin_mode = True
+                    st.session_state.master_admin_authenticated = True
+                    st.success("✅ Master Admin authenticated!")
+                    st.info("You now have access to emergency database reset functions.")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("❌ Invalid Master Admin credentials")
+    
     st.stop()
 
 # Logout
@@ -1319,21 +1420,20 @@ st.sidebar.title(f"Role: {st.session_state.user_role.title()}")
 if st.session_state.user_role == 'admin':
     page = st.sidebar.selectbox("Menu", [
         "Dashboard", 
-        "Performance Analytics",  # New menu item
+        "Performance Analytics",
         "Admin Management",
         "Staff Management", 
         "Student Enrollment", 
         "Academic Calendar",
         "Classroom Behavior",
-        "Student Decisions",  # New menu item for term 3 decisions
+        "Student Decisions",
         "Discipline Reports",
         "Generate Reports",
         "Report Design",
         "Data Export",
         "Change Login Details",
-        "Visitation Day Management",  # New menu item for VD reports
-        "Storage Management",  # New menu item for storage management
-        "Master Admin"  # Master admin database reset panel
+        "Visitation Day Management",
+        "Storage Management"
     ])
 else:
     page = st.sidebar.selectbox("Menu", [
@@ -1346,6 +1446,121 @@ else:
         "Change Login Details"
     ])
 
+# Check if Master Admin is authenticated
+if st.session_state.get("master_admin_mode", False) and st.session_state.get("master_admin_authenticated", False):
+    # Show Master Admin panel
+    st.header("🔐 Master Admin Emergency Panel")
+    
+    # Sidebar for Master Admin
+    with st.sidebar:
+        st.success("🔧 Master Admin Mode Active")
+        if st.button("Exit Master Admin", use_container_width=True):
+            st.session_state.master_admin_mode = False
+            st.session_state.master_admin_authenticated = False
+            st.rerun()
+    
+    st.warning("⚠️ **CRITICAL MODE**: You are in Master Admin emergency reset mode. Use these tools only in critical situations.")
+    
+    session = Session()
+    
+    tab1, tab2 = st.tabs(["Delete All Users", "Reset Database"])
+    
+    with tab1:
+        st.subheader("🗑️ Delete All Users")
+        st.write("This will remove all users from the system except the default admin.")
+        st.info("The default admin will be automatically recreated with credentials:\n- Username: **admin**\n- Password: **admin123**")
+        
+        try:
+            users_df = pd.read_sql("SELECT id, name, email, role FROM users WHERE email != 'admin'", ENGINE)
+            if not users_df.empty:
+                st.write(f"**Users to be deleted ({len(users_df)}):**")
+                st.dataframe(users_df, use_container_width=True)
+                
+                if st.button("🗑️ DELETE ALL USERS", use_container_width=True, key="delete_users_master"):
+                    try:
+                        session.query(User).filter(User.email != 'admin').delete()
+                        session.commit()
+                        init_admin()
+                        st.success("✅ All users deleted successfully! Default admin recreated.")
+                        st.info("Default credentials:\n- Username: admin\n- Password: admin123")
+                    except Exception as e:
+                        st.error(f"❌ Error: {str(e)}")
+                        session.rollback()
+            else:
+                st.info("No users to delete (only admin exists)")
+        except Exception as e:
+            st.error(f"❌ Error listing users: {str(e)}")
+    
+    with tab2:
+        st.subheader("🔄 Reset Database to Factory Default")
+        st.error("**⚠️ DESTRUCTIVE ACTION**: This will permanently delete ALL data in the system!")
+        
+        st.write("**Data that will be PERMANENTLY DELETED:**")
+        st.write("- All users (except default admin)")
+        st.write("- All students and their records")
+        st.write("- All marks, grades, and assessments")
+        st.write("- All academic terms")
+        st.write("- All behavior records")
+        st.write("- All discipline reports")
+        st.write("- All student decisions")
+        st.write("- All visitation day records")
+        st.write("- All audit logs")
+        st.write("- All system data")
+        
+        st.divider()
+        
+        confirm_text = st.text_input(
+            "**Type 'FACTORY RESET' to confirm:**",
+            placeholder="Type exactly: FACTORY RESET",
+            help="This is a safety measure to prevent accidental resets"
+        )
+        
+        if st.button("🔄 PERFORM FACTORY RESET", use_container_width=True, key="factory_reset"):
+            if confirm_text == "FACTORY RESET":
+                try:
+                    # Delete all data in order
+                    session.query(AuditLog).delete()
+                    session.query(ClassroomBehaviorResponse).delete()
+                    session.query(ClassroomBehavior).delete()
+                    session.query(BehaviorComponent).delete()
+                    session.query(StudentDecision).delete()
+                    session.query(VisitationDay).delete()
+                    session.query(DisciplineReport).delete()
+                    session.query(Mark).delete()
+                    session.query(ComponentMark).delete()
+                    session.query(Student).delete()
+                    session.query(AcademicTerm).delete()
+                    session.query(User).delete()
+                    session.query(ReportDesign).delete()
+                    
+                    session.commit()
+                    
+                    # Reinitialize defaults
+                    init_admin()
+                    init_report_design()
+                    seed_default_behavior_components()
+                    
+                    st.success("✅ FACTORY RESET COMPLETE!")
+                    st.info("All data has been cleared and system restored to factory defaults.")
+                    st.info("**Default admin credentials:**\n- Username: admin\n- Password: admin123")
+                    
+                    session.close()
+                    time.sleep(2)
+                    st.session_state.master_admin_mode = False
+                    st.session_state.master_admin_authenticated = False
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"❌ Factory reset failed: {str(e)}")
+                    session.rollback()
+            else:
+                if confirm_text:
+                    st.error(f"❌ Confirmation text incorrect. You entered: '{confirm_text}' but it must be exactly 'FACTORY RESET'")
+    
+    session.close()
+    st.stop()
+
+# Normal application flow continues below
 # -------------------------------
 # 10. PAGES - Dashboard
 # -------------------------------
@@ -2983,45 +3198,126 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
 # PAGE: Change Login Details
 # ========================
 elif page == "Change Login Details":
-    st.header(" Change Login Details")
+    st.header("🔐 Change Login Details & Recovery Settings")
     session = Session()
     user = session.query(User).get(st.session_state.user_id)
     
-    with st.form("change_login"):
-        st.subheader("Update Your Credentials")
-        new_email = st.text_input("New Email/Username", value=user.email)
-        current_pass = st.text_input("Current Password*", type="password")
-        new_pass = st.text_input("New Password (leave blank to keep current)", type="password")
-        confirm_pass = st.text_input("Confirm New Password", type="password")
+    tab1, tab2 = st.tabs(["Login Credentials", "Recovery Settings"])
+    
+    with tab1:
+        st.subheader("Update Your Login Credentials")
+        st.write("Change your email/username and password here.")
         
-        if st.form_submit_button("Update Login Details", use_container_width=True):
-            if hashlib.sha256(current_pass.encode()).hexdigest() != user.password_hash:
-                st.error(" Current password is incorrect")
-            elif new_pass and new_pass != confirm_pass:
-                st.error(" New passwords don't match")
-            elif session.query(User).filter(User.email == new_email, User.id != user.id).first():
-                st.error(" Email already taken by another user")
+        with st.form("change_login"):
+            new_email = st.text_input("New Email/Username", value=user.email)
+            current_pass = st.text_input("Current Password*", type="password", help="Required to verify your identity")
+            new_pass = st.text_input("New Password (leave blank to keep current)", type="password")
+            confirm_pass = st.text_input("Confirm New Password", type="password")
+            
+            if st.form_submit_button("Update Login Details", use_container_width=True):
+                if hashlib.sha256(current_pass.encode()).hexdigest() != user.password_hash:
+                    st.error("❌ Current password is incorrect")
+                elif new_pass and new_pass != confirm_pass:
+                    st.error("❌ New passwords don't match")
+                elif session.query(User).filter(User.email == new_email, User.id != user.id).first():
+                    st.error("❌ Email already taken by another user")
+                else:
+                    try:
+                        user.email = new_email
+                        if new_pass:
+                            user.password_hash = hashlib.sha256(new_pass.encode()).hexdigest()
+                        session.commit()
+                        log_audit(session, st.session_state.user_id, "change_login", new_email)
+                        st.success("✅ Login details updated! Please login again with new credentials.")
+                        st.session_state.logged_in = False
+                        session.close()
+                        time.sleep(1)
+                        st.rerun()
+                    except Exception as e:
+                        session.rollback()
+                        st.error(f"❌ Error updating login details: {str(e)}")
+    
+    with tab2:
+        st.subheader("Setup Account Recovery")
+        st.write("Set up recovery information to regain access if you forget your password.")
+        st.info("📌 These details will be used to verify your identity if you use the 'Forgot Password' option during login.")
+        
+        with st.form("recovery_settings"):
+            recovery_nickname = st.text_input(
+                "Recovery Nickname*",
+                value=user.recovery_nickname or "",
+                help="A unique nickname only you know (e.g., 'VillageNameChild')",
+                placeholder="Enter a memorable nickname"
+            )
+            
+            recovery_phone = st.text_input(
+                "Recovery Phone Number*",
+                value=user.recovery_phone or "",
+                help="A phone number associated with your account",
+                placeholder="Enter your phone number"
+            )
+            
+            recovery_city = st.text_input(
+                "Recovery City Name*",
+                value=user.recovery_city or "",
+                help="Your hometown or city name",
+                placeholder="Enter your city name"
+            )
+            
+            current_password = st.text_input(
+                "Current Password*",
+                type="password",
+                help="Required to confirm changes"
+            )
+            
+            if st.form_submit_button("Save Recovery Settings", use_container_width=True):
+                if hashlib.sha256(current_password.encode()).hexdigest() != user.password_hash:
+                    st.error("❌ Current password is incorrect")
+                elif not recovery_nickname or not recovery_phone or not recovery_city:
+                    st.error("❌ All recovery fields are required")
+                else:
+                    try:
+                        user.recovery_nickname = recovery_nickname.strip()
+                        user.recovery_phone = recovery_phone.strip()
+                        user.recovery_city = recovery_city.strip()
+                        session.commit()
+                        log_audit(session, st.session_state.user_id, "update_recovery_settings", "Recovery information updated")
+                        st.success("✅ Recovery settings saved successfully!")
+                        st.info("💡 You can now use these details to recover your account if you forget your password.")
+                    except Exception as e:
+                        session.rollback()
+                        st.error(f"❌ Error saving recovery settings: {str(e)}")
+        
+        st.divider()
+        st.subheader("Your Current Recovery Information")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if user.recovery_nickname:
+                st.metric("Nickname", "✅ Set")
             else:
-                try:
-                    user.email = new_email
-                    if new_pass:
-                        user.password_hash = hashlib.sha256(new_pass.encode()).hexdigest()
-                    session.commit()
-                    log_audit(session, st.session_state.user_id, "change_login", new_email)
-                    st.success(" Login details updated! Please login again with new credentials.")
-                    st.session_state.logged_in = False
-                    session.close()
-                    time.sleep(1)
-                    st.rerun()
-                except Exception as e:
-                    session.rollback()
-                    st.error(f" Error updating login details: {str(e)}")
+                st.metric("Nickname", "❌ Not Set")
+        with col2:
+            if user.recovery_phone:
+                st.metric("Phone", "✅ Set")
+            else:
+                st.metric("Phone", "❌ Not Set")
+        with col3:
+            if user.recovery_city:
+                st.metric("City", "✅ Set")
+            else:
+                st.metric("City", "❌ Not Set")
+        
+        if user.recovery_nickname and user.recovery_phone and user.recovery_city:
+            st.success("✅ Your account has complete recovery information. You can recover your account anytime!")
+        else:
+            st.warning("⚠️ Your recovery information is incomplete. Complete all three fields to enable account recovery.")
     
     session.close()
 
-# Sidebar footer for VS Code
+# Sidebar footer
 st.sidebar.markdown("---")
-st.sidebar.info("💡 **Empower Reports v4.0 - VS Code Dev**\n\nFeatures:\n- ✅ Enhanced debugging\n- ✅ Development tools\n- ✅ Local file storage\n- ✅ Detailed logging\n- ✅ System diagnostics\n- ✅ All original features\n\n[View Documentation](https://github.com)")
+st.sidebar.info("💡 **Empower Reports** - Secure & Reliable\n\nFeatures:\n- ✅ Multi-level security\n- ✅ Account recovery\n- ✅ Local storage\n- ✅ Data encryption\n- ✅ Audit logging")
 
 # Backup reminder for admins
 if st.session_state.user_role == 'admin':
@@ -3033,131 +3329,6 @@ if st.session_state.user_role == 'admin':
     if total_students > 0 or total_marks > 0:
         st.sidebar.warning("📌 **Reminder**: Export your data regularly!\n\nGo to **Data Export** to backup.")
 
-# MASTER ADMIN SECTION: Database Reset Panel
-elif page == "Master Admin":
-    st.header("🔐 Master Admin Panel")
-    
-    st.warning("⚠️ **WARNING**: This section allows resetting the entire database. Use with extreme caution!")
-    
-    # Authentication
-    st.subheader("Authentication Required")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        username = st.text_input("Username", placeholder="Enter master username")
-    with col2:
-        password = st.text_input("Password", type="password", placeholder="Enter master password")
-    
-    # Check credentials
-    master_username = "MikaelJ46"
-    master_password_hash = hashlib.sha256("@mikaelJ46".encode()).hexdigest()
-    
-    if st.button("Authenticate", use_container_width=True):
-        entered_password_hash = hashlib.sha256(password.encode()).hexdigest()
-        
-        if username == master_username and entered_password_hash == master_password_hash:
-            st.success("✅ Authentication successful!")
-            st.session_state.master_admin_authenticated = True
-        else:
-            st.error("❌ Invalid credentials!")
-            st.session_state.master_admin_authenticated = False
-    
-    if st.session_state.get("master_admin_authenticated", False):
-        st.divider()
-        st.subheader("Database Management")
-        
-        tab1, tab2 = st.tabs(["Delete All Users", "Reset Database"])
-        
-        with tab1:
-            st.warning("⚠️ **Delete All Users**: This will remove all users from the system except admin. The default admin (username: 'admin', password: 'admin123') will be recreated.")
-            
-            st.write("Users that will be deleted:")
-            session = Session()
-            try:
-                users_df = pd.read_sql("SELECT id, name, email, role FROM users WHERE email != 'admin'", ENGINE)
-                if not users_df.empty:
-                    st.dataframe(users_df, use_container_width=True)
-                    
-                    if st.button("🗑️ DELETE ALL USERS", use_container_width=True, key="delete_users"):
-                        try:
-                            # Delete all users except admin
-                            session.query(User).filter(User.email != 'admin').delete()
-                            session.commit()
-                            
-                            # Recreate default admin
-                            init_admin()
-                            
-                            st.success("✅ All users deleted successfully! Default admin has been recreated.")
-                            st.info("Default credentials:\n- Username: admin\n- Password: admin123")
-                        except Exception as e:
-                            st.error(f"❌ Error deleting users: {str(e)}")
-                            session.rollback()
-                else:
-                    st.info("No users to delete (only admin exists)")
-            finally:
-                session.close()
-        
-        with tab2:
-            st.warning("⚠️ **RESET DATABASE**: This will completely reset the database to its default state, deleting ALL data including students, marks, reports, etc. This action cannot be undone!")
-            
-            st.write("**Data that will be deleted:**")
-            st.write("- All users (except default admin)")
-            st.write("- All students")
-            st.write("- All marks and grades")
-            st.write("- All academic terms")
-            st.write("- All classroom behavior records")
-            st.write("- All discipline reports")
-            st.write("- All student decisions")
-            st.write("- All visitation day records")
-            st.write("- All audit logs")
-            
-            st.markdown("---")
-            
-            confirm_text = st.text_input(
-                "Type 'RESET DATABASE' to confirm reset:",
-                placeholder="Type the confirmation text...",
-                help="This is a safety measure to prevent accidental resets"
-            )
-            
-            if st.button("🔄 RESET DATABASE TO DEFAULT", use_container_width=True, key="reset_db"):
-                if confirm_text == "RESET DATABASE":
-                    try:
-                        session = Session()
-                        
-                        # Delete all data
-                        session.query(AuditLog).delete()
-                        session.query(ClassroomBehaviorResponse).delete()
-                        session.query(ClassroomBehavior).delete()
-                        session.query(BehaviorComponent).delete()
-                        session.query(StudentDecision).delete()
-                        session.query(VisitationDay).delete()
-                        session.query(DisciplineReport).delete()
-                        session.query(Mark).delete()
-                        session.query(ComponentMark).delete()
-                        session.query(Student).delete()
-                        session.query(AcademicTerm).delete()
-                        session.query(User).delete()
-                        session.query(ReportDesign).delete()
-                        
-                        session.commit()
-                        session.close()
-                        
-                        # Reinitialize default data
-                        init_admin()
-                        init_report_design()
-                        seed_default_behavior_components()
-                        
-                        st.success("✅ Database reset successfully!")
-                        st.info("All data has been cleared and default settings restored.")
-                        st.info("**Default admin credentials:**\n- Username: admin\n- Password: admin123")
-                        
-                    except Exception as e:
-                        st.error(f"❌ Error resetting database: {str(e)}")
-                        session.rollback()
-                        session.close()
-                else:
-                    if confirm_text:
-                        st.error(f"❌ Confirmation text does not match. You entered: '{confirm_text}'")
-    else:
-        if username or password:
-            st.info("Please enter valid credentials to proceed.")
+# Sidebar footer
+st.sidebar.markdown("---")
+st.sidebar.info("💡 **Empower Reports** - Secure & Reliable\n\nFeatures:\n- ✅ Multi-level security\n- ✅ Account recovery\n- ✅ Local storage\n- ✅ Data encryption\n- ✅ Audit logging")
