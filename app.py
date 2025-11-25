@@ -5473,7 +5473,17 @@ elif page == "Data Export" and st.session_state.user_role == 'admin':
 elif page == "Change Login Details":
     st.header(" Change Login Details")
     session = Session()
-    user = session.query(User).get(st.session_state.user_id)
+    user = None
+    try:
+        if st.session_state.user_id is not None:
+            user = session.query(User).get(st.session_state.user_id)
+    except Exception:
+        user = None
+
+    if not user:
+        st.warning("No user found or you are not logged in. Please login first or contact the Master Admin to reset your account.")
+        session.close()
+        st.stop()
     
     with st.form("change_login"):
         st.subheader("Update Your Credentials")
@@ -5484,9 +5494,10 @@ elif page == "Change Login Details":
         st.markdown("---")
         st.subheader("Recovery Details (used to recover account if you forget your password)")
         st.info("Provide at least one recovery detail. Keep it memorable but private.")
-        new_recovery_phone = st.text_input("Phone number (digits)", value=user.recovery_phone or "")
-        new_recovery_city = st.text_input("City of birth", value=user.recovery_city or "")
-        new_recovery_nickname = st.text_input("Nickname / Pet or spouse name", value=user.recovery_nickname or "")
+        # Use safe attribute access in case recovery fields are None
+        new_recovery_phone = st.text_input("Phone number (digits)", value=(user.recovery_phone or ""))
+        new_recovery_city = st.text_input("City of birth", value=(user.recovery_city or ""))
+        new_recovery_nickname = st.text_input("Nickname / Pet or spouse name", value=(user.recovery_nickname or ""))
         
         if st.form_submit_button("Update Login Details", use_container_width=True):
             if hashlib.sha256(current_pass.encode()).hexdigest() != user.password_hash:
