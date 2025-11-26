@@ -4788,23 +4788,35 @@ elif page == "Discipline Reports":
         st.subheader("All Discipline Reports (Message-style)")
 
         # Discipline Inbox (Messages) - shows incoming discipline report messages for admins
-        st.markdown("### Discipline Inbox (Messages)")
+        st.markdown("### 🚨 Discipline Inbox (Discipline Report Messages)")
         try:
             disc_msgs = pd.read_sql("""
                 SELECT m.*, u.name as sender_name
                 FROM messages m
                 LEFT JOIN users u ON m.sender_id = u.id
-                WHERE m.subject LIKE '%Discipline report%'
-                OR m.subject LIKE '%[Broadcast] Discipline report%'
+                WHERE m.message_type = 'discipline'
+                OR m.subject LIKE '%Discipline report%'
                 ORDER BY m.created_at DESC
             """, ENGINE)
         except Exception:
             disc_msgs = pd.DataFrame()
 
         if not disc_msgs.empty:
+            st.info(f"Found {len(disc_msgs)} discipline messages")
             for _, msg in disc_msgs.iterrows():
-                with st.expander(f"{msg['subject']} — from {msg.get('sender_name','System')} ({msg['created_at']})"):
+                # Enhanced expander header with status badges
+                report_id_display = f" [Report #{msg.get('related_report_id')}]" if msg.get('related_report_id') else ""
+                read_badge = "✓" if msg.get('read') else "🔔"
+                header_text = f"{read_badge} {msg['subject']}{report_id_display} — from {msg.get('sender_name','System')} ({msg['created_at']})"
+                
+                with st.expander(header_text):
+                    # Show message type info
+                    st.caption(f"📌 Type: **Discipline Report** | Read: {msg.get('read')}")
+                    if msg.get('related_report_id'):
+                        st.caption(f"📎 Linked to Report ID: **{msg.get('related_report_id')}**")
+                    
                     st.write(msg['body'])
+                    
                     cols = st.columns([3,1])
                     with cols[1]:
                         # mark read button
@@ -4817,18 +4829,21 @@ elif page == "Discipline Reports":
 
                     # Reply form
                     with st.form(f"reply_disc_{msg['id']}"):
-                        reply_text = st.text_area("Reply to teacher", value="")
-                        if st.form_submit_button("Send Reply"):
+                        reply_text = st.text_area("Reply to teacher", value="", key=f"reply_text_{msg['id']}")
+                        if st.form_submit_button("Send Reply (as Discipline Response)"):
                             try:
                                 recipient = int(msg['sender_id']) if msg.get('sender_id') else None
                                 subj = f"Re: {msg['subject']}"
-                                send_message(session, st.session_state.user_id, recipient, subj, reply_text, is_broadcast=False)
+                                # Send as discipline type so teacher knows it's a formal response
+                                send_message(session, st.session_state.user_id, recipient, subj, reply_text, 
+                                           is_broadcast=False, message_type='discipline', 
+                                           related_report_id=msg.get('related_report_id'))
                                 # mark original message read
                                 try:
                                     mark_message_read(session, int(msg['id']))
                                 except Exception:
                                     pass
-                                st.success("Reply sent")
+                                st.success("Discipline response sent to teacher")
                                 safe_rerun()
                             except Exception as e:
                                 st.error(f"Could not send reply: {e}")
@@ -5399,12 +5414,25 @@ elif page == "Communications":
                     except Exception:
                         pass
 
-                    # Show message type label
-                    mtype = row.get('message_type') if row.get('message_type') else ('Discipline' if row.get('related_report_id') else 'Message')
-                    read_flag = "(Unread)" if not row['read'] else ""
-                    st.markdown(f"**{row['subject']}** {read_flag}")
-                    st.write(f"From: {row.get('sender_name','System')} — {row['created_at']} — Type: {mtype}")
+                    # Determine message type and badge
+                    message_type = row.get('message_type') or ('discipline' if row.get('related_report_id') else 'standard')
+                    if message_type == 'discipline':
+                        type_badge = "🚨 **DISCIPLINE REPORT**"
+                        type_color = "red"
+                    else:
+                        type_badge = "📧 **MESSAGE**"
+                        type_color = "blue"
+                    
+                    read_flag = "(Unread)" if not row['read'] else "(Read)"
+                    st.markdown(f"**{row['subject']}** — {type_badge} {read_flag}")
+                    
+                    # Show sender and report ID if applicable
+                    sender_info = f"From: {row.get('sender_name','System')} — {row['created_at']}"
+                    if row.get('related_report_id'):
+                        sender_info += f" — Report ID: {row.get('related_report_id')}"
+                    st.write(sender_info)
                     st.write(row['body'])
+                    
                 with cols[2]:
                     # Keep manual mark-read for compatibility
                     if st.button(f"Mark Read {row['id']}", key=f"mr{row['id']}"):
