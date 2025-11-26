@@ -1521,7 +1521,7 @@ def fetch_behavior_data(student_id, term_id):
     import sys
     
     try:
-        # Try legacy table first
+        # Try legacy table first - but only if it has actual values (not all nulls)
         behavior_query = f"""
             SELECT punctuality, attendance, manners, general_behavior, 
                    organisational_skills, adherence_to_uniform, leadership_skills,
@@ -1532,10 +1532,15 @@ def fetch_behavior_data(student_id, term_id):
         """
         behavior_result = pd.read_sql(behavior_query, ENGINE)
         if not behavior_result.empty:
-            print(f"DEBUG: Using legacy classroom_behavior table", file=sys.stderr)
-            result = behavior_result.iloc[0].to_dict()
-            print(f"DEBUG: Legacy result keys: {list(result.keys())}", file=sys.stderr)
-            return result
+            result_dict = behavior_result.iloc[0].to_dict()
+            # Check if this row has ANY non-null values
+            has_values = any(v is not None and pd.notna(v) for v in result_dict.values())
+            if has_values:
+                print(f"DEBUG: Using legacy classroom_behavior table (has values)", file=sys.stderr)
+                print(f"DEBUG: Legacy result keys: {list(result_dict.keys())}", file=sys.stderr)
+                return result_dict
+            else:
+                print(f"DEBUG: Legacy classroom_behavior table exists but all values are NULL, falling back to responses", file=sys.stderr)
 
         # Fallback: build from responses joined to components
         # FIX: Use INNER JOIN to ensure we only get rows with valid components
@@ -1554,7 +1559,7 @@ def fetch_behavior_data(student_id, term_id):
         """
         resp_df = pd.read_sql(resp_q, ENGINE)
         
-        print(f"DEBUG: SQL returned {len(resp_df)} rows", file=sys.stderr)
+        print(f"DEBUG: SQL returned {len(resp_df)} rows from classroom_behavior_responses", file=sys.stderr)
         print(f"DEBUG: resp_df columns: {list(resp_df.columns)}", file=sys.stderr)
         if len(resp_df) > 0:
             print(f"DEBUG: resp_df:\n{resp_df.to_string()}", file=sys.stderr)
