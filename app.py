@@ -90,45 +90,39 @@ def backup_database():
         return True, f"Backup created: {backup_path}"
     except Exception as e:
         return False, f"Backup failed: {str(e)}"
+                # If a specific message id was requested to open, use it to expand that message
+                target_id = st.session_state.pop('open_message_id', None) if st.session_state.get('open_message_id') else None
+                for _, row in inbox.iterrows():
+                    mid = int(row['id'])
+                    summary = f"{row.get('subject','(no subject)')} — From: {row.get('sender_name','System')}"
+                    # show expander, expanded when it's the target
+                    with st.expander(summary, expanded=(mid == target_id)):
+                        # Auto-mark as read when expanded (viewed)
+                        try:
+                            if not row.get('read'):
+                                mark_message_read(session, mid)
+                                row['read'] = True
+                        except Exception:
+                            pass
 
-def restore_database(backup_file):
-    """Restore database from a backup file"""
-    try:
-        # Create a backup of current database before restoring
-        backup_database()
-        
-        # Restore from selected backup
-        shutil.copy2(backup_file, DB_PATH)
-        return True, "Database restored successfully"
-    except Exception as e:
-        return False, f"Restore failed: {str(e)}"
-
-def list_backups():
-    """List all available backups"""
-    try:
-        backups = []
-        for file in BACKUP_DIR.glob("empower_backup_*.db"):
-            backups.append({
-                "name": file.name,
-                "path": str(file),
-                "size": os.path.getsize(file),
-                "date": datetime.fromtimestamp(file.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
-            })
-        
-        # Sort by date (newest first)
-        backups.sort(key=lambda x: x["date"], reverse=True)
-        return backups
-    except Exception as e:
-        st.error(f"Error listing backups: {str(e)}")
-        return []
-
-def auto_backup_before_critical_operation(operation_name):
-    """Create an automatic backup before critical operations"""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = BACKUP_DIR / f"auto_backup_{operation_name}_{timestamp}.db"
-    
-    try:
-        shutil.copy2(DB_PATH, backup_path)
+                        message_type = row.get('message_type') or ('discipline' if row.get('related_report_id') else 'message')
+                        badge = '🚨 Discipline Report' if message_type == 'discipline' else '📧 Message'
+                        read_flag = '(Unread)' if not row['read'] else '(Read)'
+                        st.markdown(f"**{row.get('subject','No subject')}** — {badge} {read_flag}")
+                        info_line = f"From: {row.get('sender_name','System')} — {row.get('created_at')}"
+                        if row.get('related_report_id'):
+                            info_line += f" — Report ID: {row.get('related_report_id')}"
+                        st.write(info_line)
+                        st.write(row['body'])
+                        cols = st.columns([4,1])
+                        with cols[1]:
+                            if st.button("Mark Read", key=f"mr_{mid}"):
+                                try:
+                                    mark_message_read(session, mid)
+                                    st.session_state['inbox_refresh'] = True
+                                    safe_rerun()
+                                except Exception:
+                                    st.error("Could not mark message as read")
         return True
     except Exception as e:
         st.error(f"Auto backup failed: {str(e)}")
@@ -1913,6 +1907,42 @@ st.sidebar.info(" Local Storage")
 # -------------------------------
 st.sidebar.title(f"Role: {st.session_state.user_role.title()}")
 
+# -------------------------------
+# Notifications (sidebar)
+# -------------------------------
+try:
+    notif_sess = Session()
+    # fetch recent messages for this user (including broadcasts)
+    notifs = pd.read_sql(f"""
+        SELECT m.id, m.subject, m.body, m.read, m.message_type, m.related_report_id, m.created_at
+        FROM messages m
+        WHERE (m.is_broadcast = 1 OR m.recipient_id = {st.session_state.user_id})
+        ORDER BY m.created_at DESC
+        LIMIT 8
+    """, ENGINE)
+    if notifs is not None and notifs.shape[0] > 0:
+        st.sidebar.markdown("**Notifications**")
+        for _, n in notifs.iterrows():
+            summary = (n['subject'] or '')
+            # compact body preview
+            body_preview = (n['body'] or '')[:80].replace('\n', ' ')
+            mtype = (n['message_type'] or ( 'discipline' if n.get('related_report_id') else 'message'))
+            badge = '🚨' if mtype == 'discipline' else '📧'
+            key = f"notif_btn_{int(n['id'])}"
+            cols = st.sidebar.columns([8,2])
+            cols[0].markdown(f"{badge} **{summary}** — {body_preview}")
+            if cols[1].button("Open", key=key):
+                # set navigation target and message id then rerun
+                st.session_state['navigate_to'] = 'Discipline Reports' if mtype == 'discipline' else 'Communications'
+                st.session_state['open_message_id'] = int(n['id'])
+                try:
+                    safe_rerun()
+                except Exception:
+                    pass
+    notif_sess.close()
+except Exception:
+    pass
+
 # AI Chat UI removed
 
 
@@ -1954,6 +1984,13 @@ else:
         "Communications",
         "Change Login Details"
     ])
+
+# If a navigation request was set by notifications, honor it and clear the request
+if st.session_state.get('navigate_to'):
+    try:
+        page = st.session_state.pop('navigate_to')
+    except Exception:
+        page = page
 
 # ============================================
 # MASTER ADMIN PAGES (Special Access Level)
