@@ -1522,7 +1522,7 @@ def fetch_behavior_data(student_id, term_id):
 
         # Fallback: build from responses joined to components
         resp_q = f"""
-            SELECT r.component_id, r.value, bc.display_label
+            SELECT r.component_id, r.value, bc.display_label, bc.name as component_name
             FROM classroom_behavior_responses r
             LEFT JOIN behavior_components bc ON r.component_id = bc.id
             WHERE r.student_id = {student_id} AND r.term_id = {term_id}
@@ -1549,9 +1549,15 @@ def fetch_behavior_data(student_id, term_id):
 
         result = {}
         for _, r in resp_df.iterrows():
+            comp_name = r.get('component_name')
             label = r.get('display_label') or ''
             val = r.get('value')
-            # Prefer explicit mapping; otherwise normalize label to snake_case
+            # Prefer canonical component name from behavior_components table
+            if comp_name and isinstance(comp_name, str) and comp_name.strip():
+                result[comp_name] = val
+                continue
+
+            # Fallback: explicit mapping by display label, or normalized label
             field = behavior_field_mapping.get(label)
             if not field:
                 field = label.lower().replace(' ', '_') if label else None
