@@ -90,43 +90,6 @@ def backup_database():
         return True, f"Backup created: {backup_path}"
     except Exception as e:
         return False, f"Backup failed: {str(e)}"
-                # If a specific message id was requested to open, use it to expand that message
-                target_id = st.session_state.pop('open_message_id', None) if st.session_state.get('open_message_id') else None
-                for _, row in inbox.iterrows():
-                    mid = int(row['id'])
-                    summary = f"{row.get('subject','(no subject)')} — From: {row.get('sender_name','System')}"
-                    # show expander, expanded when it's the target
-                    with st.expander(summary, expanded=(mid == target_id)):
-                        # Auto-mark as read when expanded (viewed)
-                        try:
-                            if not row.get('read'):
-                                mark_message_read(session, mid)
-                                row['read'] = True
-                        except Exception:
-                            pass
-
-                        message_type = row.get('message_type') or ('discipline' if row.get('related_report_id') else 'message')
-                        badge = '🚨 Discipline Report' if message_type == 'discipline' else '📧 Message'
-                        read_flag = '(Unread)' if not row['read'] else '(Read)'
-                        st.markdown(f"**{row.get('subject','No subject')}** — {badge} {read_flag}")
-                        info_line = f"From: {row.get('sender_name','System')} — {row.get('created_at')}"
-                        if row.get('related_report_id'):
-                            info_line += f" — Report ID: {row.get('related_report_id')}"
-                        st.write(info_line)
-                        st.write(row['body'])
-                        cols = st.columns([4,1])
-                        with cols[1]:
-                            if st.button("Mark Read", key=f"mr_{mid}"):
-                                try:
-                                    mark_message_read(session, mid)
-                                    st.session_state['inbox_refresh'] = True
-                                    safe_rerun()
-                                except Exception:
-                                    st.error("Could not mark message as read")
-        return True
-    except Exception as e:
-        st.error(f"Auto backup failed: {str(e)}")
-        return False
 
 def check_and_create_periodic_backup():
     """Create a backup if it's been more than a day since the last one"""
