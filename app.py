@@ -1521,6 +1521,7 @@ def fetch_behavior_data(student_id, term_id):
     Returns a dict mapping canonical field names to values or None.
     """
     try:
+        import sys
         # Try legacy table first
         behavior_query = f"""
             SELECT punctuality, attendance, manners, general_behavior, 
@@ -1532,6 +1533,7 @@ def fetch_behavior_data(student_id, term_id):
         """
         behavior_result = pd.read_sql(behavior_query, ENGINE)
         if not behavior_result.empty:
+            print(f"DEBUG: Using legacy classroom_behavior table", file=sys.stderr)
             return behavior_result.iloc[0].to_dict()
 
         # Fallback: build from responses joined to components
@@ -1542,7 +1544,9 @@ def fetch_behavior_data(student_id, term_id):
             WHERE r.student_id = {student_id} AND r.term_id = {term_id}
         """
         resp_df = pd.read_sql(resp_q, ENGINE)
+        print(f"DEBUG: fetch_behavior_data resp_df:\n{resp_df}", file=sys.stderr)
         if resp_df.empty:
+            print(f"DEBUG: No behavior responses found", file=sys.stderr)
             return None
 
         # Mapping from display labels to canonical field names used in PDFs
@@ -1566,9 +1570,11 @@ def fetch_behavior_data(student_id, term_id):
             comp_name = r.get('component_name')
             label = r.get('display_label') or ''
             val = r.get('value')
+            print(f"DEBUG: Processing row: comp_name={comp_name}, label={label}, val={val}", file=sys.stderr)
             # Prefer canonical component name from behavior_components table
             if comp_name and isinstance(comp_name, str) and comp_name.strip():
                 result[comp_name] = val
+                print(f"DEBUG: Added result[{comp_name}] = {val}", file=sys.stderr)
                 continue
 
             # Fallback: explicit mapping by display label, or normalized label
@@ -1577,9 +1583,15 @@ def fetch_behavior_data(student_id, term_id):
                 field = label.lower().replace(' ', '_') if label else None
             if field:
                 result[field] = val
+                print(f"DEBUG: Added result[{field}] = {val} (via mapping)", file=sys.stderr)
 
+        print(f"DEBUG: Final result dict: {result}", file=sys.stderr)
         return result if result else None
-    except Exception:
+    except Exception as e:
+        import sys
+        print(f"DEBUG: fetch_behavior_data exception: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return None
 
 
