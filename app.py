@@ -1518,8 +1518,9 @@ def fetch_behavior_data(student_id, term_id):
     Returns a dict with BOTH legacy field names AND display labels as keys
     so PDF generator can find values using any lookup method.
     """
+    import sys
+    
     try:
-        import sys
         # Try legacy table first
         behavior_query = f"""
             SELECT punctuality, attendance, manners, general_behavior, 
@@ -1532,71 +1533,95 @@ def fetch_behavior_data(student_id, term_id):
         behavior_result = pd.read_sql(behavior_query, ENGINE)
         if not behavior_result.empty:
             print(f"DEBUG: Using legacy classroom_behavior table", file=sys.stderr)
-            return behavior_result.iloc[0].to_dict()
+            result = behavior_result.iloc[0].to_dict()
+            print(f"DEBUG: Legacy result keys: {list(result.keys())}", file=sys.stderr)
+            return result
 
         # Fallback: build from responses joined to components
+        # FIX: Use INNER JOIN to ensure we only get rows with valid components
         resp_q = f"""
-            SELECT r.component_id, r.value, bc.display_label, bc.name as component_name
+            SELECT 
+                r.component_id, 
+                r.value, 
+                bc.display_label, 
+                bc.name as component_name
             FROM classroom_behavior_responses r
-            LEFT JOIN behavior_components bc ON r.component_id = bc.id
-            WHERE r.student_id = {student_id} AND r.term_id = {term_id}
+            INNER JOIN behavior_components bc ON r.component_id = bc.id
+            WHERE r.student_id = {student_id} 
+            AND r.term_id = {term_id}
+            AND bc.active = 1
+            ORDER BY bc.display_order
         """
         resp_df = pd.read_sql(resp_q, ENGINE)
-        print(f"DEBUG: fetch_behavior_data resp_df:\n{resp_df}", file=sys.stderr)
+        
+        print(f"DEBUG: SQL returned {len(resp_df)} rows", file=sys.stderr)
+        print(f"DEBUG: resp_df columns: {list(resp_df.columns)}", file=sys.stderr)
+        if len(resp_df) > 0:
+            print(f"DEBUG: resp_df:\n{resp_df.to_string()}", file=sys.stderr)
+        
         if resp_df.empty:
-            print(f"DEBUG: No behavior responses found", file=sys.stderr)
+            print(f"DEBUG: No behavior responses found for student_id={student_id}, term_id={term_id}", file=sys.stderr)
             return None
 
-        # FIX: Map to ALL possible key formats for PDF generator compatibility
+        # Mapping from display labels to canonical field names used in PDFs
         behavior_field_mapping = {
             'Punctuality': 'punctuality',
             'Attendance': 'attendance',
             'Manners': 'manners',
             'General Behavior': 'general_behavior',
             'Organisation': 'organisational_skills',
+            'Organisational Skills': 'organisational_skills',
             'Adherence to Uniform': 'adherence_to_uniform',
             'Leadership': 'leadership_skills',
+            'Leadership Skills': 'leadership_skills',
             'Commitment to School': 'commitment_to_school',
             'Cooperation with Peers': 'cooperation_with_peers',
             'Cooperation with Staff': 'cooperation_with_staff',
             'Participation': 'participation_in_lessons',
-            'Homework Completion': 'completion_of_homework'
+            'Participation in Lessons': 'participation_in_lessons',
+            'Homework Completion': 'completion_of_homework',
+            'Completion of Homework': 'completion_of_homework'
         }
 
         result = {}
-        for _, r in resp_df.iterrows():
+        for idx, r in resp_df.iterrows():
             comp_name = r.get('component_name')
             label = r.get('display_label') or ''
             val = r.get('value')
             
+            print(f"DEBUG: Row {idx}: comp_name={comp_name}, label={label}, val={val}", file=sys.stderr)
+            
             # Store with component_name (e.g., 'punctuality')
-            if comp_name:
-                result[comp_name] = val
-                print(f"DEBUG: Added result[{comp_name}] = {val}", file=sys.stderr)
+            if comp_name and pd.notna(comp_name):
+                result[str(comp_name)] = val
+                print(f"DEBUG:   Added result['{comp_name}'] = {val}", file=sys.stderr)
             
             # ALSO store with display_label (e.g., 'Punctuality')
-            if label:
-                result[label] = val
-                print(f"DEBUG: Added result[{label}] = {val}", file=sys.stderr)
+            if label and pd.notna(label):
+                result[str(label)] = val
+                print(f"DEBUG:   Added result['{label}'] = {val}", file=sys.stderr)
             
-            # ALSO store with normalized label (e.g., 'Punctuality' → 'punctuality')
-            normalized = label.lower().replace(' ', '_') if label else None
-            if normalized and normalized not in result:
-                result[normalized] = val
-                print(f"DEBUG: Added result[{normalized}] = {val} (normalized)", file=sys.stderr)
+            # ALSO store with normalized label (e.g., 'punctuality')
+            if label and pd.notna(label):
+                normalized = str(label).lower().replace(' ', '_')
+                if normalized not in result:
+                    result[normalized] = val
+                    print(f"DEBUG:   Added result['{normalized}'] = {val} (normalized)", file=sys.stderr)
             
             # ALSO store with legacy field name (e.g., 'General Behavior' → 'general_behavior')
-            legacy_field = behavior_field_mapping.get(label)
-            if legacy_field and legacy_field not in result:
-                result[legacy_field] = val
-                print(f"DEBUG: Added result[{legacy_field}] = {val} (legacy mapping)", file=sys.stderr)
+            if label and pd.notna(label):
+                legacy_field = behavior_field_mapping.get(str(label))
+                if legacy_field and legacy_field not in result:
+                    result[legacy_field] = val
+                    print(f"DEBUG:   Added result['{legacy_field}'] = {val} (legacy)", file=sys.stderr)
         
-        print(f"DEBUG: Final result dict keys: {list(result.keys())}", file=sys.stderr)
-        print(f"DEBUG: Final result dict: {result}", file=sys.stderr)
+        print(f"DEBUG: Final result dict has {len(result)} keys", file=sys.stderr)
+        print(f"DEBUG: Final result keys: {list(result.keys())}", file=sys.stderr)
+        print(f"DEBUG: Final result values: {result}", file=sys.stderr)
+        
         return result if result else None
         
     except Exception as e:
-        import sys
         print(f"DEBUG: fetch_behavior_data exception: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc(file=sys.stderr)
