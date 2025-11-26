@@ -4450,6 +4450,10 @@ elif page == "Classroom Behavior":
                 session.close()
                 st.stop()
 
+            import sys
+            print(f"DEBUG: Behavior form - comps_df:\n{comps_df}", file=sys.stderr)
+            st.info(f"DEBUG: Found {len(comps_df)} behavior components")
+
             ratings = ['Excellent', 'Good', 'Satisfactory', 'Cause of Concern']
 
             # Load any existing responses for this student/term
@@ -4503,8 +4507,11 @@ elif page == "Classroom Behavior":
 
             if submit_button:
                 try:
+                    import sys
+                    print(f"DEBUG: Submit button - behavior_ratings dict: {behavior_ratings}", file=sys.stderr)
                     # Upsert each component response
                     for comp_id, val in behavior_ratings.items():
+                        print(f"DEBUG: Saving component_id={comp_id}, value={val}", file=sys.stderr)
                         existing = session.query(ClassroomBehaviorResponse).filter_by(
                             student_id=student_id,
                             term_id=active_term.id,
