@@ -1499,6 +1499,70 @@ def generate_pdf_report(student_data, term_data, marks, design, behavior_data=No
     return buffer.getvalue()
 
 
+def fetch_behavior_data(student_id, term_id):
+    """Fetch behavior data for a student/term.
+    Tries `classroom_behavior` legacy row first, then falls back to
+    assembling data from `classroom_behavior_responses` joined to
+    `behavior_components`.
+    Returns a dict mapping canonical field names to values or None.
+    """
+    try:
+        # Try legacy table first
+        behavior_query = f"""
+            SELECT punctuality, attendance, manners, general_behavior, 
+                   organisational_skills, adherence_to_uniform, leadership_skills,
+                   commitment_to_school, cooperation_with_peers, cooperation_with_staff,
+                   participation_in_lessons, completion_of_homework
+            FROM classroom_behavior
+            WHERE student_id = {student_id} AND term_id = {term_id}
+        """
+        behavior_result = pd.read_sql(behavior_query, ENGINE)
+        if not behavior_result.empty:
+            return behavior_result.iloc[0].to_dict()
+
+        # Fallback: build from responses joined to components
+        resp_q = f"""
+            SELECT r.component_id, r.value, bc.display_label
+            FROM classroom_behavior_responses r
+            LEFT JOIN behavior_components bc ON r.component_id = bc.id
+            WHERE r.student_id = {student_id} AND r.term_id = {term_id}
+        """
+        resp_df = pd.read_sql(resp_q, ENGINE)
+        if resp_df.empty:
+            return None
+
+        # Mapping from display labels to canonical field names used in PDFs
+        behavior_field_mapping = {
+            'Punctuality': 'punctuality',
+            'Attendance': 'attendance',
+            'Manners': 'manners',
+            'General Behavior': 'general_behavior',
+            'Organisation': 'organisational_skills',
+            'Adherence to Uniform': 'adherence_to_uniform',
+            'Leadership': 'leadership_skills',
+            'Commitment to School': 'commitment_to_school',
+            'Cooperation with Peers': 'cooperation_with_peers',
+            'Cooperation with Staff': 'cooperation_with_staff',
+            'Participation': 'participation_in_lessons',
+            'Homework Completion': 'completion_of_homework'
+        }
+
+        result = {}
+        for _, r in resp_df.iterrows():
+            label = r.get('display_label') or ''
+            val = r.get('value')
+            # Prefer explicit mapping; otherwise normalize label to snake_case
+            field = behavior_field_mapping.get(label)
+            if not field:
+                field = label.lower().replace(' ', '_') if label else None
+            if field:
+                result[field] = val
+
+        return result if result else None
+    except Exception:
+        return None
+
+
 def generate_discipline_pdf(student_data, reports_df, design):
     """Generate a simple PDF summary of discipline reports for a student."""
     buffer = io.BytesIO()
@@ -2335,20 +2399,8 @@ elif page == "Visitation Day Management" and st.session_state.user_role == 'admi
                             try:
                                 design = session.query(ReportDesign).first()
 
-                                # Get behavior data
-                                behavior_query = f"""
-                                    SELECT punctuality, attendance, manners, general_behavior, 
-                                           organisational_skills, adherence_to_uniform, leadership_skills,
-                                           commitment_to_school, cooperation_with_peers, cooperation_with_staff,
-                                           participation_in_lessons, completion_of_homework
-                                    FROM classroom_behavior
-                                    WHERE student_id = {student_id} AND term_id = {active_term.id}
-                                """
-                                behavior_result = pd.read_sql(behavior_query, ENGINE)
-
-                                behavior_data = None
-                                if not behavior_result.empty:
-                                    behavior_data = behavior_result.iloc[0].to_dict()
+                                # Get behavior data (supports legacy table or component responses)
+                                behavior_data = fetch_behavior_data(student_id, active_term.id)
 
                                 # Get decision data (only for term 3)
                                 decision_data = None
@@ -2441,17 +2493,8 @@ elif page == "Visitation Day Management" and st.session_state.user_role == 'admi
                                     ORDER BY m.subject
                                 """, ENGINE)
 
-                                # Get behavior data
-                                behavior_query = f"""
-                                    SELECT punctuality, attendance, manners, general_behavior, 
-                                           organisational_skills, adherence_to_uniform, leadership_skills,
-                                           commitment_to_school, cooperation_with_peers, cooperation_with_staff,
-                                           participation_in_lessons, completion_of_homework
-                                    FROM classroom_behavior
-                                    WHERE student_id = {sid} AND term_id = {active_term.id}
-                                """
-                                behavior_result = pd.read_sql(behavior_query, ENGINE)
-                                behavior_data = behavior_result.iloc[0].to_dict() if not behavior_result.empty else None
+                                # Get behavior data (supports legacy table or component responses)
+                                behavior_data = fetch_behavior_data(sid, active_term.id)
 
                                 # Get decision data (term 3)
                                 decision_data = None
@@ -4887,21 +4930,8 @@ elif page == "Generate Reports" and st.session_state.user_role == 'admin':
         
         st.write(f"**Marks found: {len(marks)}**")
         
-        # Get behavior data - FIXED VERSION
-        behavior_query = f"""
-            SELECT punctuality, attendance, manners, general_behavior, 
-                   organisational_skills, adherence_to_uniform, leadership_skills,
-                   commitment_to_school, cooperation_with_peers, cooperation_with_staff,
-                   participation_in_lessons, completion_of_homework
-            FROM classroom_behavior
-            WHERE student_id = {student_data['id']} AND term_id = {term_data['id']}
-        """
-        behavior_result = pd.read_sql(behavior_query, ENGINE)
-        
-        behavior_data = None
-        if not behavior_result.empty:
-            # Convert DataFrame row to dictionary
-            behavior_data = behavior_result.iloc[0].to_dict()
+        # Get behavior data (support legacy table or component responses)
+        behavior_data = fetch_behavior_data(student_data['id'], term_data['id'])
         
         # Get decision data (only for term 3)
         decision_data = None
@@ -5049,21 +5079,8 @@ elif page == "Generate Reports" and st.session_state.user_role == 'admin':
                             WHERE m.student_id = {student_data['id']} AND m.term_id = {term_data['id']}
                         """, ENGINE)
                         
-                        # Get behavior data - FIXED VERSION
-                        behavior_query = f"""
-                            SELECT punctuality, attendance, manners, general_behavior, 
-                                   organisational_skills, adherence_to_uniform, leadership_skills,
-                                   commitment_to_school, cooperation_with_peers, cooperation_with_staff,
-                                   participation_in_lessons, completion_of_homework
-                            FROM classroom_behavior
-                            WHERE student_id = {student_data['id']} AND term_id = {term_data['id']}
-                        """
-                        behavior_result = pd.read_sql(behavior_query, ENGINE)
-                        
-                        behavior_data = None
-                        if not behavior_result.empty:
-                            # Convert DataFrame row to dictionary
-                            behavior_data = behavior_result.iloc[0].to_dict()
+                        # Get behavior data (support legacy table or component responses)
+                        behavior_data = fetch_behavior_data(student_data['id'], term_data['id'])
                         
                         # Get decision data (only for term 3)
                         decision_data = None
