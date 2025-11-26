@@ -444,6 +444,9 @@ class Message(Base):
     is_broadcast = Column(Boolean, default=False)
     read = Column(Boolean, default=False)
     created_at = Column(String, default=lambda: datetime.now().isoformat())
+    # Optional: classify messages (e.g., 'message', 'discipline') and link to related objects
+    message_type = Column(String, default='message')
+    related_report_id = Column(Integer, nullable=True)
 
 # Update database to include new tables if they don't exist
 def update_database_schema():
@@ -478,6 +481,27 @@ def update_database_schema():
     # Check if messages table exists
     if 'messages' not in inspector.get_table_names():
         Message.__table__.create(ENGINE)
+
+    # Ensure messages table has new columns for message_type and related_report_id
+    if 'messages' in inspector.get_table_names():
+        msg_cols = [c['name'] for c in inspector.get_columns('messages')]
+        add_msg_cols = []
+        if 'message_type' not in msg_cols:
+            add_msg_cols.append(("message_type", "TEXT"))
+        if 'related_report_id' not in msg_cols:
+            add_msg_cols.append(("related_report_id", "INTEGER"))
+
+        if add_msg_cols:
+            try:
+                from sqlalchemy import text as sql_text
+                with ENGINE.begin() as conn:
+                    for col_name, col_type in add_msg_cols:
+                        try:
+                            conn.execute(sql_text(f"ALTER TABLE messages ADD COLUMN {col_name} {col_type}"))
+                        except Exception:
+                            pass
+            except Exception:
+                pass
 
     # Ensure users table has recovery columns (for older DBs)
     if 'users' in inspector.get_table_names():
@@ -807,14 +831,17 @@ def init_admin():
 # -------------------------------
 # Messaging helpers
 # -------------------------------
-def send_message(session, sender_id, recipient_id, subject, body, is_broadcast=False):
+def send_message(session, sender_id, recipient_id, subject, body, is_broadcast=False, message_type='message', related_report_id=None):
+    """Create a message. Optional `message_type` (e.g. 'message' or 'discipline') and `related_report_id` link it to a discipline report."""
     msg = Message(
         sender_id=sender_id,
         recipient_id=recipient_id,
         subject=subject,
         body=body,
         is_broadcast=is_broadcast,
-        read=False
+        read=False,
+        message_type=message_type,
+        related_report_id=related_report_id
     )
     session.add(msg)
     session.commit()
@@ -4597,21 +4624,21 @@ elif page == "Discipline Reports":
                                 if admins:
                                     for adm in admins:
                                         try:
-                                            send_message(session, st.session_state.user_id, int(adm.id), subject_msg, body_msg, is_broadcast=False)
+                                            send_message(session, st.session_state.user_id, int(adm.id), subject_msg, body_msg, is_broadcast=False, message_type='discipline', related_report_id=getattr(report, 'id', None))
                                         except Exception:
-                                            # if sending to one admin fails, continue with others
                                             pass
                                 else:
-                                    # fallback: broadcast to all users if no admin accounts found
                                     try:
-                                        send_message(session, st.session_state.user_id, None, subject_msg, body_msg, is_broadcast=True)
+                                        send_message(session, st.session_state.user_id, None, subject_msg, body_msg, is_broadcast=True, message_type='discipline', related_report_id=getattr(report, 'id', None))
                                     except Exception:
                                         pass
-                                # Additionally, create a broadcast notification so admins who rely on the Inbox page will definitely see the report
+                                # Also send a broadcast so it's visible in broadcast inboxes
                                 try:
-                                    send_message(session, st.session_state.user_id, None, f"[Broadcast] {subject_msg}", body_msg, is_broadcast=True)
+                                    send_message(session, st.session_state.user_id, None, f"[Broadcast] {subject_msg}", body_msg, is_broadcast=True, message_type='discipline', related_report_id=getattr(report, 'id', None))
                                 except Exception:
                                     pass
+                            except Exception:
+                                pass
                             except Exception:
                                 # ignore messaging errors to avoid blocking the submission
                                 pass
@@ -4771,11 +4798,10 @@ elif page == "Discipline Reports":
                                 try:
                                     teacher_id = int(report['reported_by']) if report.get('reported_by') is not None else None
                                     if teacher_id:
-                                        send_message(session, st.session_state.user_id, teacher_id, subj, body, is_broadcast=False)
+                                        send_message(session, st.session_state.user_id, teacher_id, subj, body, is_broadcast=False, message_type='discipline', related_report_id=report['id'])
                                 except Exception:
-                                    # fallback to broadcast
                                     try:
-                                        send_message(session, st.session_state.user_id, None, subj, body, is_broadcast=True)
+                                        send_message(session, st.session_state.user_id, None, subj, body, is_broadcast=True, message_type='discipline', related_report_id=report['id'])
                                     except Exception:
                                         pass
 
@@ -5275,21 +5301,32 @@ elif page == "Communications":
         st.info("No messages yet")
     else:
         for _, row in inbox.iterrows():
-            cols = st.columns([1, 4, 1])
-            with cols[1]:
-                read_flag = "(Unread)" if not row['read'] else ""
-                st.markdown(f"**{row['subject']}** {read_flag}")
-                st.write(f"From: {row['sender_name'] or 'System'} — {row['created_at']}")
-                st.write(row['body'])
-            with cols[2]:
-                if st.button(f"Mark Read {row['id']}", key=f"mr{row['id']}"):
-                    success = mark_message_read(session, int(row['id']))
-                    session.close()
-                    if success:
-                        # set a flag to refresh outside the loop
-                        st.session_state['inbox_refresh'] = True
-                    else:
-                        st.error("Could not mark message as read. Check logs.")
+                cols = st.columns([1, 5, 1])
+                with cols[1]:
+                    # Auto-mark as read when opening/viewing
+                    try:
+                        if not row.get('read'):
+                            mark_message_read(session, int(row['id']))
+                            # reflect in local row to avoid re-marking
+                            row['read'] = True
+                    except Exception:
+                        pass
+
+                    # Show message type label
+                    mtype = row.get('message_type') if row.get('message_type') else ('Discipline' if row.get('related_report_id') else 'Message')
+                    read_flag = "(Unread)" if not row['read'] else ""
+                    st.markdown(f"**{row['subject']}** {read_flag}")
+                    st.write(f"From: {row.get('sender_name','System')} — {row['created_at']} — Type: {mtype}")
+                    st.write(row['body'])
+                with cols[2]:
+                    # Keep manual mark-read for compatibility
+                    if st.button(f"Mark Read {row['id']}", key=f"mr{row['id']}"):
+                        success = mark_message_read(session, int(row['id']))
+                        session.close()
+                        if success:
+                            st.session_state['inbox_refresh'] = True
+                        else:
+                            st.error("Could not mark message as read. Check logs.")
 
     # after rendering inbox, handle refresh flag (close session already)
     if st.session_state.get('inbox_refresh'):
