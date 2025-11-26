@@ -1515,10 +1515,8 @@ def generate_pdf_report(student_data, term_data, marks, design, behavior_data=No
 
 def fetch_behavior_data(student_id, term_id):
     """Fetch behavior data for a student/term.
-    Tries `classroom_behavior` legacy row first, then falls back to
-    assembling data from `classroom_behavior_responses` joined to
-    `behavior_components`.
-    Returns a dict mapping canonical field names to values or None.
+    Returns a dict with BOTH legacy field names AND display labels as keys
+    so PDF generator can find values using any lookup method.
     """
     try:
         import sys
@@ -1549,7 +1547,7 @@ def fetch_behavior_data(student_id, term_id):
             print(f"DEBUG: No behavior responses found", file=sys.stderr)
             return None
 
-        # Mapping from display labels to canonical field names used in PDFs
+        # FIX: Map to ALL possible key formats for PDF generator compatibility
         behavior_field_mapping = {
             'Punctuality': 'punctuality',
             'Attendance': 'attendance',
@@ -1570,23 +1568,33 @@ def fetch_behavior_data(student_id, term_id):
             comp_name = r.get('component_name')
             label = r.get('display_label') or ''
             val = r.get('value')
-            print(f"DEBUG: Processing row: comp_name={comp_name}, label={label}, val={val}", file=sys.stderr)
-            # Prefer canonical component name from behavior_components table
-            if comp_name and isinstance(comp_name, str) and comp_name.strip():
+            
+            # Store with component_name (e.g., 'punctuality')
+            if comp_name:
                 result[comp_name] = val
                 print(f"DEBUG: Added result[{comp_name}] = {val}", file=sys.stderr)
-                continue
-
-            # Fallback: explicit mapping by display label, or normalized label
-            field = behavior_field_mapping.get(label)
-            if not field:
-                field = label.lower().replace(' ', '_') if label else None
-            if field:
-                result[field] = val
-                print(f"DEBUG: Added result[{field}] = {val} (via mapping)", file=sys.stderr)
-
+            
+            # ALSO store with display_label (e.g., 'Punctuality')
+            if label:
+                result[label] = val
+                print(f"DEBUG: Added result[{label}] = {val}", file=sys.stderr)
+            
+            # ALSO store with normalized label (e.g., 'Punctuality' → 'punctuality')
+            normalized = label.lower().replace(' ', '_') if label else None
+            if normalized and normalized not in result:
+                result[normalized] = val
+                print(f"DEBUG: Added result[{normalized}] = {val} (normalized)", file=sys.stderr)
+            
+            # ALSO store with legacy field name (e.g., 'General Behavior' → 'general_behavior')
+            legacy_field = behavior_field_mapping.get(label)
+            if legacy_field and legacy_field not in result:
+                result[legacy_field] = val
+                print(f"DEBUG: Added result[{legacy_field}] = {val} (legacy mapping)", file=sys.stderr)
+        
+        print(f"DEBUG: Final result dict keys: {list(result.keys())}", file=sys.stderr)
         print(f"DEBUG: Final result dict: {result}", file=sys.stderr)
         return result if result else None
+        
     except Exception as e:
         import sys
         print(f"DEBUG: fetch_behavior_data exception: {e}", file=sys.stderr)
@@ -4450,10 +4458,6 @@ elif page == "Classroom Behavior":
                 session.close()
                 st.stop()
 
-            import sys
-            print(f"DEBUG: Behavior form - comps_df:\n{comps_df}", file=sys.stderr)
-            st.info(f"DEBUG: Found {len(comps_df)} behavior components")
-
             ratings = ['Excellent', 'Good', 'Satisfactory', 'Cause of Concern']
 
             # Load any existing responses for this student/term
@@ -4507,11 +4511,8 @@ elif page == "Classroom Behavior":
 
             if submit_button:
                 try:
-                    import sys
-                    print(f"DEBUG: Submit button - behavior_ratings dict: {behavior_ratings}", file=sys.stderr)
                     # Upsert each component response
                     for comp_id, val in behavior_ratings.items():
-                        print(f"DEBUG: Saving component_id={comp_id}, value={val}", file=sys.stderr)
                         existing = session.query(ClassroomBehaviorResponse).filter_by(
                             student_id=student_id,
                             term_id=active_term.id,
