@@ -1430,24 +1430,32 @@ def generate_pdf_report(student_data, term_data, marks, design, behavior_data=No
         row = [item_label]
         
         if behavior_data:
-            # Get the field name from mapping
+            # Try multiple ways to find the rating
             field_name = behavior_field_mapping.get(item_label)
+            rating = None
             
+            # Try the mapped field name first (old field names)
             if field_name:
-                # Get the rating from behavior_data
-                rating = behavior_data.get(field_name, '')
-                
-                # Place checkmark in correct column
-                if rating == 'Excellent':
-                    row.extend(['✓', '', '', ''])
-                elif rating == 'Good':
-                    row.extend(['', '✓', '', ''])
-                elif rating == 'Satisfactory':
-                    row.extend(['', '', '✓', ''])
-                elif rating == 'Cause of Concern':
-                    row.extend(['', '', '', '✓'])
-                else:
-                    row.extend(['', '', '', ''])
+                rating = behavior_data.get(field_name)
+            
+            # If not found, try the item_label as a direct key (for component_name matches)
+            if not rating:
+                rating = behavior_data.get(item_label)
+            
+            # If still not found, try normalized item_label
+            if not rating:
+                normalized = item_label.lower().replace(' ', '_')
+                rating = behavior_data.get(normalized)
+            
+            # Place checkmark in correct column based on rating
+            if rating == 'Excellent':
+                row.extend(['✓', '', '', ''])
+            elif rating == 'Good':
+                row.extend(['', '✓', '', ''])
+            elif rating == 'Satisfactory':
+                row.extend(['', '', '✓', ''])
+            elif rating == 'Cause of Concern':
+                row.extend(['', '', '', '✓'])
             else:
                 row.extend(['', '', '', ''])
         else:
@@ -1455,6 +1463,12 @@ def generate_pdf_report(student_data, term_data, marks, design, behavior_data=No
             row.extend(['', '', '', ''])
         
         behavior_data_table.append(row)
+    
+    # Debug: log behavior_data keys for troubleshooting
+    if behavior_data:
+        import sys
+        print(f"DEBUG: behavior_data keys = {list(behavior_data.keys())}", file=sys.stderr)
+        print(f"DEBUG: behavior_data = {behavior_data}", file=sys.stderr)
     
     behavior_table = Table(behavior_data_table, colWidths=[1.6*inch, 0.9*inch, 0.9*inch, 0.9*inch, 0.9*inch])
     behavior_table.setStyle(TableStyle([
