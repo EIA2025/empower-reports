@@ -91,6 +91,81 @@ def backup_database():
     except Exception as e:
         return False, f"Backup failed: {str(e)}"
 
+def list_backups():
+    """List all available backups"""
+    try:
+        backup_log_file = BACKUP_DIR / "backup_log.json"
+        if not backup_log_file.exists():
+            return []
+        
+        backups = []
+        with open(backup_log_file, "r") as f:
+            for line in f:
+                if line.strip():
+                    backup_info = json.loads(line)
+                    # Convert timestamp to readable date format
+                    backup_info["date"] = datetime.strptime(backup_info["timestamp"], "%Y%m%d_%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
+                    backup_info["name"] = os.path.basename(backup_info["backup_file"])
+                    backup_info["path"] = backup_info["backup_file"]  # Add path for restore
+                    backups.append(backup_info)
+        
+        # Return in reverse order (most recent first)
+        return sorted(backups, key=lambda x: x["timestamp"], reverse=True)
+    except Exception as e:
+        st.error(f"Error reading backups: {str(e)}")
+        return []
+
+def restore_database(backup_path):
+    """Restore database from a backup"""
+    try:
+        # Make sure backup exists
+        if not Path(backup_path).exists():
+            return False, f"Backup file not found: {backup_path}"
+        
+        # Backup the current database first
+        backup_database()
+        
+        # Restore from backup
+        shutil.copy2(backup_path, DB_PATH)
+        
+        # Log the restore
+        with open(BACKUP_DIR / "restore_log.json", "a") as f:
+            json.dump({
+                "timestamp": datetime.now().isoformat(),
+                "restored_from": backup_path,
+                "restored_at": datetime.now().isoformat()
+            }, f)
+            f.write("\n")
+        
+        return True, f"Database restored from {Path(backup_path).name}"
+    except Exception as e:
+        return False, f"Restore failed: {str(e)}"
+
+def auto_backup_before_critical_operation(operation_name):
+    """Automatically create a backup before critical operations"""
+    try:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = BACKUP_DIR / f"auto_backup_{operation_name}_{timestamp}.db"
+        
+        # Copy database file
+        shutil.copy2(DB_PATH, backup_path)
+        
+        # Log the backup
+        with open(BACKUP_DIR / "backup_log.json", "a") as f:
+            json.dump({
+                "timestamp": timestamp,
+                "backup_file": str(backup_path),
+                "size": os.path.getsize(backup_path),
+                "type": "auto",
+                "operation": operation_name
+            }, f)
+            f.write("\n")
+        
+        return True
+    except Exception as e:
+        st.warning(f"Auto-backup failed for operation '{operation_name}': {str(e)}")
+        return False
+
 def check_and_create_periodic_backup():
     """Create a backup if it's been more than a day since the last one"""
     try:
