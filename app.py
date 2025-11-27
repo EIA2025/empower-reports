@@ -26,6 +26,7 @@ import numpy as np
 import shutil
 import time
 from dotenv import load_dotenv
+import re
 
 # Load local settings (non-AI config) from `.env` if present
 load_dotenv()
@@ -798,6 +799,47 @@ def get_teacher_name_for_mark(student_id, subject, term_id):
     except Exception:
         pass
     return ''
+
+
+def validate_phone_number(phone: str):
+    """Validate and normalize phone numbers to the format +256######### (9 digits after +256).
+
+    Returns (True, normalized_phone) on success or (False, error_message) on failure.
+    """
+    if phone is None:
+        return False, "Phone number is required"
+
+    p = phone.strip()
+    if not p:
+        return False, "Phone number is required"
+
+    # Accept several input styles but enforce final form +256#########
+    # If user provided leading 0 (e.g., 0712345678) convert to +256712345678
+    # If user provided 256 without +, add +
+    # If already in +256######### format, accept as-is.
+    # Reject anything that doesn't match digits after normalization.
+
+    # Remove spaces, dashes, parentheses
+    p_clean = re.sub(r"[\s\-()]+", "", p)
+
+    # If starts with +256 and then 9 digits
+    if re.fullmatch(r"\+256\d{9}", p_clean):
+        return True, p_clean
+
+    # If starts with 256 and then 9 digits, add +
+    if re.fullmatch(r"256\d{9}", p_clean):
+        return True, "+" + p_clean
+
+    # If starts with 0 and then 9 digits (local format), convert
+    if re.fullmatch(r"0\d{9}", p_clean):
+        # drop leading 0 and prepend +256
+        return True, "+256" + p_clean[1:]
+
+    # If digits only and length 9, assume it's the local part and add +256
+    if re.fullmatch(r"\d{9}", p_clean):
+        return True, "+256" + p_clean
+
+    return False, "Phone number must be in the format +256######### (9 digits after country code)"
 
 def init_report_design():
     session = Session()
@@ -3914,14 +3956,18 @@ elif page == "Admin Management" and st.session_state.user_role == 'admin':
                         email = st.text_input("Email", value=admin.email)
                     
                     if st.form_submit_button("Update Admin"):
-                        admin.name = name
-                        admin.gender = gender
-                        admin.phone_number = phone
-                        admin.email = email
-                        session.commit()
-                        log_audit(session, st.session_state.user_id, "edit_admin", f"Updated {name}")
-                        st.success(" Admin updated successfully!")
-                        st.rerun()
+                        valid, result = validate_phone_number(phone)
+                        if not valid:
+                            st.error(result)
+                        else:
+                            admin.name = name
+                            admin.gender = gender
+                            admin.phone_number = result
+                            admin.email = email
+                            session.commit()
+                            log_audit(session, st.session_state.user_id, "edit_admin", f"Updated {name}")
+                            st.success(" Admin updated successfully!")
+                            st.rerun()
         else:
             st.info("No other admins")
     
@@ -3948,21 +3994,25 @@ elif page == "Admin Management" and st.session_state.user_role == 'admin':
                 elif session.query(User).filter_by(email=email).first():
                     st.error("Email already exists")
                 else:
-                    new_admin = User(
-                        name=f"{name} ({admin_title})" if admin_title else name,
-                        gender=gender,
-                        phone_number=phone,
-                        email=email,
-                        role='admin',
-                        password_hash=hashlib.sha256(password.encode()).hexdigest(),
-                        subjects_taught='',
-                        class_teacher_for=''
-                    )
-                    session.add(new_admin)
-                    session.commit()
-                    log_audit(session, st.session_state.user_id, "add_admin", f"Added {name}")
-                    st.success(f" Admin added: {email} / {password}")
-                    st.rerun()
+                    valid, result = validate_phone_number(phone)
+                    if not valid:
+                        st.error(result)
+                    else:
+                        new_admin = User(
+                            name=f"{name} ({admin_title})" if admin_title else name,
+                            gender=gender,
+                            phone_number=result,
+                            email=email,
+                            role='admin',
+                            password_hash=hashlib.sha256(password.encode()).hexdigest(),
+                            subjects_taught='',
+                            class_teacher_for=''
+                        )
+                        session.add(new_admin)
+                        session.commit()
+                        log_audit(session, st.session_state.user_id, "add_admin", f"Added {name}")
+                        st.success(f" Admin added: {email} / {password}")
+                        st.rerun()
 
     with tab3:
         st.subheader("Manage Classroom Behavior Components")
@@ -4219,16 +4269,20 @@ elif page == "Staff Management" and st.session_state.user_role == 'admin':
                     col3, col4 = st.columns(2)
                     with col3:
                         if st.form_submit_button(" Update Staff", use_container_width=True):
-                            staff.name = name
-                            staff.gender = gender
-                            staff.phone_number = phone
-                            staff.email = email
-                            staff.subjects_taught = subjects
-                            staff.class_teacher_for = class_for
-                            session.commit()
-                            log_audit(session, st.session_state.user_id, "edit_staff", f"Updated {name}")
-                            st.success(" Staff updated successfully!")
-                            st.rerun()
+                            valid, result = validate_phone_number(phone)
+                            if not valid:
+                                st.error(result)
+                            else:
+                                staff.name = name
+                                staff.gender = gender
+                                staff.phone_number = result
+                                staff.email = email
+                                staff.subjects_taught = subjects
+                                staff.class_teacher_for = class_for
+                                session.commit()
+                                log_audit(session, st.session_state.user_id, "edit_staff", f"Updated {name}")
+                                st.success(" Staff updated successfully!")
+                                st.rerun()
                     
                     with col4:
                         if st.form_submit_button(" Delete Staff", type="primary", use_container_width=True):
@@ -4270,21 +4324,25 @@ elif page == "Staff Management" and st.session_state.user_role == 'admin':
                 elif session.query(User).filter_by(email=email).first():
                     st.error("Email already exists")
                 else:
-                    new_staff = User(
-                        name=name,
-                        gender=gender,
-                        phone_number=phone,
-                        email=email,
-                        role='teacher',
-                        password_hash=hashlib.sha256(password.encode()).hexdigest(),
-                        subjects_taught=subjects,
-                        class_teacher_for=class_for
-                    )
-                    session.add(new_staff)
-                    session.commit()
-                    log_audit(session, st.session_state.user_id, "add_staff", f"Added {name}")
-                    st.success(f" Staff added: {email} / {password}")
-                    st.rerun()
+                    valid, result = validate_phone_number(phone)
+                    if not valid:
+                        st.error(result)
+                    else:
+                        new_staff = User(
+                            name=name,
+                            gender=gender,
+                            phone_number=result,
+                            email=email,
+                            role='teacher',
+                            password_hash=hashlib.sha256(password.encode()).hexdigest(),
+                            subjects_taught=subjects,
+                            class_teacher_for=class_for
+                        )
+                        session.add(new_staff)
+                        session.commit()
+                        log_audit(session, st.session_state.user_id, "add_staff", f"Added {name}")
+                        st.success(f" Staff added: {email} / {password}")
+                        st.rerun()
     
     session.close()
 
@@ -5768,11 +5826,22 @@ elif page == "Change Login Details":
                 if not (new_recovery_phone.strip() or new_recovery_city.strip() or new_recovery_nickname.strip()):
                     st.error("Please provide at least one recovery detail (phone, city of birth, or nickname/pet). These are needed to recover your account if you forget your password.")
                 else:
+                    # Validate recovery phone if provided
+                    if new_recovery_phone.strip():
+                        valid, result = validate_phone_number(new_recovery_phone.strip())
+                        if not valid:
+                            st.error(result)
+                            session.close()
+                            st.stop()
+                        normalized_recovery_phone = result
+                    else:
+                        normalized_recovery_phone = None
+
                     user.email = new_email
                     if new_pass:
                         user.password_hash = hashlib.sha256(new_pass.encode()).hexdigest()
                     # Save recovery details
-                    user.recovery_phone = new_recovery_phone.strip() or None
+                    user.recovery_phone = normalized_recovery_phone
                     user.recovery_city = new_recovery_city.strip() or None
                     user.recovery_nickname = new_recovery_nickname.strip() or None
                     session.commit()
