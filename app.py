@@ -4374,79 +4374,65 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                         width='stretch'
                     )
 
-                    # Teacher comments section
+                    # Teacher comments section (spreadsheet-style editor)
                     st.markdown("---")
                     st.subheader("💬 Add Comments for Students")
-                    st.info("Add remarks or feedback for each student. Click 'Save All Comments' when finished.")
+                    st.info("Edit comments in the table below. Click 'Apply Edited Comments' to stage them, then 'Save All Comments' to persist.")
 
-                    # Initialize comments session state
+                    # Ensure session storage exists
                     if 'student_comments' not in st.session_state:
                         st.session_state.student_comments = {}
 
-                    # Display comment boxes for each student using persistent toggle buttons
-                    for _, row in compiled_df.iterrows():
-                        student_id = int(row['student_id'])
-                        student_name = row['student_name']
-                        student_reg = row['registration_number']
-                        grade = row['grade']
+                    # Build comments DataFrame for editing
+                    comments_df = compiled_df[['student_id', 'student_name', 'registration_number']].copy()
+                    if 'comment' in compiled_df.columns:
+                        comments_df['Comment'] = compiled_df['comment'].fillna('')
+                    else:
+                        comments_df['Comment'] = ''
 
-                        # Initialize storage
-                        if 'student_comments' not in st.session_state:
-                            st.session_state.student_comments = {}
-                        if student_id not in st.session_state.student_comments:
-                            st.session_state.student_comments[student_id] = ""
+                    # Show editable table for comments
+                    edited_comments = None
+                    try:
+                        edited_comments = st.data_editor(comments_df, key='comments_editor', width='stretch')
+                    except Exception as e:
+                        st.error(f"Could not display comment editor: {e}")
+                        st.dataframe(comments_df, width='stretch')
 
-                        # persistent expand state per student
-                        exp_key = f"comment_expanded_{student_id}"
-                        if exp_key not in st.session_state:
-                            st.session_state[exp_key] = False
+                    # Apply edited comments into session state for staging
+                    if edited_comments is not None:
+                        if st.button("Apply Edited Comments", key="apply_edited_comments"):
+                            for _, r in edited_comments.iterrows():
+                                try:
+                                    sid = int(r['student_id'])
+                                    com = str(r.get('Comment') or '')
+                                    st.session_state.student_comments[sid] = com
+                                except Exception:
+                                    continue
+                            st.success("Edited comments staged. Click 'Save All Comments' to persist.")
+                            st.experimental_rerun()
 
-                        # Header row with toggle button to avoid Streamlit expander collapse on reruns
-                        hcol, btncol = st.columns([9,1])
-                        with hcol:
-                            st.markdown(f"**💭 {student_name} ({student_reg}) — Grade: {grade}**")
-                        with btncol:
-                            if st.button(("Close" if st.session_state[exp_key] else "Open"), key=f"toggle_comment_{student_id}"):
-                                st.session_state[exp_key] = not st.session_state[exp_key]
-
-                        # Show the comment box only when expanded
-                        if st.session_state[exp_key]:
-                            comment_value = st.text_area(
-                                f"Comment for {student_name}",
-                                value=st.session_state.student_comments.get(student_id, ""),
-                                height=120,
-                                key=f"comment_{student_id}",
-                                label_visibility="collapsed"
-                            )
-                            # Save into session state (will not trigger rerun by itself)
-                            st.session_state.student_comments[student_id] = comment_value
-
-                    # Save all comments button
+                    # Save all staged comments to DB/audit log
                     st.markdown("---")
                     if st.button("💾 Save All Comments", width='stretch'):
                         saved_comments = 0
                         errors = []
-
                         try:
-                            for student_id, comment in st.session_state.student_comments.items():
-                                if comment.strip():  # Only save non-empty comments
+                            for student_id, comment in st.session_state.get('student_comments', {}).items():
+                                if comment and str(comment).strip():
                                     try:
-                                        # Update or create a record with student comment
-                                        # We'll store in marks table's notes field or create audit log
-                                        student_record = session.get(Student, student_id)
+                                        student_record = session.get(Student, int(student_id))
                                         if student_record:
-                                            # Log comment as audit trail
+                                            # Log comment as audit trail (keeps DB schema unchanged)
                                             log_audit(session, st.session_state.user_id, "add_student_comment",
                                                      f"Subject: {selected_subject}, Term: {active_term.term_name}, Student: {student_record.name}, Comment: {comment}")
                                             saved_comments += 1
                                     except Exception as e:
-                                        student_row = compiled_df[compiled_df['student_id'] == student_id]
+                                        student_row = compiled_df[compiled_df['student_id'] == int(student_id)]
                                         if not student_row.empty:
                                             errors.append(f"{student_row.iloc[0]['student_name']}: {str(e)}")
 
                             if saved_comments > 0:
                                 st.success(f"✅ {saved_comments} comment(s) saved successfully!")
-
                         except Exception as e:
                             st.error(f"❌ Error saving comments: {str(e)}")
 
