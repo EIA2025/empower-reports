@@ -1810,7 +1810,7 @@ st.set_page_config(page_title="Empower Reports", layout="wide")
 
 st.markdown(f"<h1 style='text-align: center; color: #1e3a8a;'>Empower International Academy</h1>", unsafe_allow_html=True)
 
-# Render logo and motto under the main title (where 'Local Storage Mode' appears)
+# Render logo and motto under the main title (centered)
 try:
     sess = Session()
     try:
@@ -1818,19 +1818,21 @@ try:
     except Exception:
         top_design = None
     # show logo (DB or fallback) and motto centered
-    try:
-        if top_design and getattr(top_design, 'logo_data', None):
-            try:
-                logo_bytes = base64.b64decode(top_design.logo_data)
-                st.image(io.BytesIO(logo_bytes), width=220)
-            except Exception:
-                pass
-        else:
-            default_logo = UPLOADS_DIR / 'school_logo.png'
-            if default_logo.exists():
-                st.image(str(default_logo), width=220)
-    except Exception:
-        pass
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:  # Center column
+        try:
+            if top_design and getattr(top_design, 'logo_data', None):
+                try:
+                    logo_bytes = base64.b64decode(top_design.logo_data)
+                    st.image(io.BytesIO(logo_bytes), width=220)
+                except Exception:
+                    pass
+            else:
+                default_logo = UPLOADS_DIR / 'school_logo.png'
+                if default_logo.exists():
+                    st.image(str(default_logo), width=220)
+        except Exception:
+            pass
     st.markdown("<p style='color:#888; margin-top:6px; font-weight:600; text-align:center;'>EXCELLENCE &nbsp;&nbsp; | &nbsp;&nbsp; INTEGRITY &nbsp;&nbsp; | &nbsp;&nbsp; ACTION</p>", unsafe_allow_html=True)
 except Exception:
     pass
@@ -4396,7 +4398,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                                     try:
                                         # Update or create a record with student comment
                                         # We'll store in marks table's notes field or create audit log
-                                        student_record = session.query(Student).get(student_id)
+                                        student_record = session.get(Student, student_id)
                                         if student_record:
                                             # Log comment as audit trail
                                             log_audit(session, st.session_state.user_id, "add_student_comment",
