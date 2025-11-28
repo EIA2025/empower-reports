@@ -3917,17 +3917,30 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
     use_spreadsheet = st.checkbox("Use spreadsheet-style entry (faster for bulk edits)", value=True)
 
     if use_spreadsheet:
-        # Build DataFrame for editor
+        # Build DataFrame for editor with unique column names using indices
         df_cols = ["student_id", "Student Name", "Reg No."]
+        col_mapping = {}  # Map display col to (type, index)
+        
         # CW columns
-        for c in st.session_state.cw_components:
-            df_cols.append(f"CW|{c['name']} (/{c['total']})")
+        for i, c in enumerate(st.session_state.cw_components):
+            col_key = f"CW_{i}"
+            col_display = f"CW {i+1}: {c['name']} (/{c['total']})"
+            df_cols.append(col_display)
+            col_mapping[col_display] = ('cw', i)
+        
         # MT columns
-        for c in st.session_state.mt_components:
-            df_cols.append(f"MT|{c['name']} (/{c['total']})")
+        for i, c in enumerate(st.session_state.mt_components):
+            col_key = f"MT_{i}"
+            col_display = f"MT {i+1}: {c['name']} (/{c['total']})"
+            df_cols.append(col_display)
+            col_mapping[col_display] = ('mt', i)
+        
         # ET columns
-        for c in st.session_state.et_components:
-            df_cols.append(f"ET|{c['name']} (/{c['total']})")
+        for i, c in enumerate(st.session_state.et_components):
+            col_key = f"ET_{i}"
+            col_display = f"ET {i+1}: {c['name']} (/{c['total']})"
+            df_cols.append(col_display)
+            col_mapping[col_display] = ('et', i)
 
         # Build rows
         rows = []
@@ -3947,16 +3960,18 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                 }
 
             scores = st.session_state.scores_data[sid]
-            # fill cw
+            # fill CW
             for i, c in enumerate(st.session_state.cw_components):
-                col_name = f"CW|{c['name']} (/{c['total']})"
-                row[col_name] = scores.get("cw_scores", [0]*len(st.session_state.cw_components))[i] if i < len(scores.get("cw_scores", [])) else 0.0
+                col_display = f"CW {i+1}: {c['name']} (/{c['total']})"
+                row[col_display] = scores.get("cw_scores", [0]*len(st.session_state.cw_components))[i] if i < len(scores.get("cw_scores", [])) else 0.0
+            # fill MT
             for i, c in enumerate(st.session_state.mt_components):
-                col_name = f"MT|{c['name']} (/{c['total']})"
-                row[col_name] = scores.get("mt_scores", [0]*len(st.session_state.mt_components))[i] if i < len(scores.get("mt_scores", [])) else 0.0
+                col_display = f"MT {i+1}: {c['name']} (/{c['total']})"
+                row[col_display] = scores.get("mt_scores", [0]*len(st.session_state.mt_components))[i] if i < len(scores.get("mt_scores", [])) else 0.0
+            # fill ET
             for i, c in enumerate(st.session_state.et_components):
-                col_name = f"ET|{c['name']} (/{c['total']})"
-                row[col_name] = scores.get("et_scores", [0]*len(st.session_state.et_components))[i] if i < len(scores.get("et_scores", [])) else 0.0
+                col_display = f"ET {i+1}: {c['name']} (/{c['total']})"
+                row[col_display] = scores.get("et_scores", [0]*len(st.session_state.et_components))[i] if i < len(scores.get("et_scores", [])) else 0.0
 
             rows.append(row)
 
@@ -3966,34 +3981,33 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
         # Show brief instructions
         st.info("Tip: Edit scores directly in the table below. When finished click 'Apply Edited Scores' to save into the entry session.")
 
-        # Use data editor if available, fall back to dataframe display
+        # Use data editor
         edited_df = None
         try:
-            edited_df = st.data_editor(editor_df, use_container_width=True)
-        except Exception:
-            try:
-                edited_df = st.experimental_data_editor(editor_df, num_rows="fixed", use_container_width=True)
-            except Exception:
-                st.dataframe(editor_df, use_container_width=True)
+            edited_df = st.data_editor(editor_df, width='stretch', use_container_width=False)
+        except Exception as e:
+            st.error(f"Could not display editor: {e}")
+            st.dataframe(editor_df, width='stretch')
 
         if edited_df is not None:
             if st.button("Apply Edited Scores", key="apply_edited_scores"):
-                # Write back into session_state.scores_data
+                # Write back into session_state.scores_data using col_mapping
                 for _, row in edited_df.iterrows():
                     sid = int(row['student_id'])
                     # prepare lists
-                    cw_list = []
-                    mt_list = []
-                    et_list = []
-                    for c in st.session_state.cw_components:
-                        col = f"CW|{c['name']} (/{c['total']})"
-                        cw_list.append(float(row.get(col, 0.0) or 0.0))
-                    for c in st.session_state.mt_components:
-                        col = f"MT|{c['name']} (/{c['total']})"
-                        mt_list.append(float(row.get(col, 0.0) or 0.0))
-                    for c in st.session_state.et_components:
-                        col = f"ET|{c['name']} (/{c['total']})"
-                        et_list.append(float(row.get(col, 0.0) or 0.0))
+                    cw_list = [0.0] * len(st.session_state.cw_components)
+                    mt_list = [0.0] * len(st.session_state.mt_components)
+                    et_list = [0.0] * len(st.session_state.et_components)
+                    
+                    # Extract scores using col_mapping
+                    for col_display, (comp_type, idx) in col_mapping.items():
+                        score_val = float(row.get(col_display, 0.0) or 0.0)
+                        if comp_type == 'cw':
+                            cw_list[idx] = score_val
+                        elif comp_type == 'mt':
+                            mt_list[idx] = score_val
+                        elif comp_type == 'et':
+                            et_list[idx] = score_val
 
                     st.session_state.scores_data[sid]["cw_scores"] = cw_list
                     st.session_state.scores_data[sid]["mt_scores"] = mt_list
