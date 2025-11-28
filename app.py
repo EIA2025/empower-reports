@@ -4459,25 +4459,36 @@ elif page == "Comments" and st.session_state.user_role == 'teacher':
         st.session_state.comments_page_idx = 0
     
     # Load existing comments from DB
-    existing_comments = pd.read_sql(f"""
-        SELECT student_id, comment, total
-        FROM marks
-        WHERE subject = '{selected_subject}'
-        AND term_id = {active_term.id}
-        AND student_id IN ({','.join(map(str, students_df['student_id'].tolist()))})
-    """, ENGINE)
+    try:
+        student_ids_list = students_df['student_id'].tolist()
+        if student_ids_list:
+            student_ids_str = ','.join(map(str, student_ids_list))
+            existing_comments = pd.read_sql(f"""
+                SELECT student_id, comment, total
+                FROM marks
+                WHERE subject = '{selected_subject.replace("'", "''")}'
+                AND term_id = {active_term.id}
+                AND student_id IN ({student_ids_str})
+            """, ENGINE)
+        else:
+            existing_comments = pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error loading comments: {str(e)}")
+        existing_comments = pd.DataFrame()
     
     # Build display dataframe with student info and averages
-    students_df['average_score'] = None
+    students_df['average_score'] = 'N/A'
     students_df['comment'] = ''
     
-    for _, row in existing_comments.iterrows():
-        sid = int(row['student_id'])
-        if students_df['student_id'].eq(sid).any():
-            if pd.notna(row['total']):
-                students_df.loc[students_df['student_id'] == sid, 'average_score'] = f"{row['total']:.1f}"
-            if pd.notna(row['comment']):
-                students_df.loc[students_df['student_id'] == sid, 'comment'] = row['comment']
+    if not existing_comments.empty:
+        for _, row in existing_comments.iterrows():
+            sid = int(row['student_id'])
+            if sid in students_df['student_id'].values:
+                idx = students_df[students_df['student_id'] == sid].index[0]
+                if pd.notna(row['total']) and row['total'] is not None:
+                    students_df.at[idx, 'average_score'] = f"{float(row['total']):.1f}"
+                if pd.notna(row['comment']) and row['comment']:
+                    students_df.at[idx, 'comment'] = str(row['comment'])
     
     # Pagination
     page_size = 15
