@@ -4328,7 +4328,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
             # Show compiled marks table for teacher review
             try:
                 compiled_df = pd.read_sql(f"""
-                    SELECT s.name as student_name, s.registration_number,
+                    SELECT s.id as student_id, s.name as student_name, s.registration_number,
                            m.coursework_out_of_20, m.midterm_out_of_20, m.endterm_out_of_60,
                            m.total, m.grade
                     FROM marks m
@@ -4343,10 +4343,10 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                     st.markdown("---")
                     st.subheader("📋 Compiled Final Marks")
                     st.info("These are the compiled final marks for the selected class and subject.")
-                    st.dataframe(compiled_df, width='stretch')
+                    st.dataframe(compiled_df[['student_name', 'registration_number', 'coursework_out_of_20', 'midterm_out_of_20', 'endterm_out_of_60', 'total', 'grade']], width='stretch')
 
                     # CSV download
-                    csv_data = compiled_df.to_csv(index=False)
+                    csv_data = compiled_df[['student_name', 'registration_number', 'coursework_out_of_20', 'midterm_out_of_20', 'endterm_out_of_60', 'total', 'grade']].to_csv(index=False)
                     st.download_button(
                         "Download Compiled Marks (CSV)",
                         csv_data,
@@ -4354,6 +4354,69 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                         "text/csv",
                         width='stretch'
                     )
+
+                    # Teacher comments section
+                    st.markdown("---")
+                    st.subheader("💬 Add Comments for Students")
+                    st.info("Add remarks or feedback for each student. Click 'Save All Comments' when finished.")
+
+                    # Initialize comments session state
+                    if 'student_comments' not in st.session_state:
+                        st.session_state.student_comments = {}
+
+                    # Display comment boxes for each student
+                    for _, row in compiled_df.iterrows():
+                        student_id = int(row['student_id'])
+                        student_name = row['student_name']
+                        student_reg = row['registration_number']
+                        grade = row['grade']
+
+                        with st.expander(f"💭 {student_name} ({student_reg}) - Grade: {grade}"):
+                            if student_id not in st.session_state.student_comments:
+                                st.session_state.student_comments[student_id] = ""
+
+                            comment = st.text_area(
+                                f"Comment for {student_name}",
+                                value=st.session_state.student_comments[student_id],
+                                height=100,
+                                key=f"comment_{student_id}",
+                                label_visibility="collapsed"
+                            )
+                            st.session_state.student_comments[student_id] = comment
+
+                    # Save all comments button
+                    st.markdown("---")
+                    if st.button("💾 Save All Comments", width='stretch'):
+                        saved_comments = 0
+                        errors = []
+
+                        try:
+                            for student_id, comment in st.session_state.student_comments.items():
+                                if comment.strip():  # Only save non-empty comments
+                                    try:
+                                        # Update or create a record with student comment
+                                        # We'll store in marks table's notes field or create audit log
+                                        student_record = session.query(Student).get(student_id)
+                                        if student_record:
+                                            # Log comment as audit trail
+                                            log_audit(session, st.session_state.user_id, "add_student_comment",
+                                                     f"Subject: {selected_subject}, Term: {active_term.term_name}, Student: {student_record.name}, Comment: {comment}")
+                                            saved_comments += 1
+                                    except Exception as e:
+                                        student_row = compiled_df[compiled_df['student_id'] == student_id]
+                                        if not student_row.empty:
+                                            errors.append(f"{student_row.iloc[0]['student_name']}: {str(e)}")
+
+                            if saved_comments > 0:
+                                st.success(f"✅ {saved_comments} comment(s) saved successfully!")
+
+                        except Exception as e:
+                            st.error(f"❌ Error saving comments: {str(e)}")
+
+                        if errors:
+                            st.error("⚠️ Errors for some students:")
+                            for error in errors:
+                                st.error(f"  • {error}")
             except Exception as e:
                 st.error(f"Could not load compiled marks for preview: {e}")
     
