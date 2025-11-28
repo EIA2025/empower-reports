@@ -1315,8 +1315,8 @@ def generate_pdf_report(student_data, term_data, marks, design, behavior_data=No
             ])
 
         # Match total width of `student_table` (0.8 + 2.2 + 0.8 + 2.2 = 6.0 inches)
-        # Adjusted distribution so headers (e.g., 'GRADE') have enough room.
-        results_table = Table(results_data, colWidths=[1.8*inch, 0.6*inch, 0.6*inch, 1.2*inch, 1.8*inch])
+        # Balanced distribution: give extra room to GRADE, COMMENT and TEACHER so headers don't overlap.
+        results_table = Table(results_data, colWidths=[1.4*inch, 0.4*inch, 0.7*inch, 1.0*inch, 2.5*inch])
     else:
         results_data = [['SUBJECTS', 'CW', 'MOT', 'EOT', 'TOTAL', 'GRADE', 'Comment', 'Teacher']]
 
@@ -1334,8 +1334,8 @@ def generate_pdf_report(student_data, term_data, marks, design, behavior_data=No
                 Paragraph(str(teacher), ParagraphStyle('Teacher', fontSize=7))
             ])
 
-        # Match total width of `student_table` (6.0 inches). Give more room to `Teacher` and `Comment`.
-        results_table = Table(results_data, colWidths=[1.1*inch, 0.45*inch, 0.45*inch, 0.45*inch, 0.45*inch, 0.5*inch, 1.1*inch, 1.5*inch])
+        # Match total width of `student_table` (6.0 inches). Balanced widths to keep headers clear.
+        results_table = Table(results_data, colWidths=[1.0*inch, 0.4*inch, 0.4*inch, 0.4*inch, 0.4*inch, 0.6*inch, 1.0*inch, 1.6*inch])
     results_table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#D3D3D3')),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
