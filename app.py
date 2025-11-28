@@ -3987,7 +3987,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
         # Use data editor
         edited_df = None
         try:
-            edited_df = st.data_editor(editor_df, width='stretch', width='content')
+            edited_df = st.data_editor(editor_df, width='stretch')
         except Exception as e:
             st.error(f"Could not display editor: {e}")
             st.dataframe(editor_df, width='stretch')
