@@ -3713,13 +3713,13 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
     with st.expander("📝 Coursework (CW) Components", expanded=True):
         col_cw1, col_cw2, col_cw3 = st.columns([2, 1, 1])
         with col_cw1:
-            st.session_state.cw_name = st.text_input("Component name (e.g., Test 1)", value=st.session_state.cw_name, key="cw_name")
+            cw_name = st.text_input("Component name (e.g., Test 1)", value=st.session_state.cw_name, key="cw_name_input")
         with col_cw2:
-            st.session_state.cw_total = st.number_input("Total marks", min_value=1.0, value=st.session_state.cw_total, step=0.5, key="cw_total")
+            cw_total = st.number_input("Total marks", min_value=1.0, value=st.session_state.cw_total, step=0.5, key="cw_total_input")
         with col_cw3:
             if st.button("➕ Add", key="add_cw", use_container_width=True):
-                if st.session_state.cw_name and st.session_state.cw_total > 0:
-                    st.session_state.cw_components.append({"name": st.session_state.cw_name, "total": st.session_state.cw_total})
+                if cw_name and cw_total > 0:
+                    st.session_state.cw_components.append({"name": cw_name, "total": cw_total})
                     st.session_state.cw_name = ""
                     st.session_state.cw_total = 20.0
                     st.rerun()
@@ -3747,13 +3747,13 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
     with st.expander("📋 Mid-Term (MT) Components", expanded=True):
         col_mt1, col_mt2, col_mt3 = st.columns([2, 1, 1])
         with col_mt1:
-            st.session_state.mt_name = st.text_input("Component name (e.g., Paper 1)", value=st.session_state.mt_name, key="mt_name")
+            mt_name = st.text_input("Component name (e.g., Paper 1)", value=st.session_state.mt_name, key="mt_name_input")
         with col_mt2:
-            st.session_state.mt_total = st.number_input("Total marks", min_value=1.0, value=st.session_state.mt_total, step=0.5, key="mt_total")
+            mt_total = st.number_input("Total marks", min_value=1.0, value=st.session_state.mt_total, step=0.5, key="mt_total_input")
         with col_mt3:
             if st.button("➕ Add", key="add_mt", use_container_width=True):
-                if st.session_state.mt_name and st.session_state.mt_total > 0:
-                    st.session_state.mt_components.append({"name": st.session_state.mt_name, "total": st.session_state.mt_total})
+                if mt_name and mt_total > 0:
+                    st.session_state.mt_components.append({"name": mt_name, "total": mt_total})
                     st.session_state.mt_name = ""
                     st.session_state.mt_total = 40.0
                     st.rerun()
@@ -3781,13 +3781,13 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
     with st.expander("🎓 End-Term (ET) Components", expanded=True):
         col_et1, col_et2, col_et3 = st.columns([2, 1, 1])
         with col_et1:
-            st.session_state.et_name = st.text_input("Component name (e.g., Final Exam)", value=st.session_state.et_name, key="et_name")
+            et_name = st.text_input("Component name (e.g., Final Exam)", value=st.session_state.et_name, key="et_name_input")
         with col_et2:
-            st.session_state.et_total = st.number_input("Total marks", min_value=1.0, value=st.session_state.et_total, step=0.5, key="et_total")
+            et_total = st.number_input("Total marks", min_value=1.0, value=st.session_state.et_total, step=0.5, key="et_total_input")
         with col_et3:
             if st.button("➕ Add", key="add_et", use_container_width=True):
-                if st.session_state.et_name and st.session_state.et_total > 0:
-                    st.session_state.et_components.append({"name": st.session_state.et_name, "total": st.session_state.et_total})
+                if et_name and et_total > 0:
+                    st.session_state.et_components.append({"name": et_name, "total": et_total})
                     st.session_state.et_name = ""
                     st.session_state.et_total = 100.0
                     st.rerun()
