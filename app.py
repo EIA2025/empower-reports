@@ -4426,10 +4426,13 @@ elif page == "Comments" and st.session_state.user_role == 'teacher':
     # Select class (optional) and subject
     col1, col2 = st.columns(2)
     with col1:
-        selected_class = st.selectbox("Select Class (optional)", available_classes)
+        # Default to 'All Classes' so teachers can comment across all students who take the subject
+        default_idx = 0 if "All Classes" in available_classes else 0
+        selected_class = st.selectbox("Select Class (optional)", available_classes, index=default_idx)
     with col2:
         subject_options = subjects_taught if subjects_taught and subjects_taught[0] else ["English", "Math", "Science"]
-        selected_subject = st.selectbox("Select Subject", subject_options)
+        # Auto-select the first subject for convenience
+        selected_subject = st.selectbox("Select Subject", subject_options, index=0)
     
     if not selected_class or not selected_subject:
         st.warning("Please select both class and subject.")
