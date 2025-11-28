@@ -4650,19 +4650,39 @@ elif page == "Admin Management" and st.session_state.user_role == 'admin':
                         phone = st.text_input("Phone Number", value=admin.phone_number or "")
                         email = st.text_input("Email", value=admin.email)
                     
-                    if st.form_submit_button("Update Admin"):
-                        valid, result = validate_phone_number(phone)
-                        if not valid:
-                            st.error(result)
-                        else:
-                            admin.name = name
-                            admin.gender = gender
-                            admin.phone_number = result
-                            admin.email = email
-                            session.commit()
-                            log_audit(session, st.session_state.user_id, "edit_admin", f"Updated {name}")
-                            st.success(" Admin updated successfully!")
-                            st.rerun()
+                    col_update, col_delete = st.columns(2)
+                    with col_update:
+                        if st.form_submit_button("Update Admin", width='stretch'):
+                            # Check if email is already taken by another admin
+                            existing_email = session.query(User).filter(User.email == email, User.id != admin_id).first()
+                            if existing_email:
+                                st.error("Email already in use by another admin")
+                            else:
+                                valid, result = validate_phone_number(phone)
+                                if not valid:
+                                    st.error(result)
+                                else:
+                                    admin.name = name
+                                    admin.gender = gender
+                                    admin.phone_number = result
+                                    admin.email = email
+                                    session.commit()
+                                    log_audit(session, st.session_state.user_id, "edit_admin", f"Updated {name}")
+                                    st.success(" Admin updated successfully!")
+                                    st.rerun()
+                    
+                    with col_delete:
+                        if st.form_submit_button(" Delete Admin", type="secondary", width='stretch'):
+                            try:
+                                admin_name = admin.name
+                                session.delete(admin)
+                                session.commit()
+                                log_audit(session, st.session_state.user_id, "delete_admin", f"Deleted {admin_name}")
+                                st.success(f" Admin {admin_name} deleted successfully!")
+                                st.rerun()
+                            except Exception as e:
+                                session.rollback()
+                                st.error(f" Error deleting admin: {str(e)}")
         else:
             st.info("No other admins")
     
@@ -4681,33 +4701,43 @@ elif page == "Admin Management" and st.session_state.user_role == 'admin':
             
             admin_title = st.text_input("Title (e.g., Principal, DOA, Facilitator)")
             
-            if st.form_submit_button("Add Admin"):
+            if st.form_submit_button("Add Admin", width='stretch'):
                 if not all([name, gender, phone, email, password]):
                     st.error("Please fill all required fields marked with *")
                 elif password != confirm_pass:
                     st.error("Passwords don't match")
-                elif session.query(User).filter_by(email=email).first():
-                    st.error("Email already exists")
+                elif len(password) < 6:
+                    st.error("Password must be at least 6 characters long")
                 else:
-                    valid, result = validate_phone_number(phone)
-                    if not valid:
-                        st.error(result)
+                    # Check if email already exists
+                    existing = session.query(User).filter_by(email=email).first()
+                    if existing:
+                        st.error(f"Email '{email}' already exists in the system")
                     else:
-                        new_admin = User(
-                            name=f"{name} ({admin_title})" if admin_title else name,
-                            gender=gender,
-                            phone_number=result,
-                            email=email,
-                            role='admin',
-                            password_hash=hashlib.sha256(password.encode()).hexdigest(),
-                            subjects_taught='',
-                            class_teacher_for=''
-                        )
-                        session.add(new_admin)
-                        session.commit()
-                        log_audit(session, st.session_state.user_id, "add_admin", f"Added {name}")
-                        st.success(f" Admin added: {email} / {password}")
-                        st.rerun()
+                        valid, result = validate_phone_number(phone)
+                        if not valid:
+                            st.error(result)
+                        else:
+                            try:
+                                new_admin = User(
+                                    name=f"{name} ({admin_title})" if admin_title else name,
+                                    gender=gender,
+                                    phone_number=result,
+                                    email=email,
+                                    role='admin',
+                                    password_hash=hashlib.sha256(password.encode()).hexdigest(),
+                                    subjects_taught='',
+                                    class_teacher_for=''
+                                )
+                                session.add(new_admin)
+                                session.commit()
+                                log_audit(session, st.session_state.user_id, "add_admin", f"Added {name}")
+                                st.success(f" Admin created successfully!")
+                                st.info(f"Email: {email} | Password: (as entered)")
+                                st.rerun()
+                            except Exception as e:
+                                session.rollback()
+                                st.error(f" Error creating admin: {str(e)}")
 
     with tab3:
         st.subheader("Manage Classroom Behavior Components")
