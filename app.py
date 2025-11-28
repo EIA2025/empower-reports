@@ -4385,15 +4385,32 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
 
                     # Build comments DataFrame for editing
                     comments_df = compiled_df[['student_id', 'student_name', 'registration_number']].copy()
+                    # Pre-fill Comment column from compiled_df if present
                     if 'comment' in compiled_df.columns:
                         comments_df['Comment'] = compiled_df['comment'].fillna('')
                     else:
                         comments_df['Comment'] = ''
 
+                    # If there are staged comments in session state, ensure they populate the editor
+                    staged = st.session_state.get('student_comments', {})
+                    if staged:
+                        def _apply_staged_to_df(df, staged_map):
+                            df = df.copy()
+                            for i, r in df.iterrows():
+                                sid = int(r['student_id'])
+                                if sid in staged_map:
+                                    df.at[i, 'Comment'] = staged_map[sid]
+                            return df
+
+                        comments_df = _apply_staged_to_df(comments_df, staged)
+
                     # Show editable table for comments
+                    # Use a versioned editor key so we can force-recreate the editor when needed
+                    editor_version = st.session_state.get('comments_editor_version', 0)
+                    editor_key = f"comments_editor_{editor_version}"
                     edited_comments = None
                     try:
-                        edited_comments = st.data_editor(comments_df, key='comments_editor', width='stretch')
+                        edited_comments = st.data_editor(comments_df, key=editor_key, width='stretch')
                     except Exception as e:
                         st.error(f"Could not display comment editor: {e}")
                         st.dataframe(comments_df, width='stretch')
@@ -4409,6 +4426,11 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                                 except Exception:
                                     continue
                             st.success("Edited comments staged. Click 'Save All Comments' to persist.")
+
+                        # Offer a reset button to reload staged comments into the editor
+                        if st.button("Reset Editor To Staged", key="reset_editor_staged"):
+                            # Increment the editor version to force Streamlit to remount the data_editor
+                            st.session_state['comments_editor_version'] = st.session_state.get('comments_editor_version', 0) + 1
                             st.experimental_rerun()
 
                     # Save all staged comments to DB/audit log
