@@ -3647,7 +3647,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
     session.close()
 
 elif page == "Enter Results" and st.session_state.user_role == 'teacher':
-    st.header(" Enter Results - Table-Based Input")
+    st.header("📊 Enter Results - Hybrid Setup & Entry")
     session = Session()
     
     user = session.query(User).get(st.session_state.user_id)
@@ -3658,255 +3658,517 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
         session.close()
         st.stop()
     
-    # FIX: Ensure Active Term is Used in Component Marks
+    # Ensure Active Term is Set
     active_term = session.query(AcademicTerm).filter_by(is_active=True).first()
     if not active_term:
         st.error(" No active term set. Please contact administrator.")
         session.close()
         st.stop()
     
-    st.info(f" Current Term: **{active_term.term_name}**")
+    st.info(f"📅 Current Term: **{active_term.term_name}**")
     
-    # FIX: Add warning message at the top
-    st.warning(" **IMPORTANT**: Use the table interface below to enter marks for all students at once. You will see a list of all students in the class — fill in their scores to ensure none are missed. After finishing, click 'Save & Compile Marks' to compile final scores.")
-    
-    # Select Class
+    # Get classes
     classes = pd.read_sql("SELECT DISTINCT class_name FROM students ORDER BY class_name", ENGINE)
-    
     if classes.empty:
         st.info("No students enrolled yet")
         session.close()
         st.stop()
     
-    col1, col2, col3 = st.columns(3)
-    
+    # Step 1: Select Class & Subject
+    col1, col2 = st.columns(2)
     with col1:
-        st.markdown("**Step 1: Select Class**")
-        selected_class = st.selectbox("Class", classes['class_name'].tolist(), label_visibility="collapsed")
-    
+        selected_class = st.selectbox("📍 Select Class", classes['class_name'].tolist())
     with col2:
-        st.markdown("**Step 2: Select Subject**")
-        selected_subject = st.selectbox("Subject", my_subjects, label_visibility="collapsed")
+        selected_subject = st.selectbox("📚 Select Subject", my_subjects)
     
-    with col3:
-        st.markdown("**Step 3: Select Component Type**")
-        component_type = st.selectbox("Component Type", ["Coursework (CW)", "Mid of Term (MOT)", "End of Term (EOT)"], label_visibility="collapsed")
+    st.divider()
     
-    # Get students in this class with the subject
+    # Initialize session state for component management
+    if 'cw_components' not in st.session_state:
+        st.session_state.cw_components = []
+    if 'mt_components' not in st.session_state:
+        st.session_state.mt_components = []
+    if 'et_components' not in st.session_state:
+        st.session_state.et_components = []
+    if 'entry_mode' not in st.session_state:
+        st.session_state.entry_mode = False
+    
+    # Step 2: Unified Component Setup (3 collapsible sections)
+    st.subheader("⚙️ Phase 1: Define Components")
+    st.write("Add all components for each assessment type. You'll see them listed in real-time.")
+    
+    # COURSEWORK SECTION
+    with st.expander("📝 Coursework (CW) Components", expanded=True):
+        col_cw1, col_cw2, col_cw3 = st.columns([2, 1, 1])
+        with col_cw1:
+            cw_name = st.text_input("Component name (e.g., Test 1)", key="cw_name")
+        with col_cw2:
+            cw_total = st.number_input("Total marks", min_value=1.0, value=20.0, step=0.5, key="cw_total")
+        with col_cw3:
+            if st.button("➕ Add", key="add_cw", use_container_width=True):
+                if cw_name and cw_total > 0:
+                    st.session_state.cw_components.append({"name": cw_name, "total": cw_total})
+                    st.session_state.cw_name = ""
+                    st.rerun()
+        
+        # Display existing CW components
+        if st.session_state.cw_components:
+            st.write("**Added Components:**")
+            for idx, comp in enumerate(st.session_state.cw_components):
+                col_disp1, col_disp2, col_disp3 = st.columns([2, 1, 1])
+                with col_disp1:
+                    st.write(f"• {comp['name']}")
+                with col_disp2:
+                    st.write(f"/{comp['total']}")
+                with col_disp3:
+                    if st.button("🗑️", key=f"del_cw_{idx}", use_container_width=True):
+                        st.session_state.cw_components.pop(idx)
+                        st.rerun()
+            
+            cw_total_all = sum(c["total"] for c in st.session_state.cw_components)
+            st.success(f"✓ {len(st.session_state.cw_components)} CW components (Total: /{cw_total_all} → auto-convert to /20)")
+        else:
+            st.write("*No coursework components added yet*")
+    
+    # MID-TERM SECTION
+    with st.expander("📋 Mid-Term (MT) Components", expanded=True):
+        col_mt1, col_mt2, col_mt3 = st.columns([2, 1, 1])
+        with col_mt1:
+            mt_name = st.text_input("Component name (e.g., Paper 1)", key="mt_name")
+        with col_mt2:
+            mt_total = st.number_input("Total marks", min_value=1.0, value=40.0, step=0.5, key="mt_total")
+        with col_mt3:
+            if st.button("➕ Add", key="add_mt", use_container_width=True):
+                if mt_name and mt_total > 0:
+                    st.session_state.mt_components.append({"name": mt_name, "total": mt_total})
+                    st.session_state.mt_name = ""
+                    st.rerun()
+        
+        # Display existing MT components
+        if st.session_state.mt_components:
+            st.write("**Added Components:**")
+            for idx, comp in enumerate(st.session_state.mt_components):
+                col_disp1, col_disp2, col_disp3 = st.columns([2, 1, 1])
+                with col_disp1:
+                    st.write(f"• {comp['name']}")
+                with col_disp2:
+                    st.write(f"/{comp['total']}")
+                with col_disp3:
+                    if st.button("🗑️", key=f"del_mt_{idx}", use_container_width=True):
+                        st.session_state.mt_components.pop(idx)
+                        st.rerun()
+            
+            mt_total_all = sum(c["total"] for c in st.session_state.mt_components)
+            st.success(f"✓ {len(st.session_state.mt_components)} MT components (Total: /{mt_total_all} → auto-convert to /20)")
+        else:
+            st.write("*No mid-term components added yet*")
+    
+    # END-TERM SECTION
+    with st.expander("🎓 End-Term (ET) Components", expanded=True):
+        col_et1, col_et2, col_et3 = st.columns([2, 1, 1])
+        with col_et1:
+            et_name = st.text_input("Component name (e.g., Final Exam)", key="et_name")
+        with col_et2:
+            et_total = st.number_input("Total marks", min_value=1.0, value=100.0, step=0.5, key="et_total")
+        with col_et3:
+            if st.button("➕ Add", key="add_et", use_container_width=True):
+                if et_name and et_total > 0:
+                    st.session_state.et_components.append({"name": et_name, "total": et_total})
+                    st.session_state.et_name = ""
+                    st.rerun()
+        
+        # Display existing ET components
+        if st.session_state.et_components:
+            st.write("**Added Components:**")
+            for idx, comp in enumerate(st.session_state.et_components):
+                col_disp1, col_disp2, col_disp3 = st.columns([2, 1, 1])
+                with col_disp1:
+                    st.write(f"• {comp['name']}")
+                with col_disp2:
+                    st.write(f"/{comp['total']}")
+                with col_disp3:
+                    if st.button("🗑️", key=f"del_et_{idx}", use_container_width=True):
+                        st.session_state.et_components.pop(idx)
+                        st.rerun()
+            
+            et_total_all = sum(c["total"] for c in st.session_state.et_components)
+            st.success(f"✓ {len(st.session_state.et_components)} ET components (Total: /{et_total_all} → auto-convert to /60)")
+        else:
+            st.write("*No end-term components added yet*")
+    
+    # Check if components are defined
+    has_components = (
+        len(st.session_state.cw_components) > 0 or 
+        len(st.session_state.mt_components) > 0 or 
+        len(st.session_state.et_components) > 0
+    )
+    
+    if not has_components:
+        st.warning("⚠️ Please add at least one component above to continue.")
+        session.close()
+        st.stop()
+    
+    st.divider()
+    
+    # Step 3: Score Entry Phase
+    st.subheader("📝 Phase 2: Enter Scores")
+    st.write("Fill in scores for each student. Totals calculate automatically.")
+    
+    
+    # Get all students in class
     students_in_class = pd.read_sql(
-        f"SELECT id, name, registration_number, year FROM students WHERE class_name = '{selected_class}' ORDER BY name",
+        f"SELECT id, name, registration_number FROM students WHERE class_name = '{selected_class}' ORDER BY name",
         ENGINE
     )
     
     if students_in_class.empty:
-        st.warning(f"No students enrolled in {selected_class}")
+        st.warning(f"No students in {selected_class}")
         session.close()
         st.stop()
     
-    # Map component type to internal name
-    type_map = {
-        "Coursework (CW)": "coursework",
-        "Mid of Term (MOT)": "midterm",
-        "End of Term (EOT)": "endterm"
-    }
-    comp_type_internal = type_map[component_type]
+    # Collect component totals
+    cw_total_all = sum(c["total"] for c in st.session_state.cw_components) if st.session_state.cw_components else 0
+    mt_total_all = sum(c["total"] for c in st.session_state.mt_components) if st.session_state.mt_components else 0
+    et_total_all = sum(c["total"] for c in st.session_state.et_components) if st.session_state.et_components else 0
     
-    st.markdown("---")
-    st.subheader(f"📋 Enter {component_type} for {selected_class} - {selected_subject}")
+    # Build the master score entry table
+    # This will be a DataFrame where we collect all scores
     
-    # Step 1: Enter component metadata
-    st.markdown("**Step 1: Define the component**")
-    col_a, col_b = st.columns(2)
+    st.write(f"**Class:** {selected_class} | **Subject:** {selected_subject} | **Students:** {len(students_in_class)}")
     
-    with col_a:
-        component_name = st.text_input(f"Component Name (e.g., Test 1, Assignment 1, Paper 1)", value="", key="comp_name_input")
+    # Create a master dict to hold scores (persisted in session state)
+    if 'scores_data' not in st.session_state:
+        st.session_state.scores_data = {}
     
-    with col_b:
-        total_marks = st.number_input(f"Total Marks for this component", min_value=1.0, value=50.0, step=0.5, key="total_marks_input")
+    # Initialize score tracking
+    if 'current_subject_class' not in st.session_state or st.session_state.current_subject_class != f"{selected_subject}_{selected_class}":
+        st.session_state.current_subject_class = f"{selected_subject}_{selected_class}"
+        st.session_state.scores_data = {}
     
-    # Step 2: Display student table for score entry
-    st.markdown("**Step 2: Enter scores for each student below**")
-    st.info(f"Fill in the score column for each student. Leave blank if not yet marked. Once complete, click the save button at the bottom.")
+    # Build the responsive table
+    st.markdown("### Score Entry Table")
     
-    # Create a data dictionary to hold scores
-    scores_data = {
-        "Student Name": [],
-        "Reg. No.": [],
-        "Score": []
-    }
+    # Create columns dynamically
+    col_widths = [2, 1.5]  # Student name + reg no
+    col_headers = ["Student Name", "Reg. No."]
     
-    # Populate existing scores from database if editing an existing component
-    existing_scores_df = pd.read_sql(f"""
-        SELECT cm.student_id, s.name, s.registration_number, cm.score
-        FROM component_marks cm
-        JOIN students s ON cm.student_id = s.id
-        WHERE cm.subject = '{selected_subject}'
-        AND cm.term_id = {active_term.id}
-        AND cm.component_type = '{comp_type_internal}'
-        AND cm.component_name = '{component_name}'
-        AND cm.total = {total_marks}
-    """, ENGINE) if component_name and total_marks > 0 else pd.DataFrame()
+    # Add CW columns
+    if st.session_state.cw_components:
+        col_widths.extend([1] * len(st.session_state.cw_components))
+        col_headers.extend([f"{c['name']}\n(/{c['total']})" for c in st.session_state.cw_components])
+        col_widths.append(1.2)
+        col_headers.append("CW Total\n(→/20)")
     
-    existing_scores_map = {}
-    if not existing_scores_df.empty:
-        existing_scores_map = dict(zip(existing_scores_df['student_id'], existing_scores_df['score']))
+    # Add MT columns
+    if st.session_state.mt_components:
+        col_widths.extend([1] * len(st.session_state.mt_components))
+        col_headers.extend([f"{c['name']}\n(/{c['total']})" for c in st.session_state.mt_components])
+        col_widths.append(1.2)
+        col_headers.append("MT Total\n(→/20)")
     
-    # Build the input table with columns
-    input_scores = []
+    # Add ET columns
+    if st.session_state.et_components:
+        col_widths.extend([1] * len(st.session_state.et_components))
+        col_headers.extend([f"{c['name']}\n(/{c['total']})" for c in st.session_state.et_components])
+        col_widths.append(1.2)
+        col_headers.append("ET Total\n(→/60)")
+    
+    # Add summary columns
+    col_widths.extend([1.2, 1, 1.5])
+    col_headers.extend(["Final\nTotal", "Grade", "Status"])
+    
+    # Display header row
+    header_cols = st.columns(col_widths)
+    for idx, header in enumerate(col_headers):
+        with header_cols[idx]:
+            st.markdown(f"**{header}**")
+    
+    st.divider()
+    
+    # Display score entry rows
+    completed_count = 0
     
     for _, student in students_in_class.iterrows():
         student_id = int(student['id'])
-        existing_score = existing_scores_map.get(student_id, None)
+        student_name = student['name']
+        student_reg = student['registration_number']
         
-        scores_data["Student Name"].append(student['name'])
-        scores_data["Reg. No."].append(student['registration_number'])
-        input_scores.append(existing_score if existing_score is not None else 0.0)
-    
-    # Display interactive table for score entry
-    st.markdown("**Student Score Entry Table**")
-    
-    # Create columns for the table display
-    cols = st.columns([2, 1.5, 1.5])
-    cols[0].write("**Student Name**")
-    cols[1].write("**Reg. No.**")
-    cols[2].write(f"**Score (out of {total_marks})**")
-    
-    st.divider()
-    
-    # Collect scores from user input
-    entered_scores = []
-    score_inputs = []
-    
-    for idx, (_, student) in enumerate(students_in_class.iterrows()):
-        cols = st.columns([2, 1.5, 1.5])
+        cols_row = st.columns(col_widths)
         
-        with cols[0]:
-            st.write(student['name'])
-        with cols[1]:
-            st.write(student['registration_number'])
-        with cols[2]:
-            existing_val = input_scores[idx] if input_scores[idx] > 0 else None
-            score = st.number_input(
-                f"Score {idx}",
-                min_value=0.0,
-                max_value=float(total_marks) * 2,  # Allow entry beyond total for flexibility
-                value=float(existing_val) if existing_val is not None else 0.0,
-                step=0.5,
-                key=f"score_input_{idx}_{student['id']}",
-                label_visibility="collapsed"
-            )
-            score_inputs.append((student['id'], student['name'], score))
-    
-    st.divider()
-    
-    # Save button
-    if st.button(f"💾 Save {component_type} Scores for {selected_class}", use_container_width=True):
-        if not component_name:
-            st.error("Please enter a component name.")
-        elif total_marks <= 0:
-            st.error("Please enter valid total marks.")
+        col_idx = 0
+        
+        # Student info
+        with cols_row[col_idx]:
+            st.write(f"**{student_name}**")
+        col_idx += 1
+        
+        with cols_row[col_idx]:
+            st.write(student_reg)
+        col_idx += 1
+        
+        # Initialize student scores in session state
+        if student_id not in st.session_state.scores_data:
+            st.session_state.scores_data[student_id] = {
+                "cw_scores": [0.0] * len(st.session_state.cw_components),
+                "mt_scores": [0.0] * len(st.session_state.mt_components),
+                "et_scores": [0.0] * len(st.session_state.et_components)
+            }
+        
+        student_scores = st.session_state.scores_data[student_id]
+        
+        # CW score inputs
+        cw_scores = student_scores["cw_scores"]
+        for comp_idx, comp in enumerate(st.session_state.cw_components):
+            with cols_row[col_idx]:
+                score = st.number_input(
+                    f"CW {comp_idx}",
+                    min_value=0.0,
+                    max_value=comp["total"] * 2,
+                    value=cw_scores[comp_idx],
+                    step=0.5,
+                    key=f"cw_{student_id}_{comp_idx}",
+                    label_visibility="collapsed"
+                )
+                cw_scores[comp_idx] = score
+            col_idx += 1
+        
+        # CW total and conversion
+        if st.session_state.cw_components:
+            cw_raw_total = sum(cw_scores)
+            cw_out_of_20 = convert_to_base(cw_raw_total, cw_total_all, 20) if cw_total_all > 0 else 0
+            with cols_row[col_idx]:
+                st.metric("", f"{cw_out_of_20:.1f}", label_visibility="collapsed")
+            col_idx += 1
         else:
+            cw_out_of_20 = 0
+        
+        # MT score inputs
+        mt_scores = student_scores["mt_scores"]
+        for comp_idx, comp in enumerate(st.session_state.mt_components):
+            with cols_row[col_idx]:
+                score = st.number_input(
+                    f"MT {comp_idx}",
+                    min_value=0.0,
+                    max_value=comp["total"] * 2,
+                    value=mt_scores[comp_idx],
+                    step=0.5,
+                    key=f"mt_{student_id}_{comp_idx}",
+                    label_visibility="collapsed"
+                )
+                mt_scores[comp_idx] = score
+            col_idx += 1
+        
+        # MT total and conversion
+        if st.session_state.mt_components:
+            mt_raw_total = sum(mt_scores)
+            mt_out_of_20 = convert_to_base(mt_raw_total, mt_total_all, 20) if mt_total_all > 0 else 0
+            with cols_row[col_idx]:
+                st.metric("", f"{mt_out_of_20:.1f}", label_visibility="collapsed")
+            col_idx += 1
+        else:
+            mt_out_of_20 = 0
+        
+        # ET score inputs
+        et_scores = student_scores["et_scores"]
+        for comp_idx, comp in enumerate(st.session_state.et_components):
+            with cols_row[col_idx]:
+                score = st.number_input(
+                    f"ET {comp_idx}",
+                    min_value=0.0,
+                    max_value=comp["total"] * 2,
+                    value=et_scores[comp_idx],
+                    step=0.5,
+                    key=f"et_{student_id}_{comp_idx}",
+                    label_visibility="collapsed"
+                )
+                et_scores[comp_idx] = score
+            col_idx += 1
+        
+        # ET total and conversion
+        if st.session_state.et_components:
+            et_raw_total = sum(et_scores)
+            et_out_of_60 = convert_to_base(et_raw_total, et_total_all, 60) if et_total_all > 0 else 0
+            with cols_row[col_idx]:
+                st.metric("", f"{et_out_of_60:.1f}", label_visibility="collapsed")
+            col_idx += 1
+        else:
+            et_out_of_60 = 0
+        
+        # Calculate final totals and grade
+        final_total = cw_out_of_20 + mt_out_of_20 + et_out_of_60
+        final_grade = get_grade(final_total)
+        
+        # Check if student has scores
+        has_any_score = any(cw_scores) or any(mt_scores) or any(et_scores)
+        status = "✓ Complete" if has_any_score else "⏳ Pending"
+        status_color = "🟢" if has_any_score else "🔴"
+        
+        if has_any_score:
+            completed_count += 1
+        
+        # Final total
+        with cols_row[col_idx]:
+            st.metric("", f"{final_total:.1f}", label_visibility="collapsed")
+        col_idx += 1
+        
+        # Grade
+        with cols_row[col_idx]:
+            st.metric("", final_grade, label_visibility="collapsed")
+        col_idx += 1
+        
+        # Status
+        with cols_row[col_idx]:
+            st.write(f"{status_color} {status}")
+        col_idx += 1
+        
+        st.divider()
+    
+    # Progress bar
+    progress = completed_count / len(students_in_class)
+    st.progress(progress, text=f"Progress: {completed_count}/{len(students_in_class)} students")
+    
+    # Save All Scores
+    st.markdown("---")
+    col_save1, col_save2 = st.columns([3, 1])
+    
+    with col_save1:
+        st.write(f"Ready to save {completed_count} students' marks?")
+    
+    with col_save2:
+        if st.button("💾 Save All Scores", use_container_width=True, key="save_all_scores"):
             saved_count = 0
             errors = []
             
             try:
-                for student_id, student_name, score in score_inputs:
-                    if score > 0:  # Only save if score is entered
-                        # Check if component already exists
-                        existing = session.query(ComponentMark).filter_by(
-                            student_id=student_id,
-                            subject=selected_subject,
-                            term_id=active_term.id,
-                            component_type=comp_type_internal,
-                            component_name=component_name
-                        ).first()
+                for student_id, scores in st.session_state.scores_data.items():
+                    student_name = students_in_class[students_in_class['id'] == student_id]['name'].iloc[0] if student_id in students_in_class['id'].values else "Unknown"
+                    
+                    has_score = any(scores["cw_scores"]) or any(scores["mt_scores"]) or any(scores["et_scores"])
+                    
+                    if has_score:
+                        try:
+                            # Save CW components
+                            for comp_idx, comp in enumerate(st.session_state.cw_components):
+                                score = scores["cw_scores"][comp_idx] if comp_idx < len(scores["cw_scores"]) else 0
+                                if score > 0:
+                                    existing = session.query(ComponentMark).filter_by(
+                                        student_id=student_id,
+                                        subject=selected_subject,
+                                        term_id=active_term.id,
+                                        component_type='coursework',
+                                        component_name=comp['name']
+                                    ).first()
+                                    
+                                    if existing:
+                                        existing.score = score
+                                        existing.total = comp['total']
+                                        existing.submitted_by = st.session_state.user_id
+                                        existing.submitted_at = datetime.now().isoformat()
+                                    else:
+                                        existing = ComponentMark(
+                                            student_id=student_id,
+                                            subject=selected_subject,
+                                            term_id=active_term.id,
+                                            component_type='coursework',
+                                            component_name=comp['name'],
+                                            score=score,
+                                            total=comp['total'],
+                                            submitted_by=st.session_state.user_id
+                                        )
+                                        session.add(existing)
+                            
+                            # Save MT components
+                            for comp_idx, comp in enumerate(st.session_state.mt_components):
+                                score = scores["mt_scores"][comp_idx] if comp_idx < len(scores["mt_scores"]) else 0
+                                if score > 0:
+                                    existing = session.query(ComponentMark).filter_by(
+                                        student_id=student_id,
+                                        subject=selected_subject,
+                                        term_id=active_term.id,
+                                        component_type='midterm',
+                                        component_name=comp['name']
+                                    ).first()
+                                    
+                                    if existing:
+                                        existing.score = score
+                                        existing.total = comp['total']
+                                        existing.submitted_by = st.session_state.user_id
+                                        existing.submitted_at = datetime.now().isoformat()
+                                    else:
+                                        existing = ComponentMark(
+                                            student_id=student_id,
+                                            subject=selected_subject,
+                                            term_id=active_term.id,
+                                            component_type='midterm',
+                                            component_name=comp['name'],
+                                            score=score,
+                                            total=comp['total'],
+                                            submitted_by=st.session_state.user_id
+                                        )
+                                        session.add(existing)
+                            
+                            # Save ET components
+                            for comp_idx, comp in enumerate(st.session_state.et_components):
+                                score = scores["et_scores"][comp_idx] if comp_idx < len(scores["et_scores"]) else 0
+                                if score > 0:
+                                    existing = session.query(ComponentMark).filter_by(
+                                        student_id=student_id,
+                                        subject=selected_subject,
+                                        term_id=active_term.id,
+                                        component_type='endterm',
+                                        component_name=comp['name']
+                                    ).first()
+                                    
+                                    if existing:
+                                        existing.score = score
+                                        existing.total = comp['total']
+                                        existing.submitted_by = st.session_state.user_id
+                                        existing.submitted_at = datetime.now().isoformat()
+                                    else:
+                                        existing = ComponentMark(
+                                            student_id=student_id,
+                                            subject=selected_subject,
+                                            term_id=active_term.id,
+                                            component_type='endterm',
+                                            component_name=comp['name'],
+                                            score=score,
+                                            total=comp['total'],
+                                            submitted_by=st.session_state.user_id
+                                        )
+                                        session.add(existing)
+                            
+                            saved_count += 1
                         
-                        if existing:
-                            # Update existing
-                            existing.score = score
-                            existing.total = total_marks
-                            existing.submitted_by = st.session_state.user_id
-                            existing.submitted_at = datetime.now().isoformat()
-                            session.add(existing)
-                        else:
-                            # Create new
-                            new_mark = ComponentMark(
-                                student_id=student_id,
-                                subject=selected_subject,
-                                term_id=active_term.id,
-                                component_type=comp_type_internal,
-                                component_name=component_name,
-                                score=score,
-                                total=total_marks,
-                                submitted_by=st.session_state.user_id
-                            )
-                            session.add(new_mark)
-                        
-                        saved_count += 1
+                        except Exception as e:
+                            errors.append(f"{student_name}: {str(e)}")
                 
                 session.commit()
-                log_audit(session, st.session_state.user_id, "enter_component_marks",
-                         f"{selected_class} - {selected_subject} - {component_type} - {component_name} - {saved_count} students")
+                log_audit(session, st.session_state.user_id, "enter_component_marks_hybrid",
+                         f"{selected_class} - {selected_subject} - {saved_count} students")
+                
                 st.success(f"✅ Scores saved for {saved_count} students!")
+                st.balloons()
                 
             except Exception as e:
                 session.rollback()
                 st.error(f"❌ Error saving scores: {str(e)}")
+            
+            if errors:
+                st.error("⚠️ Errors for some students:")
+                for error in errors:
+                    st.error(f"  • {error}")
     
-    # NEW: Enhanced component marks entry system
     st.markdown("---")
-    st.subheader(" Review & Compile Final Marks")
-    st.info("After entering all component marks (CW, MOT, EOT) for all students, use the section below to review and compile final scores.")
+    st.subheader("🚀 Auto-Compile Final Marks")
+    st.write("After saving scores above, click below to automatically compile final marks for all students.")
     
-    # Show existing marks for verification
-    with st.expander("📊 View All Marks for This Class/Subject (Existing & Compiled)"):
-        existing_marks_query = f"""
-            SELECT s.name, s.registration_number, m.coursework_out_of_20, m.midterm_out_of_20, 
-                   m.endterm_out_of_60, m.total, m.grade
-            FROM marks m
-            JOIN students s ON m.student_id = s.id
-            WHERE m.term_id = {active_term.id} 
-            AND m.subject = '{selected_subject}'
-            AND s.class_name = '{selected_class}'
-            ORDER BY s.name
-        """
-        existing_marks_df = pd.read_sql(existing_marks_query, ENGINE)
-        
-        if not existing_marks_df.empty:
-            st.dataframe(existing_marks_df, use_container_width=True)
-        else:
-            st.info("No compiled marks yet for this class/subject combination")
-    
-    # Show existing component marks
-    with st.expander("🔍 View Component Marks (Raw Data)"):
-        component_marks_query = f"""
-            SELECT s.name, s.registration_number, cm.component_type, cm.component_name, 
-                   cm.score, cm.total
-            FROM component_marks cm
-            JOIN students s ON cm.student_id = s.id
-            WHERE cm.term_id = {active_term.id} 
-            AND cm.subject = '{selected_subject}'
-            AND s.class_name = '{selected_class}'
-            ORDER BY s.name, cm.component_type, cm.component_name
-        """
-        component_marks_df = pd.read_sql(component_marks_query, ENGINE)
-        
-        if not component_marks_df.empty:
-            st.dataframe(component_marks_df, use_container_width=True)
-        else:
-            st.info("No component marks entered yet for this class/subject combination")
-    
-    # Auto-Compile Option
-    st.markdown("---")
-    st.subheader(" 🚀 Quick Compile All Students")
-    st.info("This will automatically compile final marks for ALL students in this class who have component marks entered.")
-    
-    if st.button(" Auto-Compile All Students with Component Marks", use_container_width=True, key="auto_compile_btn"):
+    if st.button("🔄 Auto-Compile All Students", use_container_width=True):
         compiled_count = 0
-        errors = []
         
-        # Get all students with component marks
-        students_with_comps = pd.read_sql(f"""
+        progress_bar = st.progress(0)
+        status_area = st.empty()
+        
+        students_to_compile = pd.read_sql(f"""
             SELECT DISTINCT s.id, s.name
             FROM students s
             JOIN component_marks cm ON s.id = cm.student_id
@@ -3916,37 +4178,28 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
             ORDER BY s.name
         """, ENGINE)
         
-        if students_with_comps.empty:
-            st.warning("No students have component marks to compile.")
+        if students_to_compile.empty:
+            st.info("No students with component marks to compile.")
         else:
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            for idx, (_, student) in enumerate(students_with_comps.iterrows()):
+            for idx, (_, student) in enumerate(students_to_compile.iterrows()):
                 try:
                     student_id = int(student['id'])
-                    student_name = student['name']
-                    
-                    # Compile marks
                     total, grade = update_compiled_marks(session, student_id, selected_subject, active_term.id, submitted_by=st.session_state.user_id)
                     compiled_count += 1
                     
-                    status_text.write(f"✅ {student_name}: {total:.1f}/100 ({grade})")
-                    progress_bar.progress((idx + 1) / len(students_with_comps))
+                    status_area.write(f"✅ {student['name']}: {total:.1f}/100 ({grade})")
+                    progress_bar.progress((idx + 1) / len(students_to_compile))
                     
                 except Exception as e:
-                    errors.append(f"{student_name}: {str(e)}")
-                    status_text.write(f"❌ {student_name}: {str(e)}")
+                    status_area.write(f"❌ {student['name']}: {str(e)}")
             
-            log_audit(session, st.session_state.user_id, "auto_compile_marks", 
+            log_audit(session, st.session_state.user_id, "auto_compile_marks_hybrid",
                      f"{selected_class} - {selected_subject} - {compiled_count} students")
             
-            st.success(f"✅ Successfully compiled marks for {compiled_count} students!")
-            
-            if errors:
-                st.error(" Errors occurred for some students:")
-                for error in errors:
-                    st.error(f"  • {error}")
+            st.success(f"✅ Final marks compiled for {compiled_count} students!")
+            st.balloons()
+    
+    session.close()
     
     session.close()
 
