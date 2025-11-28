@@ -2071,6 +2071,7 @@ else:
     page = st.sidebar.selectbox("Menu", [
         "Dashboard",
         "Enter Results",
+        "Comments",
         "Classroom Behavior",
         "Behavior Components",
         "Student Decisions",
@@ -4374,169 +4375,213 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                         width='stretch'
                     )
 
-                    # Teacher comments section (form-based, paginated)
-                    st.markdown("---")
-                    st.subheader("💬 Add Comments for Students")
-                    st.info("Edit comments in groups (forms). Submit each group to stage changes; click 'Save All Comments' to persist.")
-
-                    # Ensure session storage exists
-                    if 'student_comments' not in st.session_state:
-                        st.session_state.student_comments = {}
-                    if 'comments_page_index' not in st.session_state:
-                        st.session_state.comments_page_index = 0
-
-                    # Configuration: students per page
-                    page_size = 10
-
-                    # Prepare student list and pre-fill staged comments from compiled_df
-                    students_list = compiled_df[['student_id', 'student_name', 'registration_number']].to_dict('records')
-                    if 'comment' in compiled_df.columns:
-                        # map existing comments by student_id
-                        existing_map = {int(r['student_id']): (r.get('comment') or '') for _, r in compiled_df.iterrows()}
-                    else:
-                        existing_map = {}
-
-                    for s in students_list:
-                        sid = int(s['student_id'])
-                        if sid not in st.session_state.student_comments:
-                            st.session_state.student_comments[sid] = existing_map.get(sid, '')
-
-                    total = len(students_list)
-                    page_idx = max(0, min(st.session_state.comments_page_index, (total - 1) // page_size if total else 0))
-                    start = page_idx * page_size
-                    end = min(start + page_size, total)
-                    page_students = students_list[start:end]
-
-                    st.write(f"Showing students {start+1}-{end} of {total}")
-                    cprev, cnext, cinfo = st.columns([1,1,6])
-                    with cprev:
-                        if st.button("◀ Prev", key='comments_prev') and page_idx > 0:
-                            st.session_state.comments_page_index = page_idx - 1
-                            st.experimental_rerun()
-                    with cnext:
-                        if st.button("Next ▶", key='comments_next') and page_idx < ((total - 1) // page_size if total else 0):
-                            st.session_state.comments_page_index = page_idx + 1
-                            st.experimental_rerun()
-                    with cinfo:
-                        st.write(f"Page {page_idx+1} of {((total - 1) // page_size) + 1 if total else 0}")
-
-                    # Render a form for the current page of students
-                    form_key = f"comments_form_{page_idx}"
-                    with st.form(key=form_key):
-                        # Pre-fetch average totals for students on this page
-                        ids = ",".join([str(int(s['student_id'])) for s in page_students]) if page_students else ""
-                        avg_map = {}
-                        if ids:
-                            try:
-                                avg_q = pd.read_sql(f"SELECT student_id, AVG(total) as avg_total FROM marks WHERE term_id = {active_term.id} AND student_id IN ({ids}) GROUP BY student_id", ENGINE)
-                                for _, r in avg_q.iterrows():
-                                    avg_map[int(r['student_id'])] = float(r['avg_total']) if r['avg_total'] is not None else None
-                            except Exception:
-                                avg_map = {}
-
-                        for s in page_students:
-                            sid = int(s['student_id'])
-                            name = s['student_name']
-                            reg = s['registration_number']
-
-                            # ensure widget key persists
-                            widget_key = f"comment_{sid}"
-                            if widget_key not in st.session_state:
-                                st.session_state[widget_key] = st.session_state.student_comments.get(sid, '')
-
-                            avg_display = "N/A"
-                            if sid in avg_map and avg_map[sid] is not None:
-                                avg_display = f"{avg_map[sid]:.1f}"
-
-                            st.markdown(f"**{name}** ({reg}) — Average: {avg_display}")
-                            st.text_area(
-                                "Comment",
-                                value=st.session_state.get(widget_key, ''),
-                                key=widget_key,
-                                height=120,
-                                label_visibility="collapsed"
-                            )
-                            st.divider()
-
-                        submitted = st.form_submit_button("Save Group Comments")
-                        if submitted:
-                            for s in page_students:
-                                sid = int(s['student_id'])
-                                widget_key = f"comment_{sid}"
-                                st.session_state.student_comments[sid] = st.session_state.get(widget_key, '')
-                            st.success("Group comments staged. Click 'Save All Comments' to persist.")
-
-                    st.markdown("---")
-                    st.info("💡 **Tip**: Edit group comments, submit the form, then click 'Save All Comments' to persist all staged changes.")
-
-                    # Save all staged comments to DB (create Mark rows when missing)
-                    if st.button("💾 Save All Comments", width='stretch'):
-                        saved_comments = 0
-                        errors = []
-                        try:
-                            for student_id, comment in st.session_state.get('student_comments', {}).items():
-                                if comment and str(comment).strip():
-                                    try:
-                                        sid = int(student_id)
-                                        mark_record = session.query(Mark).filter_by(
-                                            student_id=sid,
-                                            subject=selected_subject,
-                                            term_id=active_term.id
-                                        ).first()
-
-                                        if mark_record:
-                                            mark_record.comment = str(comment).strip()
-                                            session.add(mark_record)
-                                            saved_comments += 1
-                                        else:
-                                            # Create a minimal mark record to store the comment
-                                            new_mark = Mark(
-                                                student_id=sid,
-                                                subject=selected_subject,
-                                                term_id=active_term.id,
-                                                total=None,
-                                                grade=None,
-                                                comment=str(comment).strip()
-                                            )
-                                            session.add(new_mark)
-                                            saved_comments += 1
-
-                                    except Exception as e:
-                                        student_row = compiled_df[compiled_df['student_id'] == int(student_id)]
-                                        if not student_row.empty:
-                                            errors.append(f"{student_row.iloc[0]['student_name']}: {str(e)}")
-
-                            session.commit()
-
-                            if saved_comments > 0:
-                                st.success(f"✅ {saved_comments} comment(s) saved successfully!")
-                                st.session_state.student_comments = {}
-                                try:
-                                    st.balloons()
-                                except Exception:
-                                    pass
-
-                        except Exception as e:
-                            try:
-                                session.rollback()
-                            except Exception:
-                                pass
-                            st.error(f"❌ Error saving comments: {str(e)}")
-
-                        if errors:
-                            st.error("⚠️ Errors for some students:")
-                            for error in errors:
-                                st.error(f"  • {error}")
             except Exception as e:
                 st.error(f"Could not load compiled marks for preview: {e}")
-    
-    session.close()
     
     session.close()
 
 elif page == "Enter Results" and st.session_state.user_role == 'teacher':
     # This page is now replaced but keeping placeholder to avoid breaking other logic
     st.info("The Enter Results page has been moved. Please use the main menu.")
+    
+    session.close()
+
+elif page == "Comments" and st.session_state.user_role == 'teacher':
+    st.header("💬 Add Student Comments")
+    session = Session()
+    
+    # Get active term
+    active_term = session.query(AcademicTerm).filter_by(is_active=True).first()
+    if not active_term:
+        st.warning("No active term set. Please contact administrator.")
+        session.close()
+        st.stop()
+    
+    st.info(f"📅 Current Term: **{active_term.term_name}**")
+    
+    # Get teacher's subjects and classes
+    current_user = session.query(User).filter_by(id=st.session_state.user_id).first()
+    if not current_user:
+        st.error("User not found")
+        session.close()
+        st.stop()
+    
+    subjects_taught = current_user.subjects_taught.split(',') if current_user.subjects_taught else []
+    classes_teaching = current_user.class_teacher_for.split(',') if current_user.class_teacher_for else []
+    
+    # If teacher teaches specific classes, limit selection
+    if classes_teaching and classes_teaching[0]:
+        available_classes = [c.strip() for c in classes_teaching if c.strip()]
+    else:
+        # Admin or teacher without assigned class - show all
+        available_classes = sorted(session.query(Student.class_name).distinct().with_entities(Student.class_name).all())
+        available_classes = [c[0] for c in available_classes if c[0]]
+    
+    if not available_classes:
+        st.warning("No classes assigned to you.")
+        session.close()
+        st.stop()
+    
+    # Select class and subject
+    col1, col2 = st.columns(2)
+    with col1:
+        selected_class = st.selectbox("Select Class", available_classes)
+    with col2:
+        subject_options = subjects_taught if subjects_taught and subjects_taught[0] else ["English", "Math", "Science"]
+        selected_subject = st.selectbox("Select Subject", subject_options)
+    
+    if not selected_class or not selected_subject:
+        st.warning("Please select both class and subject.")
+        session.close()
+        st.stop()
+    
+    # Load students for this class
+    students_df = pd.read_sql(f"""
+        SELECT id as student_id, name as student_name, registration_number
+        FROM students
+        WHERE class_name = '{selected_class}'
+        ORDER BY name
+    """, ENGINE)
+    
+    if students_df.empty:
+        st.info("No students in this class.")
+        session.close()
+        st.stop()
+    
+    st.markdown("---")
+    st.subheader(f"📝 Comments for {selected_class} - {selected_subject}")
+    
+    # Initialize session state for comments
+    if 'comments_data' not in st.session_state:
+        st.session_state.comments_data = {}
+    
+    if 'comments_page_idx' not in st.session_state:
+        st.session_state.comments_page_idx = 0
+    
+    # Load existing comments from DB
+    existing_comments = pd.read_sql(f"""
+        SELECT student_id, comment, total
+        FROM marks
+        WHERE subject = '{selected_subject}'
+        AND term_id = {active_term.id}
+        AND student_id IN ({','.join(map(str, students_df['student_id'].tolist()))})
+    """, ENGINE)
+    
+    # Build display dataframe with student info and averages
+    students_df['average_score'] = None
+    students_df['comment'] = ''
+    
+    for _, row in existing_comments.iterrows():
+        sid = int(row['student_id'])
+        if students_df['student_id'].eq(sid).any():
+            if pd.notna(row['total']):
+                students_df.loc[students_df['student_id'] == sid, 'average_score'] = f"{row['total']:.1f}"
+            if pd.notna(row['comment']):
+                students_df.loc[students_df['student_id'] == sid, 'comment'] = row['comment']
+    
+    # Pagination
+    page_size = 15
+    total_students = len(students_df)
+    total_pages = (total_students + page_size - 1) // page_size
+    
+    page_idx = max(0, min(st.session_state.comments_page_idx, total_pages - 1)) if total_pages > 0 else 0
+    start = page_idx * page_size
+    end = min(start + page_size, total_students)
+    page_students = students_df.iloc[start:end].copy()
+    
+    # Navigation
+    col_nav1, col_nav2, col_nav3, col_nav4 = st.columns([1, 1, 2, 2])
+    with col_nav1:
+        if st.button("◀ Prev", key='comments_nav_prev'):
+            if page_idx > 0:
+                st.session_state.comments_page_idx = page_idx - 1
+                st.rerun()
+    with col_nav2:
+        if st.button("Next ▶", key='comments_nav_next'):
+            if page_idx < total_pages - 1:
+                st.session_state.comments_page_idx = page_idx + 1
+                st.rerun()
+    with col_nav3:
+        st.write(f"Page {page_idx + 1} of {total_pages if total_pages > 0 else 1}")
+    with col_nav4:
+        st.write(f"Showing {start+1}-{end} of {total_students} students")
+    
+    # Comments table using data_editor
+    st.write("**Edit comments in the table below:**")
+    
+    comments_display = page_students[['student_name', 'registration_number', 'average_score', 'comment']].copy()
+    comments_display.columns = ['Student Name', 'Reg No', 'Avg Score', 'Comment']
+    
+    edited_comments = st.data_editor(
+        comments_display,
+        key=f"comments_editor_{selected_class}_{selected_subject}_{page_idx}",
+        width='stretch',
+        hide_index=True,
+        disabled=['Student Name', 'Reg No', 'Avg Score']
+    )
+    
+    # Save comments button
+    st.markdown("---")
+    if st.button("💾 Save Comments", width='stretch'):
+        saved_count = 0
+        errors = []
+        
+        try:
+            for idx, row in edited_comments.iterrows():
+                try:
+                    # Match student by name and reg no
+                    student_name = row['Student Name']
+                    comment_text = row['Comment']
+                    
+                    # Find student_id
+                    student_row = students_df[(students_df['student_name'] == student_name)]
+                    if student_row.empty:
+                        continue
+                    
+                    student_id = int(student_row.iloc[0]['student_id'])
+                    
+                    # Find or create mark record
+                    mark_record = session.query(Mark).filter_by(
+                        student_id=student_id,
+                        subject=selected_subject,
+                        term_id=active_term.id
+                    ).first()
+                    
+                    if mark_record:
+                        mark_record.comment = str(comment_text).strip()
+                        session.add(mark_record)
+                    else:
+                        # Create new mark record with comment only
+                        new_mark = Mark(
+                            student_id=student_id,
+                            subject=selected_subject,
+                            term_id=active_term.id,
+                            comment=str(comment_text).strip()
+                        )
+                        session.add(new_mark)
+                    
+                    saved_count += 1
+                    
+                except Exception as e:
+                    errors.append(f"Row {idx}: {str(e)}")
+            
+            session.commit()
+            
+            if saved_count > 0:
+                st.success(f"✅ Comments saved for {saved_count} student(s)!")
+                try:
+                    st.balloons()
+                except Exception:
+                    pass
+            
+            if errors:
+                with st.expander("⚠️ View errors"):
+                    for error in errors:
+                        st.write(f"• {error}")
+        
+        except Exception as e:
+            session.rollback()
+            st.error(f"Error saving comments: {str(e)}")
     
     session.close()
 
