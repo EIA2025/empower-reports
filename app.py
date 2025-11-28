@@ -3647,7 +3647,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
     session.close()
 
 elif page == "Enter Results" and st.session_state.user_role == 'teacher':
-    st.header(" Enter Results")
+    st.header(" Enter Results - Table-Based Input")
     session = Session()
     
     user = session.query(User).get(st.session_state.user_id)
@@ -3665,11 +3665,10 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
         session.close()
         st.stop()
     
-    st.info(f" Current Term: **{active_term.term_name}** (ID: {active_term.id})")
-    st.write(f"**Debug Info:** Active Term ID = {active_term.id}, Name = {active_term.term_name}")
+    st.info(f" Current Term: **{active_term.term_name}**")
     
     # FIX: Add warning message at the top
-    st.warning(" **IMPORTANT**: After entering all component marks (CW, MOT, EOT), you MUST scroll down and click ' Compile and Update Final Marks' button for each student. Otherwise, reports cannot be generated!")
+    st.warning(" **IMPORTANT**: Use the table interface below to enter marks for all students at once. You will see a list of all students in the class — fill in their scores to ensure none are missed. After finishing, click 'Save & Compile Marks' to compile final scores.")
     
     # Select Class
     classes = pd.read_sql("SELECT DISTINCT class_name FROM students ORDER BY class_name", ENGINE)
@@ -3679,48 +3678,190 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
         session.close()
         st.stop()
     
-    st.markdown("### Step 1: Select Class")
-    selected_class = st.selectbox("Class", classes['class_name'].tolist(), label_visibility="collapsed")
+    col1, col2, col3 = st.columns(3)
     
-    # Select what to enter
-    st.markdown("### Step 2: Select What to Enter")
-    result_types = ["Coursework (CW)", "Mid of Term (MOT)", "End of Term (EOT)", "All Three"]
-    selected_type = st.selectbox("Result Type", result_types, label_visibility="collapsed")
+    with col1:
+        st.markdown("**Step 1: Select Class**")
+        selected_class = st.selectbox("Class", classes['class_name'].tolist(), label_visibility="collapsed")
     
-    # Select Subject
-    st.markdown("### Step 3: Select Subject")
-    selected_subject = st.selectbox("Subject", my_subjects, label_visibility="collapsed")
+    with col2:
+        st.markdown("**Step 2: Select Subject**")
+        selected_subject = st.selectbox("Subject", my_subjects, label_visibility="collapsed")
     
-    # Get students in this class
+    with col3:
+        st.markdown("**Step 3: Select Component Type**")
+        component_type = st.selectbox("Component Type", ["Coursework (CW)", "Mid of Term (MOT)", "End of Term (EOT)"], label_visibility="collapsed")
+    
+    # Get students in this class with the subject
     students_in_class = pd.read_sql(
-        f"SELECT id, name, year, subjects FROM students WHERE class_name = '{selected_class}'",
+        f"SELECT id, name, registration_number, year FROM students WHERE class_name = '{selected_class}' ORDER BY name",
         ENGINE
     )
     
-    def has_subject(subjects_json, subject):
-        try:
-            subjects = json.loads(subjects_json)
-            return subject in subjects
-        except:
-            return False
-    
-    students_in_class['has_subject'] = students_in_class['subjects'].apply(
-        lambda x: has_subject(x, selected_subject)
-    )
-    students_with_subject = students_in_class[students_in_class['has_subject']]
-    
-    if students_with_subject.empty:
-        st.warning(f"No students in {selected_class} take {selected_subject}")
+    if students_in_class.empty:
+        st.warning(f"No students enrolled in {selected_class}")
         session.close()
         st.stop()
     
+    # Map component type to internal name
+    type_map = {
+        "Coursework (CW)": "coursework",
+        "Mid of Term (MOT)": "midterm",
+        "End of Term (EOT)": "endterm"
+    }
+    comp_type_internal = type_map[component_type]
+    
     st.markdown("---")
-    st.subheader(f"Enter {selected_type} for {selected_class} - {selected_subject}")
+    st.subheader(f"📋 Enter {component_type} for {selected_class} - {selected_subject}")
+    
+    # Step 1: Enter component metadata
+    st.markdown("**Step 1: Define the component**")
+    col_a, col_b = st.columns(2)
+    
+    with col_a:
+        component_name = st.text_input(f"Component Name (e.g., Test 1, Assignment 1, Paper 1)", value="", key="comp_name_input")
+    
+    with col_b:
+        total_marks = st.number_input(f"Total Marks for this component", min_value=1.0, value=50.0, step=0.5, key="total_marks_input")
+    
+    # Step 2: Display student table for score entry
+    st.markdown("**Step 2: Enter scores for each student below**")
+    st.info(f"Fill in the score column for each student. Leave blank if not yet marked. Once complete, click the save button at the bottom.")
+    
+    # Create a data dictionary to hold scores
+    scores_data = {
+        "Student Name": [],
+        "Reg. No.": [],
+        "Score": []
+    }
+    
+    # Populate existing scores from database if editing an existing component
+    existing_scores_df = pd.read_sql(f"""
+        SELECT cm.student_id, s.name, s.registration_number, cm.score
+        FROM component_marks cm
+        JOIN students s ON cm.student_id = s.id
+        WHERE cm.subject = '{selected_subject}'
+        AND cm.term_id = {active_term.id}
+        AND cm.component_type = '{comp_type_internal}'
+        AND cm.component_name = '{component_name}'
+        AND cm.total = {total_marks}
+    """, ENGINE) if component_name and total_marks > 0 else pd.DataFrame()
+    
+    existing_scores_map = {}
+    if not existing_scores_df.empty:
+        existing_scores_map = dict(zip(existing_scores_df['student_id'], existing_scores_df['score']))
+    
+    # Build the input table with columns
+    input_scores = []
+    
+    for _, student in students_in_class.iterrows():
+        student_id = int(student['id'])
+        existing_score = existing_scores_map.get(student_id, None)
+        
+        scores_data["Student Name"].append(student['name'])
+        scores_data["Reg. No."].append(student['registration_number'])
+        input_scores.append(existing_score if existing_score is not None else 0.0)
+    
+    # Display interactive table for score entry
+    st.markdown("**Student Score Entry Table**")
+    
+    # Create columns for the table display
+    cols = st.columns([2, 1.5, 1.5])
+    cols[0].write("**Student Name**")
+    cols[1].write("**Reg. No.**")
+    cols[2].write(f"**Score (out of {total_marks})**")
+    
+    st.divider()
+    
+    # Collect scores from user input
+    entered_scores = []
+    score_inputs = []
+    
+    for idx, (_, student) in enumerate(students_in_class.iterrows()):
+        cols = st.columns([2, 1.5, 1.5])
+        
+        with cols[0]:
+            st.write(student['name'])
+        with cols[1]:
+            st.write(student['registration_number'])
+        with cols[2]:
+            existing_val = input_scores[idx] if input_scores[idx] > 0 else None
+            score = st.number_input(
+                f"Score {idx}",
+                min_value=0.0,
+                max_value=float(total_marks) * 2,  # Allow entry beyond total for flexibility
+                value=float(existing_val) if existing_val is not None else 0.0,
+                step=0.5,
+                key=f"score_input_{idx}_{student['id']}",
+                label_visibility="collapsed"
+            )
+            score_inputs.append((student['id'], student['name'], score))
+    
+    st.divider()
+    
+    # Save button
+    if st.button(f"💾 Save {component_type} Scores for {selected_class}", use_container_width=True):
+        if not component_name:
+            st.error("Please enter a component name.")
+        elif total_marks <= 0:
+            st.error("Please enter valid total marks.")
+        else:
+            saved_count = 0
+            errors = []
+            
+            try:
+                for student_id, student_name, score in score_inputs:
+                    if score > 0:  # Only save if score is entered
+                        # Check if component already exists
+                        existing = session.query(ComponentMark).filter_by(
+                            student_id=student_id,
+                            subject=selected_subject,
+                            term_id=active_term.id,
+                            component_type=comp_type_internal,
+                            component_name=component_name
+                        ).first()
+                        
+                        if existing:
+                            # Update existing
+                            existing.score = score
+                            existing.total = total_marks
+                            existing.submitted_by = st.session_state.user_id
+                            existing.submitted_at = datetime.now().isoformat()
+                            session.add(existing)
+                        else:
+                            # Create new
+                            new_mark = ComponentMark(
+                                student_id=student_id,
+                                subject=selected_subject,
+                                term_id=active_term.id,
+                                component_type=comp_type_internal,
+                                component_name=component_name,
+                                score=score,
+                                total=total_marks,
+                                submitted_by=st.session_state.user_id
+                            )
+                            session.add(new_mark)
+                        
+                        saved_count += 1
+                
+                session.commit()
+                log_audit(session, st.session_state.user_id, "enter_component_marks",
+                         f"{selected_class} - {selected_subject} - {component_type} - {component_name} - {saved_count} students")
+                st.success(f"✅ Scores saved for {saved_count} students!")
+                
+            except Exception as e:
+                session.rollback()
+                st.error(f"❌ Error saving scores: {str(e)}")
+    
+    # NEW: Enhanced component marks entry system
+    st.markdown("---")
+    st.subheader(" Review & Compile Final Marks")
+    st.info("After entering all component marks (CW, MOT, EOT) for all students, use the section below to review and compile final scores.")
     
     # Show existing marks for verification
-    with st.expander(" View Existing Marks for This Class/Subject"):
+    with st.expander("📊 View All Marks for This Class/Subject (Existing & Compiled)"):
         existing_marks_query = f"""
-            SELECT s.name, m.coursework_out_of_20, m.midterm_out_of_20, 
+            SELECT s.name, s.registration_number, m.coursework_out_of_20, m.midterm_out_of_20, 
                    m.endterm_out_of_60, m.total, m.grade
             FROM marks m
             JOIN students s ON m.student_id = s.id
@@ -3734,370 +3875,84 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
         if not existing_marks_df.empty:
             st.dataframe(existing_marks_df, use_container_width=True)
         else:
-            st.info("No marks entered yet for this class/subject combination")
+            st.info("No compiled marks yet for this class/subject combination")
     
-    # NEW: Enhanced component marks entry system
+    # Show existing component marks
+    with st.expander("🔍 View Component Marks (Raw Data)"):
+        component_marks_query = f"""
+            SELECT s.name, s.registration_number, cm.component_type, cm.component_name, 
+                   cm.score, cm.total
+            FROM component_marks cm
+            JOIN students s ON cm.student_id = s.id
+            WHERE cm.term_id = {active_term.id} 
+            AND cm.subject = '{selected_subject}'
+            AND s.class_name = '{selected_class}'
+            ORDER BY s.name, cm.component_type, cm.component_name
+        """
+        component_marks_df = pd.read_sql(component_marks_query, ENGINE)
+        
+        if not component_marks_df.empty:
+            st.dataframe(component_marks_df, use_container_width=True)
+        else:
+            st.info("No component marks entered yet for this class/subject combination")
+    
+    # Auto-Compile Option
     st.markdown("---")
-    st.subheader(" Enter Component Marks")
-    st.info("Enter individual test/paper scores below. The system will automatically compile them into the final scores.")
+    st.subheader(" 🚀 Quick Compile All Students")
+    st.info("This will automatically compile final marks for ALL students in this class who have component marks entered.")
     
-    # Determine which component type to show based on selection
-    if selected_type in ["Coursework (CW)", "All Three"]:
-        st.markdown("###  Coursework Components")
-        
-        # Get existing component marks for this student/subject/term
-        student_name = st.selectbox("Select Student", students_with_subject['name'].tolist())
-        student_id = int(students_with_subject[students_with_subject['name'] == student_name].iloc[0]['id'])
-        
-        # Get existing component marks for coursework
-        cw_components = pd.read_sql(f"""
-            SELECT id, component_name, score, total
-            FROM component_marks
-            WHERE student_id = {student_id} 
-            AND subject = '{selected_subject}' 
-            AND term_id = {active_term.id}
-            AND component_type = 'coursework'
-            ORDER BY component_name
-        """, ENGINE)
-        
-        # Display existing components
-        if not cw_components.empty:
-            st.subheader("Existing Coursework Components")
-            st.dataframe(cw_components, use_container_width=True)
-        
-        # Add new component
-        with st.form("add_cw_component"):
-            st.markdown("#### Add New Coursework Component")
-            component_name = st.text_input("Component Name (e.g., Test 1, Assignment 1)")
-            score = st.number_input("Score", 0.0, 1000.0, step=0.5)
-            total = st.number_input("Total Marks", 0.1, 1000.0, step=0.5)
-            
-            if st.form_submit_button("Add Coursework Component"):
-                if component_name and total > 0:
-                    new_component = ComponentMark(
-                        student_id=student_id,
-                        subject=selected_subject,
-                        term_id=active_term.id,
-                        component_type='coursework',
-                        component_name=component_name,
-                        score=score,
-                        total=total,
-                        submitted_by=st.session_state.user_id
-                    )
-                    session.add(new_component)
-                    session.commit()
-                    log_audit(session, st.session_state.user_id, "add_cw_component", 
-                             f"{student_name} - {selected_subject} - {component_name}")
-                    st.success(f" Coursework component added: {component_name}")
-                    st.rerun()
-                else:
-                    st.error("Please provide a component name and total marks")
-        
-        # Delete component
-        if not cw_components.empty:
-            st.markdown("#### Delete Coursework Component")
-            component_to_delete = st.selectbox("Select Component to Delete", 
-                                           cw_components['id'].tolist(), 
-                                           format_func=lambda x: cw_components[cw_components['id']==x]['component_name'].iloc[0])
-            
-            if st.button("Delete Selected Component", key="delete_cw"):
-                component = session.query(ComponentMark).get(component_to_delete)
-                if component:
-                    session.delete(component)
-                    session.commit()
-                    log_audit(session, st.session_state.user_id, "delete_cw_component", 
-                             f"{student_name} - {selected_subject} - {component.component_name}")
-                    st.success(f" Component deleted: {component.component_name}")
-                    st.rerun()
-    
-    if selected_type in ["Mid of Term (MOT)", "All Three"]:
-        st.markdown("###  Mid of Term Components")
-        
-        # Get existing component marks for this student/subject/term
-        student_name = st.selectbox("Select Student", students_with_subject['name'].tolist(), key="mt_student")
-        student_id = int(students_with_subject[students_with_subject['name'] == student_name].iloc[0]['id'])
-        
-        # Get existing component marks for mid-term
-        mt_components = pd.read_sql(f"""
-            SELECT id, component_name, score, total
-            FROM component_marks
-            WHERE student_id = {student_id} 
-            AND subject = '{selected_subject}' 
-            AND term_id = {active_term.id}
-            AND component_type = 'midterm'
-            ORDER BY component_name
-        """, ENGINE)
-        
-        # Display existing components
-        if not mt_components.empty:
-            st.subheader("Existing Mid-term Components")
-            st.dataframe(mt_components, use_container_width=True)
-        
-        # Add new component
-        with st.form("add_mt_component"):
-            st.markdown("#### Add New Mid-term Component")
-            component_name = st.text_input("Component Name (e.g., Paper 1, Paper 2)", key="mt_component_name")
-            score = st.number_input("Score", 0.0, 1000.0, step=0.5, key="mt_score")
-            total = st.number_input("Total Marks", 0.1, 1000.0, step=0.5, key="mt_total")
-            
-            if st.form_submit_button("Add Mid-term Component", key="add_mt"):
-                if component_name and total > 0:
-                    new_component = ComponentMark(
-                        student_id=student_id,
-                        subject=selected_subject,
-                        term_id=active_term.id,
-                        component_type='midterm',
-                        component_name=component_name,
-                        score=score,
-                        total=total,
-                        submitted_by=st.session_state.user_id
-                    )
-                    session.add(new_component)
-                    session.commit()
-                    log_audit(session, st.session_state.user_id, "add_mt_component", 
-                             f"{student_name} - {selected_subject} - {component_name}")
-                    st.success(f" Mid-term component added: {component_name}")
-                    st.rerun()
-                else:
-                    st.error("Please provide a component name and total marks")
-        
-        # Delete component
-        if not mt_components.empty:
-            st.markdown("#### Delete Mid-term Component")
-            st.markdown("#### Delete Mid-term Component")
-            component_to_delete = st.selectbox("Select Component to Delete", 
-                                           mt_components['id'].tolist(), 
-                                           format_func=lambda x: mt_components[mt_components['id']==x]['component_name'].iloc[0],
-                                           key="mt_delete")
-            
-            if st.button("Delete Selected Component", key="delete_mt"):
-                component = session.query(ComponentMark).get(component_to_delete)
-                if component:
-                    session.delete(component)
-                    session.commit()
-                    log_audit(session, st.session_state.user_id, "delete_mt_component", 
-                             f"{student_name} - {selected_subject} - {component.component_name}")
-                    st.success(f" Component deleted: {component.component_name}")
-                    st.rerun()
-    
-    if selected_type in ["End of Term (EOT)", "All Three"]:
-        st.markdown("###  End of Term Components")
-        
-        # Get existing component marks for this student/subject/term
-        student_name = st.selectbox("Select Student", students_with_subject['name'].tolist(), key="et_student")
-        student_id = int(students_with_subject[students_with_subject['name'] == student_name].iloc[0]['id'])
-        
-        # Get existing component marks for end-term
-        et_components = pd.read_sql(f"""
-            SELECT id, component_name, score, total
-            FROM component_marks
-            WHERE student_id = {student_id} 
-            AND subject = '{selected_subject}' 
-            AND term_id = {active_term.id}
-            AND component_type = 'endterm'
-            ORDER BY component_name
-        """, ENGINE)
-        
-        # Display existing components
-        if not et_components.empty:
-            st.subheader("Existing End-term Components")
-            st.dataframe(et_components, use_container_width=True)
-        
-        # Add new component
-        with st.form("add_et_component"):
-            st.markdown("#### Add New End-term Component")
-            component_name = st.text_input("Component Name (e.g., Paper 1, Paper 2)", key="et_component_name")
-            score = st.number_input("Score", 0.0, 1000.0, step=0.5, key="et_score")
-            total = st.number_input("Total Marks", 0.1, 1000.0, step=0.5, key="et_total")
-            
-            if st.form_submit_button("Add End-term Component", key="add_et"):
-                if component_name and total > 0:
-                    new_component = ComponentMark(
-                        student_id=student_id,
-                        subject=selected_subject,
-                        term_id=active_term.id,
-                        component_type='endterm',
-                        component_name=component_name,
-                        score=score,
-                        total=total,
-                        submitted_by=st.session_state.user_id
-                    )
-                    session.add(new_component)
-                    session.commit()
-                    log_audit(session, st.session_state.user_id, "add_et_component", 
-                             f"{student_name} - {selected_subject} - {component_name}")
-                    st.success(f" End-term component added: {component_name}")
-                    st.rerun()
-                else:
-                    st.error("Please provide a component name and total marks")
-        
-        # Delete component
-        if not et_components.empty:
-            st.markdown("#### Delete End-term Component")
-            component_to_delete = st.selectbox("Select Component to Delete", 
-                                           et_components['id'].tolist(), 
-                                           format_func=lambda x: et_components[et_components['id']==x]['component_name'].iloc[0],
-                                           key="et_delete")
-            
-            if st.button("Delete Selected Component", key="delete_et"):
-                component = session.query(ComponentMark).get(component_to_delete)
-                if component:
-                    session.delete(component)
-                    session.commit()
-                    log_audit(session, st.session_state.user_id, "delete_et_component", 
-                             f"{student_name} - {selected_subject} - {component.component_name}")
-                    st.success(f" Component deleted: {component.component_name}")
-                    st.rerun()
-    
-    # Compile and update marks
-    st.markdown("---")
-    st.subheader(" Compile and Update Final Marks")
-    
-    # Get students with components
-    students_with_components = pd.read_sql(f"""
-        SELECT DISTINCT s.id, s.name
-        FROM students s
-        JOIN component_marks cm ON s.id = cm.student_id
-        WHERE s.class_name = '{selected_class}'
-        AND s.id IN (
-            SELECT student_id FROM component_marks 
-            WHERE subject = '{selected_subject}' 
-            AND term_id = {active_term.id}
-        )
-        ORDER BY s.name
-    """, ENGINE)
-    
-    if students_with_components.empty:
-        st.info("No students with component marks found. Add component marks first.")
-    else:
-        selected_student = st.selectbox("Select Student to Compile", students_with_components['name'].tolist())
-        student_id = int(students_with_components[students_with_components['name'] == selected_student].iloc[0]['id'])
-        
-        # Show current compiled scores
-        cw_score, cw_total = calculate_compiled_score(session, student_id, selected_subject, active_term.id, 'coursework')
-        mt_score, mt_total = calculate_compiled_score(session, student_id, selected_subject, active_term.id, 'midterm')
-        et_score, et_total = calculate_compiled_score(session, student_id, selected_subject, active_term.id, 'endterm')
-        
-        # Convert to standardized bases
-        cw_out_of_20 = convert_to_base(cw_score, cw_total, 20)
-        mt_out_of_20 = convert_to_base(mt_score, mt_total, 20)
-        et_out_of_60 = convert_to_base(et_score, et_total, 60)
-        
-        # Calculate total and grade
-        total = compute_total(cw_out_of_20, mt_out_of_20, et_out_of_60)
-        grade = get_grade(total)
-        
-        st.subheader(f"Compiled Scores for {selected_student}")
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Coursework (out of 20)", f"{cw_out_of_20:.1f}")
-            st.write(f"Based on {cw_score:.1f}/{cw_total:.1f}")
-        with col2:
-            st.metric("Mid-term (out of 20)", f"{mt_out_of_20:.1f}")
-            st.write(f"Based on {mt_score:.1f}/{mt_total:.1f}")
-        with col3:
-            st.metric("End-term (out of 60)", f"{et_out_of_60:.1f}")
-            st.write(f"Based on {et_score:.1f}/{et_total:.1f}")
-        
-        col4, col5 = st.columns(2)
-        with col4:
-            st.metric("Total (out of 100)", f"{total:.1f}")
-        with col5:
-            st.metric("Grade", grade)
-        
-        # Update button
-        if st.button(f" Update Final Marks for {selected_student}", use_container_width=True):
-            try:
-                total, grade = update_compiled_marks(session, student_id, selected_subject, active_term.id)
-                log_audit(session, st.session_state.user_id, "update_compiled_marks", 
-                         f"{selected_student} - {selected_subject} - {active_term.term_name}")
-                st.success(f" Final marks updated for {selected_student}!")
-                st.success(f" Total: {total:.1f}/100 | Grade: {grade}")
-                st.rerun()
-            except Exception as e:
-                st.error(f" Error updating marks: {str(e)}")
-
-        # Allow teacher/admin to edit final compiled marks (if exists)
-        existing_mark = session.query(Mark).filter_by(student_id=student_id, subject=selected_subject, term_id=active_term.id).first()
-        if existing_mark:
-            can_edit = (existing_mark.submitted_by == st.session_state.user_id) or (st.session_state.user_role == 'admin')
-            if can_edit:
-                with st.expander(" Edit Final Mark (Coursework/MOT/EOT, Comment) ", expanded=False):
-                    # Prefill values
-                    cw_pref = existing_mark.coursework_out_of_20 or 0.0
-                    mt_pref = existing_mark.midterm_out_of_20 or 0.0
-                    et_pref = existing_mark.endterm_out_of_60 or 0.0
-                    comment_pref = existing_mark.comment or ""
-
-                    new_cw = st.number_input("Coursework (out of 20)", value=float(cw_pref), step=0.1, key=f"edit_cw_{student_id}")
-                    new_mt = st.number_input("Midterm (out of 20)", value=float(mt_pref), step=0.1, key=f"edit_mt_{student_id}")
-                    new_et = st.number_input("Endterm (out of 60)", value=float(et_pref), step=0.1, key=f"edit_et_{student_id}")
-                    new_comment = st.text_area("Comment", value=comment_pref, key=f"edit_comment_{student_id}")
-
-                    if st.button("Save Edited Final Mark", key=f"save_edit_{student_id}"):
-                        try:
-                            # Recompute totals/grade from edited values
-                            new_total = compute_total(new_cw, new_mt, new_et)
-                            new_grade = get_grade(new_total)
-
-                            existing_mark.coursework_out_of_20 = float(new_cw)
-                            existing_mark.midterm_out_of_20 = float(new_mt)
-                            existing_mark.endterm_out_of_60 = float(new_et)
-                            existing_mark.total = float(new_total)
-                            existing_mark.grade = new_grade
-                            existing_mark.comment = new_comment
-                            existing_mark.submitted_by = st.session_state.user_id
-                            existing_mark.submitted_at = datetime.now().isoformat()
-                            session.commit()
-                            log_audit(session, st.session_state.user_id, "edit_final_mark", f"{selected_student} - {selected_subject}")
-                            st.success(" Edited final mark saved")
-                            st.rerun()
-                        except Exception as e:
-                            session.rollback()
-                            st.error(f" Could not save edited mark: {e}")
-    
-    # FIX: Add Auto-Compile Option
-    st.markdown("---")
-    st.subheader(" Quick Compile All Students")
-    st.info("This will automatically compile final marks for ALL students in this class who have component marks.")
-    
-    if st.button(" Auto-Compile All Students with Component Marks", use_container_width=True):
+    if st.button(" Auto-Compile All Students with Component Marks", use_container_width=True, key="auto_compile_btn"):
         compiled_count = 0
         errors = []
         
-        for _, student in students_with_subject.iterrows():
-            try:
-                student_id = int(student['id'])
-                
-                # Check if student has any component marks
-                has_components = pd.read_sql(f"""
-                    SELECT COUNT(*) as count 
-                    FROM component_marks
-                    WHERE student_id = {student_id} 
-                    AND subject = '{selected_subject}' 
-                    AND term_id = {active_term.id}
-                """, ENGINE)
-                
-                if has_components['count'].iloc[0] > 0:
-                    # Compile marks
-                    total, grade = update_compiled_marks(session, student_id, selected_subject, active_term.id)
-                    compiled_count += 1
-                    st.success(f" {student['name']}: {total:.1f}/100 ({grade})")
-            except Exception as e:
-                errors.append(f"{student['name']}: {str(e)}")
+        # Get all students with component marks
+        students_with_comps = pd.read_sql(f"""
+            SELECT DISTINCT s.id, s.name
+            FROM students s
+            JOIN component_marks cm ON s.id = cm.student_id
+            WHERE cm.term_id = {active_term.id}
+            AND cm.subject = '{selected_subject}'
+            AND s.class_name = '{selected_class}'
+            ORDER BY s.name
+        """, ENGINE)
         
-        if compiled_count > 0:
+        if students_with_comps.empty:
+            st.warning("No students have component marks to compile.")
+        else:
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            for idx, (_, student) in enumerate(students_with_comps.iterrows()):
+                try:
+                    student_id = int(student['id'])
+                    student_name = student['name']
+                    
+                    # Compile marks
+                    total, grade = update_compiled_marks(session, student_id, selected_subject, active_term.id, submitted_by=st.session_state.user_id)
+                    compiled_count += 1
+                    
+                    status_text.write(f"✅ {student_name}: {total:.1f}/100 ({grade})")
+                    progress_bar.progress((idx + 1) / len(students_with_comps))
+                    
+                except Exception as e:
+                    errors.append(f"{student_name}: {str(e)}")
+                    status_text.write(f"❌ {student_name}: {str(e)}")
+            
             log_audit(session, st.session_state.user_id, "auto_compile_marks", 
                      f"{selected_class} - {selected_subject} - {compiled_count} students")
-            st.success(f" Successfully compiled marks for {compiled_count} students!")
-        
-        if errors:
-            st.error(" Errors occurred for some students:")
-            for error in errors:
-                st.error(error)
-        
-        st.rerun()
+            
+            st.success(f"✅ Successfully compiled marks for {compiled_count} students!")
+            
+            if errors:
+                st.error(" Errors occurred for some students:")
+                for error in errors:
+                    st.error(f"  • {error}")
+    
+    session.close()
+
+elif page == "Enter Results" and st.session_state.user_role == 'teacher':
+    # This page is now replaced but keeping placeholder to avoid breaking other logic
+    st.info("The Enter Results page has been moved. Please use the main menu.")
     
     session.close()
 
