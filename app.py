@@ -3990,7 +3990,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                     st.session_state.scores_data[sid]["et_scores"] = et_list
 
                 st.success("Edited scores applied to session. Scroll down to see computed totals and Save All to persist.")
-                st.experimental_rerun()
+                st.rerun()
 
         # After editor we still want to show computed summary below, so fall through to compute metrics using session_state.scores_data
     else:
