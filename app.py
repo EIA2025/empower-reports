@@ -1292,8 +1292,6 @@ def generate_pdf_report(student_data, term_data, marks, design, behavior_data=No
     if is_vd_report:
         # For VD reports we show only the Mid-term (MOT), Grade (based on VD scaled %), Comment, and Teacher
         results_data = [['SUBJECTS', 'MOT', 'GRADE', 'Comment', 'Teacher']]
-        # Core subjects header row (match column count)
-        results_data.append([Paragraph('<b>Core subjects</b>', styles['Normal']), '', '', '', ''])
 
         for _, row in marks.iterrows():
             mot = float(row.get('midterm_out_of_20') or 0)
@@ -1319,8 +1317,6 @@ def generate_pdf_report(student_data, term_data, marks, design, behavior_data=No
         results_table = Table(results_data, colWidths=[2.0*inch, 0.8*inch, 0.6*inch, 1.6*inch, 1.4*inch])
     else:
         results_data = [['SUBJECTS', 'CW', 'MOT', 'EOT', 'TOTAL', 'GRADE', 'Comment', 'Teacher']]
-        # Core subjects section (8 columns)
-        results_data.append([Paragraph('<b>Core subjects</b>', styles['Normal']), '', '', '', '', '', '', ''])
 
         for _, row in marks.iterrows():
             teacher = row.get('teacher_name') or get_teacher_name_for_mark(student_data['id'], row['subject'], term_data['id'])
