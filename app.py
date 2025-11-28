@@ -4423,6 +4423,17 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                     # Render a form for the current page of students
                     form_key = f"comments_form_{page_idx}"
                     with st.form(key=form_key):
+                        # Pre-fetch average totals for students on this page
+                        ids = ",".join([str(int(s['student_id'])) for s in page_students]) if page_students else ""
+                        avg_map = {}
+                        if ids:
+                            try:
+                                avg_q = pd.read_sql(f"SELECT student_id, AVG(total) as avg_total FROM marks WHERE term_id = {active_term.id} AND student_id IN ({ids}) GROUP BY student_id", ENGINE)
+                                for _, r in avg_q.iterrows():
+                                    avg_map[int(r['student_id'])] = float(r['avg_total']) if r['avg_total'] is not None else None
+                            except Exception:
+                                avg_map = {}
+
                         for s in page_students:
                             sid = int(s['student_id'])
                             name = s['student_name']
@@ -4433,7 +4444,11 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                             if widget_key not in st.session_state:
                                 st.session_state[widget_key] = st.session_state.student_comments.get(sid, '')
 
-                            st.markdown(f"**{name}** ({reg})")
+                            avg_display = "N/A"
+                            if sid in avg_map and avg_map[sid] is not None:
+                                avg_display = f"{avg_map[sid]:.1f}"
+
+                            st.markdown(f"**{name}** ({reg}) — Average: {avg_display}")
                             st.text_area(
                                 "Comment",
                                 value=st.session_state.get(widget_key, ''),
@@ -4454,7 +4469,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                     st.markdown("---")
                     st.info("💡 **Tip**: Edit group comments, submit the form, then click 'Save All Comments' to persist all staged changes.")
 
-                    # Save all staged comments to DB
+                    # Save all staged comments to DB (create Mark rows when missing)
                     if st.button("💾 Save All Comments", width='stretch'):
                         saved_comments = 0
                         errors = []
@@ -4462,8 +4477,9 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                             for student_id, comment in st.session_state.get('student_comments', {}).items():
                                 if comment and str(comment).strip():
                                     try:
+                                        sid = int(student_id)
                                         mark_record = session.query(Mark).filter_by(
-                                            student_id=int(student_id),
+                                            student_id=sid,
                                             subject=selected_subject,
                                             term_id=active_term.id
                                         ).first()
@@ -4471,6 +4487,18 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                                         if mark_record:
                                             mark_record.comment = str(comment).strip()
                                             session.add(mark_record)
+                                            saved_comments += 1
+                                        else:
+                                            # Create a minimal mark record to store the comment
+                                            new_mark = Mark(
+                                                student_id=sid,
+                                                subject=selected_subject,
+                                                term_id=active_term.id,
+                                                total=None,
+                                                grade=None,
+                                                comment=str(comment).strip()
+                                            )
+                                            session.add(new_mark)
                                             saved_comments += 1
 
                                     except Exception as e:
