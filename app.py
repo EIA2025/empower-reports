@@ -2030,6 +2030,7 @@ if st.session_state.user_role == 'master_admin':
     page = st.sidebar.selectbox("Master Admin Menu", [
         "Master Admin Dashboard",
         "Reset Database",
+        "Reset System Admin Password",
         "Logout"
     ])
 elif st.session_state.user_role == 'admin':
@@ -2177,6 +2178,59 @@ if st.session_state.user_role == 'master_admin':
                 st.text(f"📦 {backup['name']} - {backup['date']} ({backup['size']/1024/1024:.2f} MB)")
         else:
             st.info("No backups found yet.")
+
+    elif page == "Reset System Admin Password":
+        st.header("🔁 Reset System Admin Password")
+        st.error("⚠️ This will reset the main system admin account password to the default. No other data will be deleted.")
+        st.info("Default credentials will be: Username: `admin`, Password: `admin123`")
+
+        confirm_password = st.text_input("Enter master admin password to proceed:", type="password")
+
+        if st.button("Reset Admin Password", key="reset_admin_pw"):
+            master_hash = hashlib.sha256("@mikaelJ46".encode()).hexdigest()
+            if hashlib.sha256(confirm_password.encode()).hexdigest() == master_hash:
+                try:
+                    session = Session()
+                    # Look for the standard default admin user by common emails
+                    admin_user = session.query(User).filter(User.email.in_(['admin', 'admin@eia.edu', 'admin@local'])).first()
+                    if not admin_user:
+                        # Fallback: first user with role 'admin'
+                        admin_user = session.query(User).filter_by(role='admin').order_by(User.id.asc()).first()
+
+                    desired_password = 'admin123'
+                    desired_hash = hashlib.sha256(desired_password.encode()).hexdigest()
+
+                    if admin_user:
+                        admin_user.password_hash = desired_hash
+                        session.add(admin_user)
+                        session.commit()
+                        log_audit(session, None, "MASTER_ADMIN_RESET_ADMIN_PW", f"Reset password for admin user id {admin_user.id}")
+                        st.success("✅ System admin password reset to default.")
+                        st.info("Username: `admin` — Password: `admin123`")
+                    else:
+                        # No admin exists; create the default admin user (no data loss)
+                        new_admin = User(
+                            name='Administrator',
+                            email='admin',
+                            role='admin',
+                            password_hash=desired_hash,
+                            subjects_taught='',
+                            class_teacher_for='',
+                            gender='',
+                            phone_number=''
+                        )
+                        session.add(new_admin)
+                        session.commit()
+                        log_audit(session, None, "MASTER_ADMIN_CREATE_ADMIN", f"Created default admin id {new_admin.id}")
+                        st.success("✅ Default admin created with credentials:")
+                        st.info("Username: `admin` — Password: `admin123`")
+
+                    session.close()
+                    st.info("You will remain logged in as Master Admin. Use the admin credentials to login separately if needed.")
+                except Exception as e:
+                    st.error(f"❌ Error resetting admin password: {str(e)}")
+            else:
+                st.error("❌ Incorrect master admin password")
     
     elif page == "Logout":
         st.session_state.logged_in = False
