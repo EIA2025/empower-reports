@@ -764,6 +764,14 @@ def safe_rerun():
     """Call Streamlit rerun safely across different Streamlit versions.
     Falls back to setting a session flag and calling `st.stop()` if `experimental_rerun` is unavailable.
     """
+    # Prefer the stable API when available
+    try:
+        st.rerun()
+        return
+    except Exception:
+        pass
+
+    # Fallback to experimental_rerun if present
     try:
         if hasattr(st, 'experimental_rerun'):
             st.experimental_rerun()
@@ -4280,7 +4288,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
     st.subheader("🚀 Auto-Compile Final Marks")
     st.write("After saving scores above, click below to automatically compile final marks for all students.")
     
-    if st.button("🔄 Auto-Compile All Students", use_container_width=True):
+    if st.button("🔄 Auto-Compile All Students", width='stretch'):
         compiled_count = 0
         
         progress_bar = st.progress(0)
@@ -4316,6 +4324,38 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
             
             st.success(f"✅ Final marks compiled for {compiled_count} students!")
             st.balloons()
+
+            # Show compiled marks table for teacher review
+            try:
+                compiled_df = pd.read_sql(f"""
+                    SELECT s.name as student_name, s.registration_number,
+                           m.coursework_out_of_20, m.midterm_out_of_20, m.endterm_out_of_60,
+                           m.total, m.grade
+                    FROM marks m
+                    JOIN students s ON m.student_id = s.id
+                    WHERE m.term_id = {active_term.id}
+                    AND m.subject = '{selected_subject}'
+                    AND s.class_name = '{selected_class}'
+                    ORDER BY s.name
+                """, ENGINE)
+
+                if not compiled_df.empty:
+                    st.markdown("---")
+                    st.subheader("📋 Compiled Final Marks")
+                    st.info("These are the compiled final marks for the selected class and subject.")
+                    st.dataframe(compiled_df, width='stretch')
+
+                    # CSV download
+                    csv_data = compiled_df.to_csv(index=False)
+                    st.download_button(
+                        "Download Compiled Marks (CSV)",
+                        csv_data,
+                        f"compiled_marks_{selected_class}_{selected_subject}_{active_term.term_name}.csv",
+                        "text/csv",
+                        width='stretch'
+                    )
+            except Exception as e:
+                st.error(f"Could not load compiled marks for preview: {e}")
     
     session.close()
     
