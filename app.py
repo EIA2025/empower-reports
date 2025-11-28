@@ -1990,7 +1990,7 @@ st.sidebar.markdown("###  Storage Status")
 try:
     db_size = os.path.getsize(DB_PATH) / (1024 * 1024)  # MB
     st.sidebar.metric("Database", f"{db_size:.2f} MB")
-except:
+except Exception:
     st.sidebar.metric("Database", "Unknown")
 
 st.sidebar.info(" Local Storage")
@@ -4383,8 +4383,6 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
 elif page == "Enter Results" and st.session_state.user_role == 'teacher':
     # This page is now replaced but keeping placeholder to avoid breaking other logic
     st.info("The Enter Results page has been moved. Please use the main menu.")
-    
-    session.close()
 
 elif page == "Comments" and st.session_state.user_role == 'teacher':
     st.header("💬 Add Student Comments")
@@ -4416,16 +4414,19 @@ elif page == "Comments" and st.session_state.user_role == 'teacher':
         # Admin or teacher without assigned class - show all
         available_classes = sorted(session.query(Student.class_name).distinct().with_entities(Student.class_name).all())
         available_classes = [c[0] for c in available_classes if c[0]]
+
+    # Allow teacher to comment across all classes for the selected subject
+    available_classes = ["All Classes"] + available_classes
     
     if not available_classes:
         st.warning("No classes assigned to you.")
         session.close()
         st.stop()
     
-    # Select class and subject
+    # Select class (optional) and subject
     col1, col2 = st.columns(2)
     with col1:
-        selected_class = st.selectbox("Select Class", available_classes)
+        selected_class = st.selectbox("Select Class (optional)", available_classes)
     with col2:
         subject_options = subjects_taught if subjects_taught and subjects_taught[0] else ["English", "Math", "Science"]
         selected_subject = st.selectbox("Select Subject", subject_options)
@@ -4435,16 +4436,31 @@ elif page == "Comments" and st.session_state.user_role == 'teacher':
         session.close()
         st.stop()
     
-    # Load students for this class
-    students_df = pd.read_sql(f"""
-        SELECT id as student_id, name as student_name, registration_number
-        FROM students
-        WHERE class_name = '{selected_class}'
-        ORDER BY name
-    """, ENGINE)
+    # Load students: either all students that take the selected subject (school-wide)
+    # or students in the selected class who take the subject.
+    sel_sub = selected_subject.replace("'", "''")
+    if selected_class == "All Classes":
+        # Match both JSON-encoded subjects ("Subject") and comma-separated lists as a fallback
+        students_q = f"""
+            SELECT id as student_id, name as student_name, registration_number
+            FROM students
+            WHERE (subjects LIKE '%\"{sel_sub}\"%' OR subjects LIKE '%{sel_sub}%')
+            ORDER BY name
+        """
+    else:
+        sel_cls = selected_class.replace("'", "''")
+        students_q = f"""
+            SELECT id as student_id, name as student_name, registration_number
+            FROM students
+            WHERE class_name = '{sel_cls}'
+              AND (subjects LIKE '%\"{sel_sub}\"%' OR subjects LIKE '%{sel_sub}%')
+            ORDER BY name
+        """
+
+    students_df = pd.read_sql(students_q, ENGINE)
     
     if students_df.empty:
-        st.info("No students in this class.")
+        st.info("No students found for the selected subject.")
         session.close()
         st.stop()
     
@@ -5560,8 +5576,6 @@ elif page == "Discipline Reports":
                                 except Exception:
                                     pass
                             except Exception:
-                                pass
-                            except Exception:
                                 # ignore messaging errors to avoid blocking the submission
                                 pass
 
@@ -6161,7 +6175,7 @@ elif page == "Report Design" and st.session_state.user_role == 'admin':
                     # It's base64
                     logo_bytes = base64.b64decode(design.logo_data)
                     st.image(logo_bytes, width=150)
-            except:
+            except Exception:
                 st.error("Error loading logo")
         
         st.markdown(f"<h2 style='text-align: center; color: {design.primary_color};'>{design.school_name}</h2>", unsafe_allow_html=True)
@@ -6246,7 +6260,6 @@ elif page == "Communications":
                     # Keep manual mark-read for compatibility
                     if st.button(f"Mark Read {row['id']}", key=f"mr{row['id']}"):
                         success = mark_message_read(session, int(row['id']))
-                        session.close()
                         if success:
                             st.session_state['inbox_refresh'] = True
                         else:
