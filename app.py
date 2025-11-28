@@ -3902,153 +3902,244 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
     
     # Display score entry rows
     completed_count = 0
-    
-    for _, student in students_in_class.iterrows():
-        student_id = int(student['id'])
-        student_name = student['name']
-        student_reg = student['registration_number']
-        
-        cols_row = st.columns(col_widths)
-        
-        col_idx = 0
-        
-        # Student info
-        with cols_row[col_idx]:
-            st.write(f"**{student_name}**")
-        col_idx += 1
-        
-        with cols_row[col_idx]:
-            st.write(student_reg)
-        col_idx += 1
-        
-        # Initialize student scores in session state
-        if student_id not in st.session_state.scores_data:
-            st.session_state.scores_data[student_id] = {
-                "cw_scores": [0.0] * len(st.session_state.cw_components),
-                "mt_scores": [0.0] * len(st.session_state.mt_components),
-                "et_scores": [0.0] * len(st.session_state.et_components)
+
+    # Allow spreadsheet-style entry for better UX
+    use_spreadsheet = st.checkbox("Use spreadsheet-style entry (faster for bulk edits)", value=True)
+
+    if use_spreadsheet:
+        # Build DataFrame for editor
+        df_cols = ["student_id", "Student Name", "Reg No."]
+        # CW columns
+        for c in st.session_state.cw_components:
+            df_cols.append(f"CW|{c['name']} (/{c['total']})")
+        # MT columns
+        for c in st.session_state.mt_components:
+            df_cols.append(f"MT|{c['name']} (/{c['total']})")
+        # ET columns
+        for c in st.session_state.et_components:
+            df_cols.append(f"ET|{c['name']} (/{c['total']})")
+
+        # Build rows
+        rows = []
+        for _, student in students_in_class.iterrows():
+            sid = int(student['id'])
+            row = {
+                "student_id": sid,
+                "Student Name": student['name'],
+                "Reg No.": student['registration_number']
             }
-        
-        student_scores = st.session_state.scores_data[student_id]
+            # ensure session lists exist
+            if sid not in st.session_state.scores_data:
+                st.session_state.scores_data[sid] = {
+                    "cw_scores": [0.0] * len(st.session_state.cw_components),
+                    "mt_scores": [0.0] * len(st.session_state.mt_components),
+                    "et_scores": [0.0] * len(st.session_state.et_components)
+                }
 
-        # Ensure student score lists match current component counts (avoid index errors)
-        needed_cw = len(st.session_state.cw_components)
-        needed_mt = len(st.session_state.mt_components)
-        needed_et = len(st.session_state.et_components)
+            scores = st.session_state.scores_data[sid]
+            # fill cw
+            for i, c in enumerate(st.session_state.cw_components):
+                col_name = f"CW|{c['name']} (/{c['total']})"
+                row[col_name] = scores.get("cw_scores", [0]*len(st.session_state.cw_components))[i] if i < len(scores.get("cw_scores", [])) else 0.0
+            for i, c in enumerate(st.session_state.mt_components):
+                col_name = f"MT|{c['name']} (/{c['total']})"
+                row[col_name] = scores.get("mt_scores", [0]*len(st.session_state.mt_components))[i] if i < len(scores.get("mt_scores", [])) else 0.0
+            for i, c in enumerate(st.session_state.et_components):
+                col_name = f"ET|{c['name']} (/{c['total']})"
+                row[col_name] = scores.get("et_scores", [0]*len(st.session_state.et_components))[i] if i < len(scores.get("et_scores", [])) else 0.0
 
-        if len(student_scores.get("cw_scores", [])) < needed_cw:
-            student_scores["cw_scores"] = student_scores.get("cw_scores", []) + [0.0] * (needed_cw - len(student_scores.get("cw_scores", [])))
-        if len(student_scores.get("mt_scores", [])) < needed_mt:
-            student_scores["mt_scores"] = student_scores.get("mt_scores", []) + [0.0] * (needed_mt - len(student_scores.get("mt_scores", [])))
-        if len(student_scores.get("et_scores", [])) < needed_et:
-            student_scores["et_scores"] = student_scores.get("et_scores", []) + [0.0] * (needed_et - len(student_scores.get("et_scores", [])))
+            rows.append(row)
 
-        # CW score inputs
-        cw_scores = student_scores["cw_scores"]
-        for comp_idx, comp in enumerate(st.session_state.cw_components):
+        import pandas as _pd
+        editor_df = _pd.DataFrame(rows, columns=df_cols)
+
+        # Show brief instructions
+        st.info("Tip: Edit scores directly in the table below. When finished click 'Apply Edited Scores' to save into the entry session.")
+
+        # Use data editor if available, fall back to dataframe display
+        edited_df = None
+        try:
+            edited_df = st.data_editor(editor_df, use_container_width=True)
+        except Exception:
+            try:
+                edited_df = st.experimental_data_editor(editor_df, num_rows="fixed", use_container_width=True)
+            except Exception:
+                st.dataframe(editor_df, use_container_width=True)
+
+        if edited_df is not None:
+            if st.button("Apply Edited Scores", key="apply_edited_scores"):
+                # Write back into session_state.scores_data
+                for _, row in edited_df.iterrows():
+                    sid = int(row['student_id'])
+                    # prepare lists
+                    cw_list = []
+                    mt_list = []
+                    et_list = []
+                    for c in st.session_state.cw_components:
+                        col = f"CW|{c['name']} (/{c['total']})"
+                        cw_list.append(float(row.get(col, 0.0) or 0.0))
+                    for c in st.session_state.mt_components:
+                        col = f"MT|{c['name']} (/{c['total']})"
+                        mt_list.append(float(row.get(col, 0.0) or 0.0))
+                    for c in st.session_state.et_components:
+                        col = f"ET|{c['name']} (/{c['total']})"
+                        et_list.append(float(row.get(col, 0.0) or 0.0))
+
+                    st.session_state.scores_data[sid]["cw_scores"] = cw_list
+                    st.session_state.scores_data[sid]["mt_scores"] = mt_list
+                    st.session_state.scores_data[sid]["et_scores"] = et_list
+
+                st.success("Edited scores applied to session. Scroll down to see computed totals and Save All to persist.")
+                st.experimental_rerun()
+
+        # After editor we still want to show computed summary below, so fall through to compute metrics using session_state.scores_data
+    else:
+        for _, student in students_in_class.iterrows():
+            student_id = int(student['id'])
+            student_name = student['name']
+            student_reg = student['registration_number']
+            
+            cols_row = st.columns(col_widths)
+            
+            col_idx = 0
+            
+            # Student info
             with cols_row[col_idx]:
-                score = st.number_input(
-                    f"CW {comp_idx}",
-                    min_value=0.0,
-                    max_value=comp["total"] * 2,
-                    value=cw_scores[comp_idx],
-                    step=0.5,
-                    key=f"cw_{student_id}_{comp_idx}",
-                    label_visibility="collapsed"
-                )
-                cw_scores[comp_idx] = score
+                st.write(f"**{student_name}**")
             col_idx += 1
-        
-        # CW total and conversion
-        if st.session_state.cw_components:
-            cw_raw_total = sum(cw_scores)
-            cw_out_of_20 = convert_to_base(cw_raw_total, cw_total_all, 20) if cw_total_all > 0 else 0
+            
             with cols_row[col_idx]:
-                st.metric("", f"{cw_out_of_20:.1f}", label_visibility="collapsed")
+                st.write(student_reg)
             col_idx += 1
-        else:
-            cw_out_of_20 = 0
-        
-        # MT score inputs
-        mt_scores = student_scores["mt_scores"]
-        for comp_idx, comp in enumerate(st.session_state.mt_components):
+            
+            # Initialize student scores in session state
+            if student_id not in st.session_state.scores_data:
+                st.session_state.scores_data[student_id] = {
+                    "cw_scores": [0.0] * len(st.session_state.cw_components),
+                    "mt_scores": [0.0] * len(st.session_state.mt_components),
+                    "et_scores": [0.0] * len(st.session_state.et_components)
+                }
+            
+            student_scores = st.session_state.scores_data[student_id]
+
+            # Ensure student score lists match current component counts (avoid index errors)
+            needed_cw = len(st.session_state.cw_components)
+            needed_mt = len(st.session_state.mt_components)
+            needed_et = len(st.session_state.et_components)
+
+            if len(student_scores.get("cw_scores", [])) < needed_cw:
+                student_scores["cw_scores"] = student_scores.get("cw_scores", []) + [0.0] * (needed_cw - len(student_scores.get("cw_scores", [])))
+            if len(student_scores.get("mt_scores", [])) < needed_mt:
+                student_scores["mt_scores"] = student_scores.get("mt_scores", []) + [0.0] * (needed_mt - len(student_scores.get("mt_scores", [])))
+            if len(student_scores.get("et_scores", [])) < needed_et:
+                student_scores["et_scores"] = student_scores.get("et_scores", []) + [0.0] * (needed_et - len(student_scores.get("et_scores", [])))
+
+            # CW score inputs
+            cw_scores = student_scores["cw_scores"]
+            for comp_idx, comp in enumerate(st.session_state.cw_components):
+                with cols_row[col_idx]:
+                    score = st.number_input(
+                        f"CW {comp_idx}",
+                        min_value=0.0,
+                        max_value=comp["total"] * 2,
+                        value=cw_scores[comp_idx],
+                        step=0.5,
+                        key=f"cw_{student_id}_{comp_idx}",
+                        label_visibility="collapsed"
+                    )
+                    cw_scores[comp_idx] = score
+                col_idx += 1
+            
+            # CW total and conversion
+            if st.session_state.cw_components:
+                cw_raw_total = sum(cw_scores)
+                cw_out_of_20 = convert_to_base(cw_raw_total, cw_total_all, 20) if cw_total_all > 0 else 0
+                with cols_row[col_idx]:
+                    st.metric("", f"{cw_out_of_20:.1f}", label_visibility="collapsed")
+                col_idx += 1
+            else:
+                cw_out_of_20 = 0
+            
+            # MT score inputs
+            mt_scores = student_scores["mt_scores"]
+            for comp_idx, comp in enumerate(st.session_state.mt_components):
+                with cols_row[col_idx]:
+                    score = st.number_input(
+                        f"MT {comp_idx}",
+                        min_value=0.0,
+                        max_value=comp["total"] * 2,
+                        value=mt_scores[comp_idx],
+                        step=0.5,
+                        key=f"mt_{student_id}_{comp_idx}",
+                        label_visibility="collapsed"
+                    )
+                    mt_scores[comp_idx] = score
+                col_idx += 1
+            
+            # MT total and conversion
+            if st.session_state.mt_components:
+                mt_raw_total = sum(mt_scores)
+                mt_out_of_20 = convert_to_base(mt_raw_total, mt_total_all, 20) if mt_total_all > 0 else 0
+                with cols_row[col_idx]:
+                    st.metric("", f"{mt_out_of_20:.1f}", label_visibility="collapsed")
+                col_idx += 1
+            else:
+                mt_out_of_20 = 0
+            
+            # ET score inputs
+            et_scores = student_scores["et_scores"]
+            for comp_idx, comp in enumerate(st.session_state.et_components):
+                with cols_row[col_idx]:
+                    score = st.number_input(
+                        f"ET {comp_idx}",
+                        min_value=0.0,
+                        max_value=comp["total"] * 2,
+                        value=et_scores[comp_idx],
+                        step=0.5,
+                        key=f"et_{student_id}_{comp_idx}",
+                        label_visibility="collapsed"
+                    )
+                    et_scores[comp_idx] = score
+                col_idx += 1
+            
+            # ET total and conversion
+            if st.session_state.et_components:
+                et_raw_total = sum(et_scores)
+                et_out_of_60 = convert_to_base(et_raw_total, et_total_all, 60) if et_total_all > 0 else 0
+                with cols_row[col_idx]:
+                    st.metric("", f"{et_out_of_60:.1f}", label_visibility="collapsed")
+                col_idx += 1
+            else:
+                et_out_of_60 = 0
+            
+            # Calculate final totals and grade
+            final_total = cw_out_of_20 + mt_out_of_20 + et_out_of_60
+            final_grade = get_grade(final_total)
+            
+            # Check if student has scores
+            has_any_score = any(cw_scores) or any(mt_scores) or any(et_scores)
+            status = "✓ Complete" if has_any_score else "⏳ Pending"
+            status_color = "🟢" if has_any_score else "🔴"
+            
+            if has_any_score:
+                completed_count += 1
+            
+            # Final total
             with cols_row[col_idx]:
-                score = st.number_input(
-                    f"MT {comp_idx}",
-                    min_value=0.0,
-                    max_value=comp["total"] * 2,
-                    value=mt_scores[comp_idx],
-                    step=0.5,
-                    key=f"mt_{student_id}_{comp_idx}",
-                    label_visibility="collapsed"
-                )
-                mt_scores[comp_idx] = score
+                st.metric("", f"{final_total:.1f}", label_visibility="collapsed")
             col_idx += 1
-        
-        # MT total and conversion
-        if st.session_state.mt_components:
-            mt_raw_total = sum(mt_scores)
-            mt_out_of_20 = convert_to_base(mt_raw_total, mt_total_all, 20) if mt_total_all > 0 else 0
+            
+            # Grade
             with cols_row[col_idx]:
-                st.metric("", f"{mt_out_of_20:.1f}", label_visibility="collapsed")
+                st.metric("", final_grade, label_visibility="collapsed")
             col_idx += 1
-        else:
-            mt_out_of_20 = 0
-        
-        # ET score inputs
-        et_scores = student_scores["et_scores"]
-        for comp_idx, comp in enumerate(st.session_state.et_components):
+            
+            # Status
             with cols_row[col_idx]:
-                score = st.number_input(
-                    f"ET {comp_idx}",
-                    min_value=0.0,
-                    max_value=comp["total"] * 2,
-                    value=et_scores[comp_idx],
-                    step=0.5,
-                    key=f"et_{student_id}_{comp_idx}",
-                    label_visibility="collapsed"
-                )
-                et_scores[comp_idx] = score
+                st.write(f"{status_color} {status}")
             col_idx += 1
-        
-        # ET total and conversion
-        if st.session_state.et_components:
-            et_raw_total = sum(et_scores)
-            et_out_of_60 = convert_to_base(et_raw_total, et_total_all, 60) if et_total_all > 0 else 0
-            with cols_row[col_idx]:
-                st.metric("", f"{et_out_of_60:.1f}", label_visibility="collapsed")
-            col_idx += 1
-        else:
-            et_out_of_60 = 0
-        
-        # Calculate final totals and grade
-        final_total = cw_out_of_20 + mt_out_of_20 + et_out_of_60
-        final_grade = get_grade(final_total)
-        
-        # Check if student has scores
-        has_any_score = any(cw_scores) or any(mt_scores) or any(et_scores)
-        status = "✓ Complete" if has_any_score else "⏳ Pending"
-        status_color = "🟢" if has_any_score else "🔴"
-        
-        if has_any_score:
-            completed_count += 1
-        
-        # Final total
-        with cols_row[col_idx]:
-            st.metric("", f"{final_total:.1f}", label_visibility="collapsed")
-        col_idx += 1
-        
-        # Grade
-        with cols_row[col_idx]:
-            st.metric("", final_grade, label_visibility="collapsed")
-        col_idx += 1
-        
-        # Status
-        with cols_row[col_idx]:
-            st.write(f"{status_color} {status}")
-        col_idx += 1
-        
-        st.divider()
+            
+            st.divider()
     
     # Progress bar
     progress = completed_count / len(students_in_class)
