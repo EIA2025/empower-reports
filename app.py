@@ -2918,7 +2918,7 @@ elif page == "Student Decisions":
     st.header(" Student Decisions")
     session = Session()
     
-    user = session.query(User).get(st.session_state.user_id)
+    user = session.get(User, st.session_state.user_id)
     active_term = session.query(AcademicTerm).filter_by(is_active=True).first()
     
     if not active_term:
@@ -3650,7 +3650,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
     st.header("📊 Enter Results - Hybrid Setup & Entry")
     session = Session()
     
-    user = session.query(User).get(st.session_state.user_id)
+    user = session.get(User, st.session_state.user_id)
     my_subjects = [s.strip() for s in user.subjects_taught.split(',')] if user.subjects_taught else []
     
     if not my_subjects:
@@ -3930,7 +3930,19 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
             }
         
         student_scores = st.session_state.scores_data[student_id]
-        
+
+        # Ensure student score lists match current component counts (avoid index errors)
+        needed_cw = len(st.session_state.cw_components)
+        needed_mt = len(st.session_state.mt_components)
+        needed_et = len(st.session_state.et_components)
+
+        if len(student_scores.get("cw_scores", [])) < needed_cw:
+            student_scores["cw_scores"] = student_scores.get("cw_scores", []) + [0.0] * (needed_cw - len(student_scores.get("cw_scores", [])))
+        if len(student_scores.get("mt_scores", [])) < needed_mt:
+            student_scores["mt_scores"] = student_scores.get("mt_scores", []) + [0.0] * (needed_mt - len(student_scores.get("mt_scores", [])))
+        if len(student_scores.get("et_scores", [])) < needed_et:
+            student_scores["et_scores"] = student_scores.get("et_scores", []) + [0.0] * (needed_et - len(student_scores.get("et_scores", [])))
+
         # CW score inputs
         cw_scores = student_scores["cw_scores"]
         for comp_idx, comp in enumerate(st.session_state.cw_components):
@@ -4247,7 +4259,7 @@ elif page == "Admin Management" and st.session_state.user_role == 'admin':
                                        admins_df['id'].tolist(), 
                                        format_func=lambda x: admins_df[admins_df['id']==x]['name'].iloc[0])
                 
-                admin = session.query(User).get(admin_id)
+                admin = session.get(User, admin_id)
                 
                 with st.form("edit_admin"):
                     col1, col2 = st.columns(2)
@@ -4555,7 +4567,7 @@ elif page == "Staff Management" and st.session_state.user_role == 'admin':
                                        staff_df['id'].tolist(), 
                                        format_func=lambda x: staff_df[staff_df['id']==x]['name'].iloc[0])
                 
-                staff = session.query(User).get(staff_id)
+                staff = session.get(User, staff_id)
                 
                 with st.form("edit_staff"):
                     col1, col2 = st.columns(2)
@@ -4865,7 +4877,7 @@ elif page == "Classroom Behavior":
     st.header(" Classroom Behavior Evaluation")
     session = Session()
     
-    user = session.query(User).get(st.session_state.user_id)
+    user = session.get(User, st.session_state.user_id)
     active_term = session.query(AcademicTerm).filter_by(is_active=True).first()
     
     if not active_term:
@@ -5153,7 +5165,7 @@ elif page == "Discipline Reports":
 
                             # Notify admins via Messages about the new discipline report
                             try:
-                                teacher = session.query(User).get(int(st.session_state.user_id))
+                                teacher = session.get(User, int(st.session_state.user_id))
                                 teacher_name = teacher.name if teacher else "Teacher"
                             except Exception:
                                 teacher_name = "Teacher"
@@ -6095,7 +6107,7 @@ elif page == "Change Login Details":
     user = None
     try:
         if st.session_state.user_id is not None:
-            user = session.query(User).get(st.session_state.user_id)
+            user = session.get(User, st.session_state.user_id)
     except Exception:
         user = None
 
