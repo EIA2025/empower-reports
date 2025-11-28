@@ -416,7 +416,7 @@ def get_component_label_safe(session, comp_or_id):
         if hasattr(comp_or_id, 'display_label'):
             return getattr(comp_or_id, 'display_label') or getattr(comp_or_id, 'name', f"id:{getattr(comp_or_id, 'id', 'unknown')}")
         # Otherwise assume it's an id
-        comp_row = session.query(BehaviorComponent).get(int(comp_or_id))
+        comp_row = session.get(BehaviorComponent, int(comp_or_id))
         if comp_row:
             return comp_row.display_label or comp_row.name
     except Exception:
@@ -949,7 +949,10 @@ def mark_message_read(session, message_id):
         try:
             msg = session.get(Message, int(message_id))
         except Exception:
-            msg = session.query(Message).get(int(message_id))
+            try:
+                msg = session.get(Message, int(message_id))
+            except Exception:
+                msg = None
 
         if msg:
             msg.read = True
@@ -1047,7 +1050,7 @@ def compute_top_students(session, term_id, class_name=None, limit=5):
 
 def find_most_improved_students(session, term_id, subject=None):
     """Find most improved students compared to previous term"""
-    current_term = session.query(AcademicTerm).get(term_id)
+    current_term = session.get(AcademicTerm, term_id)
     if not current_term or current_term.term_number == 1:
         return None
     
@@ -4551,7 +4554,7 @@ elif page == "Admin Management" and st.session_state.user_role == 'admin':
 
             with st.expander("Edit / Toggle / Delete Component"):
                 comp_id = st.selectbox("Select Component", comps['id'].tolist(), format_func=lambda x: comps[comps['id']==x]['display_label'].iloc[0])
-                comp = session.query(BehaviorComponent).get(int(comp_id))
+                comp = session.get(BehaviorComponent, int(comp_id))
                 with st.form("edit_component"):
                     label = st.text_input("Display Label", value=get_component_label_safe(session, comp) or getattr(comp, 'name', ''))
                     name = st.text_input("Internal Name", value=comp.name)
@@ -4670,7 +4673,7 @@ elif page == "Behavior Components" and st.session_state.user_role == 'admin':
 
         with st.expander("Edit / Toggle / Delete Component"):
             comp_id = st.selectbox("Select Component", comps['id'].tolist(), format_func=lambda x: comps[comps['id']==x]['display_label'].iloc[0])
-            comp = session.query(BehaviorComponent).get(int(comp_id))
+            comp = session.get(BehaviorComponent, int(comp_id))
             with st.form("edit_component_page"):
                 label = st.text_input("Display Label", value=get_component_label_safe(session, comp) or getattr(comp, 'name', ''))
                 name = st.text_input("Internal Name", value=comp.name)
@@ -4892,7 +4895,7 @@ elif page == "Student Enrollment" and st.session_state.user_role == 'admin':
                                          students_df['id'].tolist(), 
                                          format_func=lambda x: students_df[students_df['id']==x]['name'].iloc[0])
                 
-                student = session.query(Student).get(student_id)
+                student = session.get(Student, student_id)
                 
                 # Parse existing subjects
                 try:
@@ -5570,7 +5573,7 @@ elif page == "Discipline Reports":
                         if st.form_submit_button("Send Feedback"):
                             try:
                                 # Persist admin note
-                                rep = session.query(DisciplineReport).get(report['id'])
+                                rep = session.get(DisciplineReport, report['id'])
                                 prev = rep.admin_notes or ""
                                 rep.admin_notes = (prev + "\n\n" + feedback).strip()
                                 # Optionally clear status if present
