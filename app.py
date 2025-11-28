@@ -2031,6 +2031,7 @@ if st.session_state.user_role == 'master_admin':
         "Master Admin Dashboard",
         "Reset Database",
         "Reset System Admin Password",
+        "Wipe All Data & Cache",
         "Logout"
     ])
 elif st.session_state.user_role == 'admin':
@@ -2231,6 +2232,132 @@ if st.session_state.user_role == 'master_admin':
                     st.error(f"❌ Error resetting admin password: {str(e)}")
             else:
                 st.error("❌ Incorrect master admin password")
+    
+    elif page == "Wipe All Data & Cache":
+        st.header("🧹 Wipe All Data & Cache")
+        st.error("⚠️ This will DELETE the database, ALL backups, uploads, exports, and common cache folders under the application directory. This is irreversible.")
+        st.info("Use this when you need a completely clean app state for presentation. The app code files will NOT be deleted.")
+
+        st.markdown("**Type the confirmation phrase to proceed:**")
+        confirm_text = st.text_input("Type 'DELETE ALL DATA AND CACHES' to confirm:")
+        confirm_password = st.text_input("Enter master admin password to proceed:", type="password")
+
+        if confirm_text == "DELETE ALL DATA AND CACHES":
+            if st.button("WIPE EVERYTHING (IRREVERSIBLE)", key="confirm_wipe"):
+                master_hash = hashlib.sha256("@mikaelJ46".encode()).hexdigest()
+                if hashlib.sha256(confirm_password.encode()).hexdigest() == master_hash:
+                    try:
+                        st.warning("🔄 Performing full wipe. This may take a few seconds...")
+
+                        # Close sessions and dispose engine
+                        try:
+                            s = Session()
+                            s.close()
+                        except Exception:
+                            pass
+                        try:
+                            ENGINE.dispose()
+                        except Exception:
+                            pass
+
+                        # Remove sqlite db files in base dir
+                        try:
+                            for dbfile in BASE_DIR.glob("*.db"):
+                                try:
+                                    dbfile.unlink()
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+
+                        # Remove backups, uploads, exports directories entirely
+                        def safe_rmtree(pathobj):
+                            try:
+                                if pathobj.exists():
+                                    shutil.rmtree(pathobj)
+                            except Exception:
+                                try:
+                                    # attempt to remove files inside then dir
+                                    for child in pathobj.iterdir():
+                                        try:
+                                            if child.is_dir():
+                                                shutil.rmtree(child)
+                                            else:
+                                                child.unlink()
+                                        except Exception:
+                                            pass
+                                    if pathobj.exists():
+                                        pathobj.rmdir()
+                                except Exception:
+                                    pass
+
+                        try:
+                            safe_rmtree(BACKUP_DIR)
+                        except Exception:
+                            pass
+                        try:
+                            safe_rmtree(UPLOADS_DIR)
+                        except Exception:
+                            pass
+                        try:
+                            safe_rmtree(EXPORTS_DIR)
+                        except Exception:
+                            pass
+
+                        # Remove common cache folders under BASE_DIR
+                        cache_names = ["__pycache__", ".streamlit", ".cache", "cache"]
+                        try:
+                            for name in cache_names:
+                                for p in BASE_DIR.rglob(name):
+                                    try:
+                                        if p.is_dir():
+                                            shutil.rmtree(p)
+                                    except Exception:
+                                        pass
+                        except Exception:
+                            pass
+
+                        # Recreate directories to avoid runtime errors later
+                        try:
+                            BACKUP_DIR.mkdir(exist_ok=True)
+                            UPLOADS_DIR.mkdir(exist_ok=True)
+                            EXPORTS_DIR.mkdir(exist_ok=True)
+                        except Exception:
+                            pass
+
+                        # Recreate database and initial objects
+                        try:
+                            # Dispose and re-create engine to ensure fresh DB
+                            try:
+                                ENGINE.dispose()
+                            except Exception:
+                                pass
+
+                            # Recreate the sqlite database file by ensuring engine can connect
+                            Base.metadata.create_all(ENGINE)
+                            update_database_schema()
+                            seed_default_behavior_components()
+                            init_report_design()
+                            init_admin()
+
+                            # Create a session to log the wipe action now that DB exists
+                            log_sess = Session()
+                            log_audit(log_sess, None, "MASTER_ADMIN_WIPE", "Full wipe of database, backups, uploads, exports, and caches via master admin")
+                            log_sess.close()
+
+                            st.success("✅ Full wipe completed. App state is now clean.")
+                            st.info("Default admin account has been (re)created. Username: `admin` Password: `admin123`")
+                            st.session_state.logged_in = False
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Error reinitializing DB after wipe: {str(e)}")
+                    except Exception as e:
+                        # Outer try: catch any error during the wipe operation
+                        st.error(f"❌ Error during full wipe: {str(e)}")
+                else:
+                    st.error("❌ Incorrect master admin password")
+        else:
+            st.info("Enter the exact confirmation phrase to enable wipe.")
     
     elif page == "Logout":
         st.session_state.logged_in = False
