@@ -4374,64 +4374,87 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                         width='stretch'
                     )
 
-                    # Teacher comments section (spreadsheet-style editor)
+                    # Teacher comments section (form-based, paginated)
                     st.markdown("---")
                     st.subheader("💬 Add Comments for Students")
-                    st.info("Edit comments in the table below. Changes are auto-staged as you type. Click 'Save All Comments' when done.")
+                    st.info("Edit comments in groups (forms). Submit each group to stage changes; click 'Save All Comments' to persist.")
 
                     # Ensure session storage exists
                     if 'student_comments' not in st.session_state:
                         st.session_state.student_comments = {}
+                    if 'comments_page_index' not in st.session_state:
+                        st.session_state.comments_page_index = 0
 
-                    # Build comments DataFrame for editing
-                    comments_df = compiled_df[['student_id', 'student_name', 'registration_number']].copy()
+                    # Configuration: students per page
+                    page_size = 10
 
-                    # Pre-fill with existing comments from compiled_df (if present)
-                    comment_map = {}
-                    for _, row in compiled_df.iterrows():
-                        sid = int(row['student_id'])
-                        comment_map[sid] = row.get('comment', '') if 'comment' in compiled_df.columns else ''
+                    # Prepare student list and pre-fill staged comments from compiled_df
+                    students_list = compiled_df[['student_id', 'student_name', 'registration_number']].to_dict('records')
+                    if 'comment' in compiled_df.columns:
+                        # map existing comments by student_id
+                        existing_map = {int(r['student_id']): (r.get('comment') or '') for _, r in compiled_df.iterrows()}
+                    else:
+                        existing_map = {}
 
-                    # Override with any staged comments
-                    staged = st.session_state.get('student_comments', {})
-                    for sid, comment in staged.items():
-                        try:
-                            comment_map[int(sid)] = comment
-                        except Exception:
-                            continue
+                    for s in students_list:
+                        sid = int(s['student_id'])
+                        if sid not in st.session_state.student_comments:
+                            st.session_state.student_comments[sid] = existing_map.get(sid, '')
 
-                    # Apply to dataframe
-                    comments_df['Comment'] = comments_df['student_id'].map(comment_map).fillna('')
+                    total = len(students_list)
+                    page_idx = max(0, min(st.session_state.comments_page_index, (total - 1) // page_size if total else 0))
+                    start = page_idx * page_size
+                    end = min(start + page_size, total)
+                    page_students = students_list[start:end]
 
-                    # Show editable table WITHOUT an intermediate button - let users edit directly
-                    st.write("**Edit comments directly in the table:**")
-                    edited_comments = None
-                    try:
-                        edited_comments = st.data_editor(
-                            comments_df,
-                            key="comments_editor_persistent",
-                            width='stretch',
-                            hide_index=True,
-                            disabled=['student_id', 'student_name', 'registration_number']
-                        )
-                    except Exception as e:
-                        st.error(f"Could not display comment editor: {e}")
-                        st.dataframe(comments_df, width='stretch')
+                    st.write(f"Showing students {start+1}-{end} of {total}")
+                    cprev, cnext, cinfo = st.columns([1,1,6])
+                    with cprev:
+                        if st.button("◀ Prev", key='comments_prev') and page_idx > 0:
+                            st.session_state.comments_page_index = page_idx - 1
+                            st.experimental_rerun()
+                    with cnext:
+                        if st.button("Next ▶", key='comments_next') and page_idx < ((total - 1) // page_size if total else 0):
+                            st.session_state.comments_page_index = page_idx + 1
+                            st.experimental_rerun()
+                    with cinfo:
+                        st.write(f"Page {page_idx+1} of {((total - 1) // page_size) + 1 if total else 0}")
 
-                    # Auto-stage changes (no Apply button required)
-                    if edited_comments is not None:
-                        for _, r in edited_comments.iterrows():
-                            try:
-                                sid = int(r['student_id'])
-                                com = str(r.get('Comment', '') or '')
-                                st.session_state.student_comments[sid] = com
-                            except Exception:
-                                continue
+                    # Render a form for the current page of students
+                    form_key = f"comments_form_{page_idx}"
+                    with st.form(key=form_key):
+                        for s in page_students:
+                            sid = int(s['student_id'])
+                            name = s['student_name']
+                            reg = s['registration_number']
+
+                            # ensure widget key persists
+                            widget_key = f"comment_{sid}"
+                            if widget_key not in st.session_state:
+                                st.session_state[widget_key] = st.session_state.student_comments.get(sid, '')
+
+                            st.markdown(f"**{name}** ({reg})")
+                            st.text_area(
+                                "Comment",
+                                value=st.session_state.get(widget_key, ''),
+                                key=widget_key,
+                                height=120,
+                                label_visibility="collapsed"
+                            )
+                            st.divider()
+
+                        submitted = st.form_submit_button("Save Group Comments")
+                        if submitted:
+                            for s in page_students:
+                                sid = int(s['student_id'])
+                                widget_key = f"comment_{sid}"
+                                st.session_state.student_comments[sid] = st.session_state.get(widget_key, '')
+                            st.success("Group comments staged. Click 'Save All Comments' to persist.")
 
                     st.markdown("---")
-                    st.info("💡 **Tip**: Your edits are automatically saved to the session. Click 'Save All Comments' below to persist them to the database.")
+                    st.info("💡 **Tip**: Edit group comments, submit the form, then click 'Save All Comments' to persist all staged changes.")
 
-                    # Save all staged comments to DB (write into Mark.comment if a mark exists)
+                    # Save all staged comments to DB
                     if st.button("💾 Save All Comments", width='stretch'):
                         saved_comments = 0
                         errors = []
@@ -4439,7 +4462,6 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                             for student_id, comment in st.session_state.get('student_comments', {}).items():
                                 if comment and str(comment).strip():
                                     try:
-                                        # Find the mark record for this student, subject and term
                                         mark_record = session.query(Mark).filter_by(
                                             student_id=int(student_id),
                                             subject=selected_subject,
@@ -4456,12 +4478,10 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                                         if not student_row.empty:
                                             errors.append(f"{student_row.iloc[0]['student_name']}: {str(e)}")
 
-                            # Commit changes if any
                             session.commit()
 
                             if saved_comments > 0:
                                 st.success(f"✅ {saved_comments} comment(s) saved successfully!")
-                                # Clear staged comments after successful save
                                 st.session_state.student_comments = {}
                                 try:
                                     st.balloons()
