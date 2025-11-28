@@ -4377,7 +4377,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                     # Teacher comments section (spreadsheet-style editor)
                     st.markdown("---")
                     st.subheader("💬 Add Comments for Students")
-                    st.info("Edit comments in the table below. Click 'Apply Edited Comments' to stage them, then 'Save All Comments' to persist.")
+                    st.info("Edit comments in the table below. Changes are auto-staged as you type. Click 'Save All Comments' when done.")
 
                     # Ensure session storage exists
                     if 'student_comments' not in st.session_state:
@@ -4385,56 +4385,53 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
 
                     # Build comments DataFrame for editing
                     comments_df = compiled_df[['student_id', 'student_name', 'registration_number']].copy()
-                    # Pre-fill Comment column from compiled_df if present
-                    if 'comment' in compiled_df.columns:
-                        comments_df['Comment'] = compiled_df['comment'].fillna('')
-                    else:
-                        comments_df['Comment'] = ''
 
-                    # If there are staged comments in session state, ensure they populate the editor
+                    # Pre-fill with existing comments from compiled_df (if present)
+                    comment_map = {}
+                    for _, row in compiled_df.iterrows():
+                        sid = int(row['student_id'])
+                        comment_map[sid] = row.get('comment', '') if 'comment' in compiled_df.columns else ''
+
+                    # Override with any staged comments
                     staged = st.session_state.get('student_comments', {})
-                    if staged:
-                        def _apply_staged_to_df(df, staged_map):
-                            df = df.copy()
-                            for i, r in df.iterrows():
-                                sid = int(r['student_id'])
-                                if sid in staged_map:
-                                    df.at[i, 'Comment'] = staged_map[sid]
-                            return df
+                    for sid, comment in staged.items():
+                        try:
+                            comment_map[int(sid)] = comment
+                        except Exception:
+                            continue
 
-                        comments_df = _apply_staged_to_df(comments_df, staged)
+                    # Apply to dataframe
+                    comments_df['Comment'] = comments_df['student_id'].map(comment_map).fillna('')
 
-                    # Show editable table for comments
-                    # Use a versioned editor key so we can force-recreate the editor when needed
-                    editor_version = st.session_state.get('comments_editor_version', 0)
-                    editor_key = f"comments_editor_{editor_version}"
+                    # Show editable table WITHOUT an intermediate button - let users edit directly
+                    st.write("**Edit comments directly in the table:**")
                     edited_comments = None
                     try:
-                        edited_comments = st.data_editor(comments_df, key=editor_key, width='stretch')
+                        edited_comments = st.data_editor(
+                            comments_df,
+                            key="comments_editor_persistent",
+                            width='stretch',
+                            hide_index=True,
+                            disabled=['student_id', 'student_name', 'registration_number']
+                        )
                     except Exception as e:
                         st.error(f"Could not display comment editor: {e}")
                         st.dataframe(comments_df, width='stretch')
 
-                    # Apply edited comments into session state for staging
+                    # Auto-stage changes (no Apply button required)
                     if edited_comments is not None:
-                        if st.button("Apply Edited Comments", key="apply_edited_comments"):
-                            for _, r in edited_comments.iterrows():
-                                try:
-                                    sid = int(r['student_id'])
-                                    com = str(r.get('Comment') or '')
-                                    st.session_state.student_comments[sid] = com
-                                except Exception:
-                                    continue
-                            st.success("Edited comments staged. Click 'Save All Comments' to persist.")
+                        for _, r in edited_comments.iterrows():
+                            try:
+                                sid = int(r['student_id'])
+                                com = str(r.get('Comment', '') or '')
+                                st.session_state.student_comments[sid] = com
+                            except Exception:
+                                continue
 
-                        # Offer a reset button to reload staged comments into the editor
-                        if st.button("Reset Editor To Staged", key="reset_editor_staged"):
-                            # Increment the editor version to force Streamlit to remount the data_editor
-                            st.session_state['comments_editor_version'] = st.session_state.get('comments_editor_version', 0) + 1
-                            st.experimental_rerun()
-
-                    # Save all staged comments to DB/audit log
                     st.markdown("---")
+                    st.info("💡 **Tip**: Your edits are automatically saved to the session. Click 'Save All Comments' below to persist them to the database.")
+
+                    # Save all staged comments to DB (write into Mark.comment if a mark exists)
                     if st.button("💾 Save All Comments", width='stretch'):
                         saved_comments = 0
                         errors = []
@@ -4442,20 +4439,40 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                             for student_id, comment in st.session_state.get('student_comments', {}).items():
                                 if comment and str(comment).strip():
                                     try:
-                                        student_record = session.get(Student, int(student_id))
-                                        if student_record:
-                                            # Log comment as audit trail (keeps DB schema unchanged)
-                                            log_audit(session, st.session_state.user_id, "add_student_comment",
-                                                     f"Subject: {selected_subject}, Term: {active_term.term_name}, Student: {student_record.name}, Comment: {comment}")
+                                        # Find the mark record for this student, subject and term
+                                        mark_record = session.query(Mark).filter_by(
+                                            student_id=int(student_id),
+                                            subject=selected_subject,
+                                            term_id=active_term.id
+                                        ).first()
+
+                                        if mark_record:
+                                            mark_record.comment = str(comment).strip()
+                                            session.add(mark_record)
                                             saved_comments += 1
+
                                     except Exception as e:
                                         student_row = compiled_df[compiled_df['student_id'] == int(student_id)]
                                         if not student_row.empty:
                                             errors.append(f"{student_row.iloc[0]['student_name']}: {str(e)}")
 
+                            # Commit changes if any
+                            session.commit()
+
                             if saved_comments > 0:
                                 st.success(f"✅ {saved_comments} comment(s) saved successfully!")
+                                # Clear staged comments after successful save
+                                st.session_state.student_comments = {}
+                                try:
+                                    st.balloons()
+                                except Exception:
+                                    pass
+
                         except Exception as e:
+                            try:
+                                session.rollback()
+                            except Exception:
+                                pass
                             st.error(f"❌ Error saving comments: {str(e)}")
 
                         if errors:
