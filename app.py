@@ -4383,25 +4383,42 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                     if 'student_comments' not in st.session_state:
                         st.session_state.student_comments = {}
 
-                    # Display comment boxes for each student
+                    # Display comment boxes for each student using persistent toggle buttons
                     for _, row in compiled_df.iterrows():
                         student_id = int(row['student_id'])
                         student_name = row['student_name']
                         student_reg = row['registration_number']
                         grade = row['grade']
 
-                        with st.expander(f"💭 {student_name} ({student_reg}) - Grade: {grade}"):
-                            if student_id not in st.session_state.student_comments:
-                                st.session_state.student_comments[student_id] = ""
+                        # Initialize storage
+                        if 'student_comments' not in st.session_state:
+                            st.session_state.student_comments = {}
+                        if student_id not in st.session_state.student_comments:
+                            st.session_state.student_comments[student_id] = ""
 
-                            # Direct widget state update without callback
+                        # persistent expand state per student
+                        exp_key = f"comment_expanded_{student_id}"
+                        if exp_key not in st.session_state:
+                            st.session_state[exp_key] = False
+
+                        # Header row with toggle button to avoid Streamlit expander collapse on reruns
+                        hcol, btncol = st.columns([9,1])
+                        with hcol:
+                            st.markdown(f"**💭 {student_name} ({student_reg}) — Grade: {grade}**")
+                        with btncol:
+                            if st.button(("Close" if st.session_state[exp_key] else "Open"), key=f"toggle_comment_{student_id}"):
+                                st.session_state[exp_key] = not st.session_state[exp_key]
+
+                        # Show the comment box only when expanded
+                        if st.session_state[exp_key]:
                             comment_value = st.text_area(
                                 f"Comment for {student_name}",
-                                value=st.session_state.student_comments[student_id],
-                                height=100,
+                                value=st.session_state.student_comments.get(student_id, ""),
+                                height=120,
                                 key=f"comment_{student_id}",
                                 label_visibility="collapsed"
                             )
+                            # Save into session state (will not trigger rerun by itself)
                             st.session_state.student_comments[student_id] = comment_value
 
                     # Save all comments button
