@@ -4391,17 +4391,15 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                             if student_id not in st.session_state.student_comments:
                                 st.session_state.student_comments[student_id] = ""
 
-                            def update_comment(sid=student_id):
-                                st.session_state.student_comments[sid] = st.session_state[f"comment_{sid}"]
-
-                            st.text_area(
+                            # Direct widget state update without callback
+                            comment_value = st.text_area(
                                 f"Comment for {student_name}",
                                 value=st.session_state.student_comments[student_id],
                                 height=100,
                                 key=f"comment_{student_id}",
-                                label_visibility="collapsed",
-                                on_change=update_comment
+                                label_visibility="collapsed"
                             )
+                            st.session_state.student_comments[student_id] = comment_value
 
                     # Save all comments button
                     st.markdown("---")
