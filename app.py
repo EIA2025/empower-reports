@@ -1973,7 +1973,7 @@ if not st.session_state.logged_in:
 # Logout
 with st.sidebar:
     st.success(f"Welcome, {st.session_state.username}")
-    if st.button("Logout", use_container_width=True, key="logout_btn"):
+    if st.button("Logout", width='stretch', key="logout_btn"):
         st.session_state.logged_in = False
         st.session_state.user_role = None
         st.session_state.user_id = None
@@ -2470,7 +2470,7 @@ if page == "Dashboard":
     st.subheader("Recent Activity")
     logs = pd.read_sql("SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 10", ENGINE)
     if not logs.empty:
-        st.dataframe(logs, use_container_width=True)
+        st.dataframe(logs, width='stretch')
     else:
         st.info("No activity logs yet")
     
@@ -2521,7 +2521,7 @@ elif page == "Storage Management" and st.session_state.user_role == 'admin':
         col1, col2 = st.columns(2)
         
         with col1:
-            if st.button("Create Backup", use_container_width=True):
+            if st.button("Create Backup", width='stretch'):
                 success, message = backup_database()
                 if success:
                     st.success(message)
@@ -2529,7 +2529,7 @@ elif page == "Storage Management" and st.session_state.user_role == 'admin':
                     st.error(message)
         
         with col2:
-            if st.button("List Backups", use_container_width=True):
+            if st.button("List Backups", width='stretch'):
                 backups = list_backups()
                 if backups:
                     st.dataframe(backups)
@@ -2678,7 +2678,7 @@ elif page == "Visitation Day Management" and st.session_state.user_role == 'admi
                     if not day_students.empty:
                         st.dataframe(day_students[['student_name', 'class_name', 'registration_number', 
                                                   'parent_attended', 'report_given', 'notes']], 
-                                     use_container_width=True)
+                                     width='stretch')
     
     with tab2:
         st.subheader("Generate VD Reports")
@@ -2757,7 +2757,7 @@ elif page == "Visitation Day Management" and st.session_state.user_role == 'admi
                         ]].copy()
 
                         display_df.columns = ['Subject', 'CW/20', 'MOT/20', 'EOT/60', 'Total', 'Grade', 'Comment', 'Teacher']
-                        st.dataframe(display_df, use_container_width=True)
+                        st.dataframe(display_df, width='stretch')
 
                         # Show actual total and converted total for VD
                         actual_total = marks['total'].mean()
@@ -2773,7 +2773,7 @@ elif page == "Visitation Day Management" and st.session_state.user_role == 'admi
                         with col2:
                             st.metric("VD Total (out of 100)", f"{vd_total:.0f}")
 
-                        if st.button(f"Generate VD Report for {selected_student}", use_container_width=True):
+                        if st.button(f"Generate VD Report for {selected_student}", width='stretch'):
                             try:
                                 design = session.query(ReportDesign).first()
 
@@ -2811,7 +2811,7 @@ elif page == "Visitation Day Management" and st.session_state.user_role == 'admi
                                     pdf_data,
                                     f"{selected_student}_VD_{selected_date}_report.pdf",
                                     "application/pdf",
-                                    use_container_width=True
+                                    width='stretch'
                                 )
                                 log_audit(session, st.session_state.user_id, "generate_vd_report", 
                                          f"VD Report: {selected_student} - {selected_date}")
@@ -2854,7 +2854,7 @@ elif page == "Visitation Day Management" and st.session_state.user_role == 'admi
                     class_students = day_students[day_students['class_name'] == selected_class]
                     st.info(f"Found {len(class_students)} students in {selected_class} for {selected_date}")
 
-                    if st.button(f"Generate All VD Reports for {selected_class}", use_container_width=True):
+                    if st.button(f"Generate All VD Reports for {selected_class}", width='stretch'):
                         import zipfile
                         zip_buffer = io.BytesIO()
                         design = session.query(ReportDesign).first()
@@ -2913,7 +2913,7 @@ elif page == "Visitation Day Management" and st.session_state.user_role == 'admi
                             zip_buffer.getvalue(),
                             f"{selected_class}_{selected_date}_VD_reports.zip",
                             "application/zip",
-                            use_container_width=True
+                            width='stretch'
                         )
                         log_audit(session, st.session_state.user_id, "generate_vd_reports_bulk", f"VD Bulk: {selected_class} - {selected_date}")
         else:
@@ -2992,7 +2992,7 @@ elif page == "Student Decisions":
             
             display_df = marks[['subject', 'total', 'grade']].copy()
             display_df.columns = ['Subject', 'Total', 'Grade']
-            st.dataframe(display_df, use_container_width=True)
+            st.dataframe(display_df, width='stretch')
             
             overall_avg = round(marks['total'].mean(), 1)
             overall_grade = get_grade(overall_avg)
@@ -3025,7 +3025,7 @@ elif page == "Student Decisions":
                 help="Additional information about this decision"
             )
             
-            submit_button = st.form_submit_button(" Save Decision", use_container_width=True)
+            submit_button = st.form_submit_button(" Save Decision", width='stretch')
             
             if submit_button:
                 # Show what we're about to save
@@ -3132,7 +3132,7 @@ elif page == "Student Decisions":
                     'Date': row['evaluated_at'][:10] if row['evaluated_at'] else 'N/A'
                 })
             
-            st.dataframe(pd.DataFrame(summary_data), use_container_width=True)
+            st.dataframe(pd.DataFrame(summary_data), width='stretch')
             
         else:
             st.info(" No behavior evaluations completed yet for this class")
@@ -3164,7 +3164,7 @@ elif page == "Student Decisions":
             st.success(f" Found {len(behavior_df)} evaluations for {selected_class}")
             st.dataframe(behavior_df[['name', 'registration_number', 'evaluator_name', 
                                          'punctuality', 'attendance', 'general_behavior']], 
-                           use_container_width=True)
+                           width='stretch')
         else:
             st.info(f"No evaluations yet for {selected_class}")
                 
@@ -3241,15 +3241,15 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
             tab1, tab2, tab3 = st.tabs(["Assessment Performance", "Grade Distribution", "Subject Performance"])
             
             with tab1:
-                st.plotly_chart(charts['overall_performance'], use_container_width=True)
+                st.plotly_chart(charts['overall_performance'], width='stretch')
             with tab2:
-                st.plotly_chart(charts['grade_distribution'], use_container_width=True)
+                st.plotly_chart(charts['grade_distribution'], width='stretch')
             with tab3:
-                st.plotly_chart(charts['subject_performance'], use_container_width=True)
+                st.plotly_chart(charts['subject_performance'], width='stretch')
             
             # Detailed data table
             st.subheader("Detailed Performance Data")
-            st.dataframe(performance['detailed_data'], use_container_width=True)
+            st.dataframe(performance['detailed_data'], width='stretch')
             
             # Download option
             csv_data = performance['detailed_data'].to_csv(index=False)
@@ -3258,7 +3258,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                 csv_data,
                 f"{selected_class}_performance_{selected_term}.csv",
                 "text/csv",
-                use_container_width=True
+                width='stretch'
             )
         else:
             st.info(f"No performance data available for {selected_class} in {selected_term}")
@@ -3273,7 +3273,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
         if scope == "Class":
             selected_class = st.selectbox("Select Class", classes['class_name'].tolist())
 
-        if st.button("Show Top Students", use_container_width=True):
+        if st.button("Show Top Students", width='stretch'):
             top_df = compute_top_students(session, term_id, class_name=selected_class, limit=int(top_n))
             if top_df is None or top_df.empty:
                 st.info("No marks found for the selected criteria")
@@ -3281,18 +3281,18 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                 # Display table and chart
                 display_df = top_df[['rank', 'name', 'registration_number', 'class_name', 'avg_total']].copy()
                 display_df.columns = ['Rank', 'Student Name', 'Reg No', 'Class', 'Average (out of 100)']
-                st.dataframe(display_df, use_container_width=True)
+                st.dataframe(display_df, width='stretch')
 
                 # Bar chart
                 fig = px.bar(display_df, x='Rank', y='Average (out of 100)', text='Student Name')
                 fig.update_layout(xaxis=dict(type='category'), showlegend=False)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
 
                 # Download
                 csv_data = display_df.to_csv(index=False)
                 st.download_button("Download Top Students CSV", csv_data,
                                    f"top_{top_n}_{'class_'+selected_class if selected_class else 'school'}_{selected_term}.csv",
-                                   "text/csv", use_container_width=True)
+                                   "text/csv", width='stretch')
 
     
     
@@ -3308,7 +3308,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
             else:
                 selected_subject = None
         
-        if st.button("Analyze Improvements", use_container_width=True):
+        if st.button("Analyze Improvements", width='stretch'):
             improvement_data = find_most_improved_students(session, term_id, selected_subject)
             
             if improvement_data:
@@ -3316,14 +3316,14 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                 
                 # Create improvement chart
                 chart = create_improvement_chart(improvement_data)
-                st.plotly_chart(chart, use_container_width=True)
+                st.plotly_chart(chart, width='stretch')
                 
                 # Detailed table
                 st.subheader("Top Improved Students")
                 # FIXED: Correct syntax for selecting columns
                 display_data = improvement_data['most_improved'][['name', 'subject', 'prev_total', 'current_total', 'improvement', 'improvement_pct']].copy()
                 display_data.columns = ['Student Name', 'Subject', 'Previous Total', 'Current Total', 'Improvement', 'Improvement %']
-                st.dataframe(display_data, use_container_width=True)
+                st.dataframe(display_data, width='stretch')
                 
                 # Download option
                 csv_data = display_data.to_csv(index=False)
@@ -3332,7 +3332,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                     csv_data,
                     f"improvement_analysis_{improvement_data['subject'].replace(' ', '_')}_{selected_term}.csv",
                     "text/csv",
-                    use_container_width=True
+                    width='stretch'
                 )
             else:
                 st.warning("No improvement data available. This could be because:")
@@ -3401,14 +3401,14 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                 showlegend=False
             )
             
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             
             # Detailed table
             st.subheader("Subject Performance Summary")
             display_data = subject_performance.copy()
             display_data.columns = ['Subject', 'Average Total', 'Average CW', 'Average MT', 
                                  'Average ET', 'Number of Students', 'Total Entries']
-            st.dataframe(display_data, use_container_width=True)
+            st.dataframe(display_data, width='stretch')
             
             # Download option
             csv_data = display_data.to_csv(index=False)
@@ -3417,7 +3417,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                 csv_data,
                 f"subject_comparison_{selected_term}.csv",
                 "text/csv",
-                use_container_width=True
+                width='stretch'
             )
         else:
             st.info("No subject performance data available for this term")
@@ -3457,7 +3457,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                 height=500
             )
             
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             
             # Statistics
             total_entries = grade_dist['count'].sum()
@@ -3524,10 +3524,10 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                     height=500
                 )
                 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
                 
                 # Summary table
-                st.dataframe(class_df, use_container_width=True)
+                st.dataframe(class_df, width='stretch')
         
         elif presentation_content == "Top Performing Students":
             st.subheader(" Top Performing Students")
@@ -3565,12 +3565,12 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                     height=600
                 )
                 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
                 
                 # Detailed table
                 display_data = top_students.copy()
                 display_data.columns = ['Student Name', 'Class', 'Average Score', 'Subjects Taken']
-                st.dataframe(display_data, use_container_width=True)
+                st.dataframe(display_data, width='stretch')
         
         elif presentation_content == "Subject Rankings":
             st.subheader(" Subject Rankings")
@@ -3601,7 +3601,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                     height=500
                 )
                 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
         
         elif presentation_content == "Grade Overview":
             st.subheader(" Grade Overview")
@@ -3648,7 +3648,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                     height=600
                 )
                 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
         
         # Auto-refresh logic
         if auto_refresh:
@@ -3727,7 +3727,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
         with col_cw2:
             cw_total = st.number_input("Total marks", min_value=1.0, value=st.session_state.cw_total, step=0.5, key="cw_total_input")
         with col_cw3:
-            if st.button("➕ Add", key="add_cw", use_container_width=True):
+            if st.button("➕ Add", key="add_cw", width='stretch'):
                 if cw_name and cw_total > 0:
                     st.session_state.cw_components.append({"name": cw_name, "total": cw_total})
                     st.session_state.cw_name = ""
@@ -3744,7 +3744,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                 with col_disp2:
                     st.write(f"/{comp['total']}")
                 with col_disp3:
-                    if st.button("🗑️", key=f"del_cw_{idx}", use_container_width=True):
+                    if st.button("🗑️", key=f"del_cw_{idx}", width='stretch'):
                         st.session_state.cw_components.pop(idx)
                         st.rerun()
             
@@ -3761,7 +3761,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
         with col_mt2:
             mt_total = st.number_input("Total marks", min_value=1.0, value=st.session_state.mt_total, step=0.5, key="mt_total_input")
         with col_mt3:
-            if st.button("➕ Add", key="add_mt", use_container_width=True):
+            if st.button("➕ Add", key="add_mt", width='stretch'):
                 if mt_name and mt_total > 0:
                     st.session_state.mt_components.append({"name": mt_name, "total": mt_total})
                     st.session_state.mt_name = ""
@@ -3778,7 +3778,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                 with col_disp2:
                     st.write(f"/{comp['total']}")
                 with col_disp3:
-                    if st.button("🗑️", key=f"del_mt_{idx}", use_container_width=True):
+                    if st.button("🗑️", key=f"del_mt_{idx}", width='stretch'):
                         st.session_state.mt_components.pop(idx)
                         st.rerun()
             
@@ -3795,7 +3795,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
         with col_et2:
             et_total = st.number_input("Total marks", min_value=1.0, value=st.session_state.et_total, step=0.5, key="et_total_input")
         with col_et3:
-            if st.button("➕ Add", key="add_et", use_container_width=True):
+            if st.button("➕ Add", key="add_et", width='stretch'):
                 if et_name and et_total > 0:
                     st.session_state.et_components.append({"name": et_name, "total": et_total})
                     st.session_state.et_name = ""
@@ -3812,7 +3812,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                 with col_disp2:
                     st.write(f"/{comp['total']}")
                 with col_disp3:
-                    if st.button("🗑️", key=f"del_et_{idx}", use_container_width=True):
+                    if st.button("🗑️", key=f"del_et_{idx}", width='stretch'):
                         st.session_state.et_components.pop(idx)
                         st.rerun()
             
@@ -3984,7 +3984,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
         # Use data editor
         edited_df = None
         try:
-            edited_df = st.data_editor(editor_df, width='stretch', use_container_width=False)
+            edited_df = st.data_editor(editor_df, width='stretch', width='content')
         except Exception as e:
             st.error(f"Could not display editor: {e}")
             st.dataframe(editor_df, width='stretch')
@@ -4177,7 +4177,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
         st.write(f"Ready to save {completed_count} students' marks?")
     
     with col_save2:
-        if st.button("💾 Save All Scores", use_container_width=True, key="save_all_scores"):
+        if st.button("💾 Save All Scores", width='stretch', key="save_all_scores"):
             saved_count = 0
             errors = []
             
@@ -4391,14 +4391,17 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                             if student_id not in st.session_state.student_comments:
                                 st.session_state.student_comments[student_id] = ""
 
-                            comment = st.text_area(
+                            def update_comment(sid=student_id):
+                                st.session_state.student_comments[sid] = st.session_state[f"comment_{sid}"]
+
+                            st.text_area(
                                 f"Comment for {student_name}",
                                 value=st.session_state.student_comments[student_id],
                                 height=100,
                                 key=f"comment_{student_id}",
-                                label_visibility="collapsed"
+                                label_visibility="collapsed",
+                                on_change=update_comment
                             )
-                            st.session_state.student_comments[student_id] = comment
 
                     # Save all comments button
                     st.markdown("---")
@@ -4462,7 +4465,7 @@ elif page == "Admin Management" and st.session_state.user_role == 'admin':
         """, ENGINE)
         
         if not admins_df.empty:
-            st.dataframe(admins_df, use_container_width=True)
+            st.dataframe(admins_df, width='stretch')
             
             with st.expander(" Edit Admin"):
                 admin_id = st.selectbox("Select Admin to Edit", 
@@ -4546,7 +4549,7 @@ elif page == "Admin Management" and st.session_state.user_role == 'admin':
 
         comps = pd.read_sql("SELECT * FROM behavior_components ORDER BY display_order, id", ENGINE)
         if not comps.empty:
-            st.dataframe(comps[['id','display_label','name','display_order','active']], use_container_width=True)
+            st.dataframe(comps[['id','display_label','name','display_order','active']], width='stretch')
 
             with st.expander("Edit / Toggle / Delete Component"):
                 comp_id = st.selectbox("Select Component", comps['id'].tolist(), format_func=lambda x: comps[comps['id']==x]['display_label'].iloc[0])
@@ -4665,7 +4668,7 @@ elif page == "Behavior Components" and st.session_state.user_role == 'admin':
 
     comps = pd.read_sql("SELECT * FROM behavior_components ORDER BY display_order, id", ENGINE)
     if not comps.empty:
-        st.dataframe(comps[['id','display_label','name','display_order','active']], use_container_width=True)
+        st.dataframe(comps[['id','display_label','name','display_order','active']], width='stretch')
 
         with st.expander("Edit / Toggle / Delete Component"):
             comp_id = st.selectbox("Select Component", comps['id'].tolist(), format_func=lambda x: comps[comps['id']==x]['display_label'].iloc[0])
@@ -4770,7 +4773,7 @@ elif page == "Staff Management" and st.session_state.user_role == 'admin':
         """, ENGINE)
         
         if not staff_df.empty:
-            st.dataframe(staff_df, use_container_width=True)
+            st.dataframe(staff_df, width='stretch')
             
             with st.expander(" Edit or Delete Staff"):
                 staff_id = st.selectbox("Select Staff to Edit", 
@@ -4794,7 +4797,7 @@ elif page == "Staff Management" and st.session_state.user_role == 'admin':
                     
                     col3, col4 = st.columns(2)
                     with col3:
-                        if st.form_submit_button(" Update Staff", use_container_width=True):
+                        if st.form_submit_button(" Update Staff", width='stretch'):
                             valid, result = validate_phone_number(phone)
                             if not valid:
                                 st.error(result)
@@ -4811,7 +4814,7 @@ elif page == "Staff Management" and st.session_state.user_role == 'admin':
                                 st.rerun()
                     
                     with col4:
-                        if st.form_submit_button(" Delete Staff", type="primary", use_container_width=True):
+                        if st.form_submit_button(" Delete Staff", type="primary", width='stretch'):
                             # First check if staff has any marks
                             marks_count = session.query(Mark).filter_by(submitted_by=staff_id).count()
                             if marks_count > 0:
@@ -4883,7 +4886,7 @@ elif page == "Student Enrollment" and st.session_state.user_role == 'admin':
         students_df = pd.read_sql("SELECT * FROM students", ENGINE)
         
         if not students_df.empty:
-            st.dataframe(students_df, use_container_width=True)
+            st.dataframe(students_df, width='stretch')
             
             # Edit/Delete Student
             with st.expander(" Edit or Delete Student"):
@@ -4926,7 +4929,7 @@ elif page == "Student Enrollment" and st.session_state.user_role == 'admin':
                     
                     col3, col4 = st.columns(2)
                     with col3:
-                        if st.form_submit_button(" Update Student", use_container_width=True):
+                        if st.form_submit_button(" Update Student", width='stretch'):
                             if not all([name, gender, class_name, reg_number]) or not selected_subjects:
                                 st.error("Please fill all required fields and select at least one subject")
                             else:
@@ -4946,7 +4949,7 @@ elif page == "Student Enrollment" and st.session_state.user_role == 'admin':
                                 st.rerun()
                     
                     with col4:
-                        if st.form_submit_button(" Delete Student", type="primary", use_container_width=True):
+                        if st.form_submit_button(" Delete Student", type="primary", width='stretch'):
                             # First check if student has any marks
                             marks_count = session.query(Mark).filter_by(student_id=student_id).count()
                             if marks_count > 0:
@@ -5277,7 +5280,7 @@ elif page == "Classroom Behavior":
                     'Date': row['evaluated_at'][:10] if row['evaluated_at'] else 'N/A'
                 })
             
-            st.dataframe(pd.DataFrame(summary_data), use_container_width=True)
+            st.dataframe(pd.DataFrame(summary_data), width='stretch')
             
         else:
             st.info(" No behavior evaluations completed yet for this class")
@@ -5309,7 +5312,7 @@ elif page == "Classroom Behavior":
             st.success(f" Found {len(behavior_df)} evaluations for {selected_class}")
             st.dataframe(behavior_df[['name', 'registration_number', 'evaluator_name', 
                                          'punctuality', 'attendance', 'general_behavior']], 
-                           use_container_width=True)
+                           width='stretch')
         else:
             st.info(f"No evaluations yet for {selected_class}")
                 
@@ -5531,7 +5534,7 @@ elif page == "Discipline Reports":
                 if raw.empty:
                     st.write("Raw table appears empty (no rows returned)")
                 else:
-                    st.dataframe(raw, use_container_width=True)
+                    st.dataframe(raw, width='stretch')
             except Exception as e:
                 st.write(f"Could not read raw discipline_reports table: {e}")
 
@@ -5698,7 +5701,7 @@ elif page == "Generate Reports" and st.session_state.user_role == 'admin':
             ]].copy()
             
             display_df.columns = ['Subject', 'CW/20', 'MOT/20', 'EOT/60', 'Total', 'Grade', 'Comment', 'Teacher']
-            st.dataframe(display_df, use_container_width=True)
+            st.dataframe(display_df, width='stretch')
             
             overall_avg = round(marks['total'].mean(), 1)
             overall_grade = get_grade(overall_avg)
@@ -5729,7 +5732,7 @@ elif page == "Generate Reports" and st.session_state.user_role == 'admin':
             if term_data['term_number'] == 3 and decision_data:
                 st.metric("Decision", decision_data.get('decision', 'Pending'))
             
-            if st.button(" Generate PDF Report", use_container_width=True):
+            if st.button(" Generate PDF Report", width='stretch'):
                 try:
                     pdf_data = generate_pdf_report(student_data, term_data, marks, design, behavior_data, decision_data)
                     
@@ -5738,7 +5741,7 @@ elif page == "Generate Reports" and st.session_state.user_role == 'admin':
                         pdf_data,
                         f"{selected_student}_{selected_term}_report.pdf",
                         "application/pdf",
-                        use_container_width=True
+                        width='stretch'
                     )
                     log_audit(session, st.session_state.user_id, "generate_report", 
                              f"Individual: {selected_student} - {selected_term}")
@@ -5757,7 +5760,7 @@ elif page == "Generate Reports" and st.session_state.user_role == 'admin':
         classes = pd.read_sql("SELECT DISTINCT class_name FROM students ORDER BY class_name", ENGINE)
         selected_class = st.selectbox("Select Class", classes['class_name'].tolist())
         # Add an option to auto-compile missing marks for this class/term
-        if st.button(" Auto-compile missing final marks for this class/term", use_container_width=True):
+        if st.button(" Auto-compile missing final marks for this class/term", width='stretch'):
             with st.spinner("Compiling marks for class, this may take a moment..."):
                 class_students = students[students['class_name'] == selected_class]
                 compiled = 0
@@ -5808,7 +5811,7 @@ elif page == "Generate Reports" and st.session_state.user_role == 'admin':
                 st.write(", ".join(students_without_marks))
         
         if students_with_marks:
-            if st.button(f" Generate All Reports for {selected_class}", use_container_width=True):
+            if st.button(f" Generate All Reports for {selected_class}", width='stretch'):
                 import zipfile
                 
                 zip_buffer = io.BytesIO()
@@ -5850,7 +5853,7 @@ elif page == "Generate Reports" and st.session_state.user_role == 'admin':
                     zip_buffer.getvalue(),
                     f"{selected_class}_{selected_term}_reports.zip",
                     "application/zip",
-                    use_container_width=True
+                    width='stretch'
                 )
                 
                 log_audit(session, st.session_state.user_id, "generate_reports", 
@@ -5893,7 +5896,7 @@ elif page == "Report Design" and st.session_state.user_role == 'admin':
                                         value=design.report_footer or "",
                                         help="Add any additional text to appear at bottom of reports")
             
-            if st.form_submit_button(" Save School Information", use_container_width=True):
+            if st.form_submit_button(" Save School Information", width='stretch'):
                 try:
                     # Get fresh session and design object
                     save_session = Session()
@@ -5957,7 +5960,7 @@ elif page == "Report Design" and st.session_state.user_role == 'admin':
             # NEW: Quick insert Empower logo
             st.markdown("---")
             st.markdown("**🚀 Quick Insert Empower Logo**")
-            if st.button("Use Empower Academy Logo", use_container_width=True):
+            if st.button("Use Empower Academy Logo", width='stretch'):
                 empower_logo_url = "https://z-cdn-media.chatglm.cn/files/a7ca3e7c-8f26-410d-94e5-84b20d17eaed_empower-logo.png?auth_key=1863023354-290424df56d14d3b9f2ee211186220cf-0-e728679b39cedb32228a3c796ca046cf"
                 logo_b64 = download_logo_from_url(empower_logo_url)
                 if logo_b64:
@@ -5972,7 +5975,7 @@ elif page == "Report Design" and st.session_state.user_role == 'admin':
                                      value=design.logo_data if design.logo_data and design.logo_data.startswith('http') else "",
                                      help="Enter direct URL to your logo image")
             
-            if st.button("Load Logo from URL", use_container_width=True):
+            if st.button("Load Logo from URL", width='stretch'):
                 if logo_url:
                     logo_b64 = download_logo_from_url(logo_url)
                     if logo_b64:
@@ -5986,7 +5989,7 @@ elif page == "Report Design" and st.session_state.user_role == 'admin':
             
             primary_color = st.color_picker("Primary Color", value=design.primary_color)
             
-            if st.button(" Save Color", use_container_width=True):
+            if st.button(" Save Color", width='stretch'):
                 design.primary_color = primary_color
                 session.commit()
                 log_audit(session, st.session_state.user_id, "update_report_design", f"Color: {primary_color}")
@@ -6044,7 +6047,7 @@ elif page == "Report Design" and st.session_state.user_role == 'admin':
             'Total': [89, 87, 90],
             'Grade': ['A', 'A', 'A*']
         }
-        st.dataframe(sample_data, use_container_width=True)
+        st.dataframe(sample_data, width='stretch')
         
         if design.report_footer:
             st.markdown("---")
@@ -6140,24 +6143,24 @@ elif page == "Data Export" and st.session_state.user_role == 'admin':
     
     with col1:
         st.subheader("Export Students")
-        if st.button("Download Students Data", use_container_width=True):
+        if st.button("Download Students Data", width='stretch'):
             # Create backup before export
             auto_backup_before_critical_operation("data_export_students")
             
             df = pd.read_sql("SELECT * FROM students", ENGINE)
             if not df.empty:
                 csv = df.to_csv(index=False)
-                st.download_button(" Download CSV", csv, "students.csv", "text/csv", use_container_width=True)
+                st.download_button(" Download CSV", csv, "students.csv", "text/csv", width='stretch')
             else:
                 st.info("No data to export")
     
     with col2:
         st.subheader("Export Staff")
-        if st.button("Download Staff Data", use_container_width=True):
+        if st.button("Download Staff Data", width='stretch'):
             df = pd.read_sql("SELECT * FROM users WHERE role = 'teacher'", ENGINE)
             if not df.empty:
                 csv = df.to_csv(index=False)
-                st.download_button(" Download CSV", csv, "staff.csv", "text/csv", use_container_width=True)
+                st.download_button(" Download CSV", csv, "staff.csv", "text/csv", width='stretch')
             else:
                 st.info("No data to export")
     
@@ -6169,7 +6172,7 @@ elif page == "Data Export" and st.session_state.user_role == 'admin':
         selected_term = st.selectbox("Select Term", terms['term_name'].tolist())
         term_id = terms[terms['term_name'] == selected_term].iloc[0]['id']
         
-        if st.button("Download Results for Selected Term", use_container_width=True):
+        if st.button("Download Results for Selected Term", width='stretch'):
             # Create backup before export
             auto_backup_before_critical_operation("data_export_results")
             
@@ -6199,7 +6202,7 @@ elif page == "Data Export" and st.session_state.user_role == 'admin':
                 csv = marks_df.to_csv(index=False)
                 st.download_button(" Download Results CSV", csv, 
                                   f"results_{selected_term.replace(' ', '_')}.csv", "text/csv",
-                                  use_container_width=True)
+                                  width='stretch')
             else:
                 st.info("No results for this term")
     else:
@@ -6212,7 +6215,7 @@ elif page == "Data Export" and st.session_state.user_role == 'admin':
     export_mode = st.radio("Export for:", ["CSV (All)", "Individual Student (PDF)", "Whole Class (PDF ZIP)"], horizontal=True)
 
     if export_mode == "CSV (All)":
-        if st.button("Download All Discipline Reports (CSV)", use_container_width=True):
+        if st.button("Download All Discipline Reports (CSV)", width='stretch'):
             reports_df = pd.read_sql("""
                 SELECT 
                     s.name as student_name,
@@ -6233,7 +6236,7 @@ elif page == "Data Export" and st.session_state.user_role == 'admin':
             """, ENGINE)
             if not reports_df.empty:
                 csv = reports_df.drop(columns=['student_id']).to_csv(index=False)
-                st.download_button("Download Reports CSV", csv, "discipline_reports.csv", "text/csv", use_container_width=True)
+                st.download_button("Download Reports CSV", csv, "discipline_reports.csv", "text/csv", width='stretch')
             else:
                 st.info("No discipline reports")
 
@@ -6264,10 +6267,10 @@ elif page == "Data Export" and st.session_state.user_role == 'admin':
                 st.info("No discipline reports found for this student in the selected period")
             else:
                 st.dataframe(reports_df[['incident_date', 'incident_type', 'status', 'reported_by', 'created_at']])
-                if st.button("Generate Student Discipline PDF", use_container_width=True):
+                if st.button("Generate Student Discipline PDF", width='stretch'):
                     try:
                         pdf_bytes = generate_discipline_pdf(student_row.to_dict(), reports_df, design)
-                        st.download_button("Download Discipline PDF", pdf_bytes, f"{selected_student}_discipline_summary.pdf", "application/pdf", use_container_width=True)
+                        st.download_button("Download Discipline PDF", pdf_bytes, f"{selected_student}_discipline_summary.pdf", "application/pdf", width='stretch')
                         log_audit(session, st.session_state.user_id, "export_discipline_pdf", f"Individual: {selected_student}")
                         st.success("PDF generated successfully")
                     except Exception as e:
@@ -6286,7 +6289,7 @@ elif page == "Data Export" and st.session_state.user_role == 'admin':
             class_students = pd.read_sql(f"SELECT id, name, registration_number FROM students WHERE class_name = '{sel_class}' ORDER BY name", ENGINE)
             st.info(f"Found {len(class_students)} students in {sel_class}")
 
-            if st.button(f"Generate Discipline PDFs for {sel_class} (ZIP)", use_container_width=True):
+            if st.button(f"Generate Discipline PDFs for {sel_class} (ZIP)", width='stretch'):
                 import zipfile
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
@@ -6306,7 +6309,7 @@ elif page == "Data Export" and st.session_state.user_role == 'admin':
                                 # skip student on error but log
                                 _ = None
                 zip_buffer.seek(0)
-                st.download_button(f"Download {sel_class} Discipline PDFs (ZIP)", zip_buffer.getvalue(), f"{sel_class}_discipline_reports.zip", "application/zip", use_container_width=True)
+                st.download_button(f"Download {sel_class} Discipline PDFs (ZIP)", zip_buffer.getvalue(), f"{sel_class}_discipline_reports.zip", "application/zip", width='stretch')
                 log_audit(session, st.session_state.user_id, "export_discipline_zip", f"Class: {sel_class}")
     
     session.close()
@@ -6340,7 +6343,7 @@ elif page == "Change Login Details":
         new_recovery_city = st.text_input("City of birth", value=(user.recovery_city or ""))
         new_recovery_nickname = st.text_input("Nickname / Pet or spouse name", value=(user.recovery_nickname or ""))
         
-        if st.form_submit_button("Update Login Details", use_container_width=True):
+        if st.form_submit_button("Update Login Details", width='stretch'):
             if hashlib.sha256(current_pass.encode()).hexdigest() != user.password_hash:
                 st.error(" Current password is incorrect")
             elif new_pass and new_pass != confirm_pass:
@@ -6392,3 +6395,4 @@ if st.session_state.user_role == 'admin':
     
     if total_students > 0 or total_marks > 0:
         st.sidebar.warning(" **Reminder**: Export your data regularly!\n\nGo to **Data Export** to backup.")
+
