@@ -3193,11 +3193,13 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
         st.warning("Need terms and classes with students to analyze performance")
         session.close()
         st.stop()
+    # When viewing this page, set read_only based on role so widgets can be disabled for admins
+    read_only = (st.session_state.get('user_role') == 'admin')
     
     # Sidebar controls
     st.sidebar.subheader("Analysis Controls")
     
-    selected_term = st.sidebar.selectbox("Select Term", terms['term_name'].tolist())
+    selected_term = st.sidebar.selectbox("Select Term", terms['term_name'].tolist(), disabled=read_only)
     term_id = terms[terms['term_name'] == selected_term].iloc[0]['id']
     
     analysis_type = st.sidebar.selectbox("Analysis Type", [
@@ -3207,12 +3209,12 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
         "Grade Distribution Analysis",
         "Top Students",
         "Presentation Mode"
-    ])
+    ], disabled=read_only)
     
     if analysis_type == "Class Performance Overview":
         st.subheader(" Class Performance Overview")
         
-        selected_class = st.selectbox("Select Class", classes['class_name'].tolist())
+        selected_class = st.selectbox("Select Class", classes['class_name'].tolist(), disabled=read_only)
         
         # Calculate class performance
         performance = calculate_class_performance(session, selected_class, term_id)
@@ -3269,14 +3271,14 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
     elif analysis_type == "Top Students":
         st.subheader(" Top Students")
 
-        scope = st.selectbox("Scope", ["Class", "Whole School"])
-        top_n = st.selectbox("Top N", [5, 10, 20], index=0)
+        scope = st.selectbox("Scope", ["Class", "Whole School"], disabled=read_only)
+        top_n = st.selectbox("Top N", [5, 10, 20], index=0, disabled=read_only)
 
         selected_class = None
         if scope == "Class":
-            selected_class = st.selectbox("Select Class", classes['class_name'].tolist())
+            selected_class = st.selectbox("Select Class", classes['class_name'].tolist(), disabled=read_only)
 
-        if st.button("Show Top Students", width='stretch'):
+        if st.button("Show Top Students", width='stretch', disabled=read_only):
             top_df = compute_top_students(session, term_id, class_name=selected_class, limit=int(top_n))
             if top_df is None or top_df.empty:
                 st.info("No marks found for the selected criteria")
@@ -3304,14 +3306,14 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
         
         col1, col2 = st.columns(2)
         with col1:
-            scope = st.selectbox("Scope", ["All Subjects", "Specific Subject"])
+            scope = st.selectbox("Scope", ["All Subjects", "Specific Subject"], disabled=read_only)
         with col2:
             if scope == "Specific Subject":
-                selected_subject = st.selectbox("Select Subject", subjects['subject'].tolist())
+                selected_subject = st.selectbox("Select Subject", subjects['subject'].tolist(), disabled=read_only)
             else:
                 selected_subject = None
         
-        if st.button("Analyze Improvements", width='stretch'):
+        if st.button("Analyze Improvements", width='stretch', disabled=read_only):
             improvement_data = find_most_improved_students(session, term_id, selected_subject)
             
             if improvement_data:
@@ -3478,9 +3480,9 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
         st.info("This mode is designed for presenting performance data in meetings or parent-teacher conferences.")
         
         # Auto-refresh interval
-        auto_refresh = st.checkbox("Enable Auto-refresh (for live presentations)")
+        auto_refresh = st.checkbox("Enable Auto-refresh (for live presentations)", disabled=read_only)
         if auto_refresh:
-            refresh_interval = st.slider("Refresh Interval (seconds)", 5, 60, 10)
+            refresh_interval = st.slider("Refresh Interval (seconds)", 5, 60, 10, disabled=read_only)
         
         # Select what to present
         presentation_content = st.selectbox("Select Content to Present", [
@@ -3488,7 +3490,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
             "Top Performing Students",
             "Subject Rankings",
             "Grade Overview"
-        ])
+        ], disabled=read_only)
         
         if presentation_content == "Class Performance Summary":
             st.subheader(" Class Performance Summary")
