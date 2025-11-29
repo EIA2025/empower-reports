@@ -3195,6 +3195,8 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
         st.stop()
     # When viewing this page, set read_only based on role so widgets can be disabled for admins
     read_only = (st.session_state.get('user_role') == 'admin')
+    # For admins, use a static Plotly config to prevent interactive edits/zooming
+    plotly_config = {'staticPlot': True, 'displayModeBar': False} if read_only else {}
     
     # Sidebar controls
     st.sidebar.subheader("Analysis Controls")
@@ -3246,11 +3248,11 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
             tab1, tab2, tab3 = st.tabs(["Assessment Performance", "Grade Distribution", "Subject Performance"])
             
             with tab1:
-                st.plotly_chart(charts['overall_performance'], width='stretch')
+                st.plotly_chart(charts['overall_performance'], width='stretch', config=plotly_config)
             with tab2:
-                st.plotly_chart(charts['grade_distribution'], width='stretch')
+                st.plotly_chart(charts['grade_distribution'], width='stretch', config=plotly_config)
             with tab3:
-                st.plotly_chart(charts['subject_performance'], width='stretch')
+                st.plotly_chart(charts['subject_performance'], width='stretch', config=plotly_config)
             
             # Detailed data table
             st.subheader("Detailed Performance Data")
@@ -3291,7 +3293,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                 # Bar chart
                 fig = px.bar(display_df, x='Rank', y='Average (out of 100)', text='Student Name')
                 fig.update_layout(xaxis=dict(type='category'), showlegend=False)
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, width='stretch', config=plotly_config)
 
                 # Download
                 csv_data = display_df.to_csv(index=False)
@@ -3321,7 +3323,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                 
                 # Create improvement chart
                 chart = create_improvement_chart(improvement_data)
-                st.plotly_chart(chart, width='stretch')
+                st.plotly_chart(chart, width='stretch', config=plotly_config)
                 
                 # Detailed table
                 st.subheader("Top Improved Students")
@@ -3406,7 +3408,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                 showlegend=False
             )
             
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, width='stretch', config=plotly_config)
             
             # Detailed table
             st.subheader("Subject Performance Summary")
@@ -3462,7 +3464,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                 height=500
             )
             
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, width='stretch', config=plotly_config)
             
             # Statistics
             total_entries = grade_dist['count'].sum()
@@ -3529,7 +3531,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                     height=500
                 )
                 
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, width='stretch', config=plotly_config)
                 
                 # Summary table
                 st.dataframe(class_df, width='stretch')
@@ -3570,7 +3572,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                     height=600
                 )
                 
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, width='stretch', config=plotly_config)
                 
                 # Detailed table
                 display_data = top_students.copy()
@@ -3606,7 +3608,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                     height=500
                 )
                 
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, width='stretch', config=plotly_config)
         
         elif presentation_content == "Grade Overview":
             st.subheader(" Grade Overview")
@@ -3653,7 +3655,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
                     height=600
                 )
                 
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, width='stretch', config=plotly_config)
         
         # Auto-refresh logic
         if auto_refresh:
