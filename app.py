@@ -5601,7 +5601,6 @@ elif page == "Discipline Reports":
     st.header(" Discipline Reports")
     session = Session()
     st.session_state['_suppress_notifications'] = True
-    try:
     
     if st.session_state.user_role == 'teacher':
         st.subheader("Submit Discipline Report")
@@ -5876,16 +5875,9 @@ elif page == "Discipline Reports":
                                 st.error(f"Could not send feedback: {e}")
         else:
             st.info("No discipline reports found")
-
-        finally:
-            try:
-                st.session_state['_suppress_notifications'] = False
-            except Exception:
-                pass
-            try:
-                session.close()
-            except Exception:
-                pass
+    
+    st.session_state['_suppress_notifications'] = False
+    session.close()
 
 elif page == "Generate Reports" and st.session_state.user_role == 'admin':
     st.header(" Generate Student Reports")
@@ -6340,8 +6332,7 @@ elif page == "Communications":
     st.header(" Communications")
     session = Session()
     st.session_state['_suppress_notifications'] = True
-    try:
-
+    
     st.subheader("Inbox")
     inbox = get_inbox(session, st.session_state.user_id)
     if inbox.empty:
@@ -6414,16 +6405,9 @@ elif page == "Communications":
         send_message(session, st.session_state.user_id, recipient_id, subject, body, is_broadcast=is_broadcast)
         log_audit(session, st.session_state.user_id, "send_message", f"To: {recipient} Subject: {subject}")
         st.success("Message sent")
-
-    finally:
-        try:
-            st.session_state['_suppress_notifications'] = False
-        except Exception:
-            pass
-        try:
-            session.close()
-        except Exception:
-            pass
+    
+    st.session_state['_suppress_notifications'] = False
+    session.close()
 
 elif page == "Data Export" and st.session_state.user_role == 'admin':
     st.header(" Data Export")
