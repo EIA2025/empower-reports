@@ -1961,7 +1961,7 @@ if not st.session_state.logged_in:
                 st.session_state.user_role = "master_admin"
                 st.session_state.user_id = None
                 st.session_state.username = "Master Admin"
-                st.success("✅ Master Admin access granted!")
+                st.success(" Master Admin access granted!")
                 st.info("You can now reset the database and recreate admin accounts.")
                 time.sleep(1)
                 st.rerun()
@@ -2019,7 +2019,7 @@ try:
             # compact body preview
             body_preview = (n['body'] or '')[:80].replace('\n', ' ')
             mtype = (n['message_type'] or ( 'discipline' if n.get('related_report_id') else 'message'))
-            badge = '🚨' if mtype == 'discipline' else '📧'
+            badge = '🚨' if mtype == 'discipline' else ''
             key = f"notif_btn_{int(n['id'])}"
             cols = st.sidebar.columns([8,2])
             cols[0].markdown(f"{badge} **{summary}** — {body_preview}")
@@ -2093,8 +2093,8 @@ if st.session_state.get('navigate_to'):
 
 if st.session_state.user_role == 'master_admin':
     if page == "Master Admin Dashboard":
-        st.header("🔐 Master Admin Dashboard")
-        st.warning("⚠️ You have full system access. Use with caution!")
+        st.header(" Master Admin Dashboard")
+        st.warning(" You have full system access. Use with caution!")
         
         col1, col2, col3 = st.columns(3)
         session = Session()
@@ -2116,8 +2116,8 @@ if st.session_state.user_role == 'master_admin':
         """)
     
     elif page == "Reset Database":
-        st.header("🗑️  Factory Reset Database")
-        st.error("⚠️ WARNING: This will DELETE ALL data and create a fresh database!")
+        st.header("  Factory Reset Database")
+        st.error(" WARNING: This will DELETE ALL data and create a fresh database!")
         
         col1, col2 = st.columns(2)
         
@@ -2126,9 +2126,9 @@ if st.session_state.user_role == 'master_admin':
             if st.button("Create Backup Before Reset", key="create_backup"):
                 success, msg = backup_database()
                 if success:
-                    st.success(f"✅ {msg}")
+                    st.success(f" {msg}")
                 else:
-                    st.error(f"❌ {msg}")
+                    st.error(f" {msg}")
         
         with col2:
             st.subheader("Step 2: Confirm Reset")
@@ -2141,7 +2141,7 @@ if st.session_state.user_role == 'master_admin':
                     master_hash = hashlib.sha256("@mikaelJ46".encode()).hexdigest()
                     
                     if hashlib.sha256(confirm_password.encode()).hexdigest() == master_hash:
-                        st.warning("🔄 Resetting database... Please wait")
+                        st.warning(" Resetting database... Please wait")
                         
                         try:
                             # Auto backup before deletion
@@ -2169,7 +2169,7 @@ if st.session_state.user_role == 'master_admin':
                             log_audit(session, None, "MASTER_ADMIN_RESET", "Factory reset performed via master admin")
                             session.close()
                             
-                            st.success("✅ Database successfully reset to factory defaults!")
+                            st.success(" Database successfully reset to factory defaults!")
                             st.info("New Admin Credentials:\n- Username: `admin`\n- Password: `admin123`")
                             st.info("You will be logged out. Please login again with the new credentials.")
                             time.sleep(2)
@@ -2177,10 +2177,10 @@ if st.session_state.user_role == 'master_admin':
                             st.rerun()
                         
                         except Exception as e:
-                            st.error(f"❌ Error during reset: {str(e)}")
+                            st.error(f" Error during reset: {str(e)}")
                             st.error("Database may be in an inconsistent state. Please restore from backup.")
                     else:
-                        st.error("❌ Incorrect master admin password")
+                        st.error(" Incorrect master admin password")
             else:
                 st.info("Enter the confirmation text to proceed.")
         
@@ -2189,13 +2189,13 @@ if st.session_state.user_role == 'master_admin':
         backups = list_backups()
         if backups:
             for backup in backups[:5]:  # Show last 5
-                st.text(f"📦 {backup['name']} - {backup['date']} ({backup['size']/1024/1024:.2f} MB)")
+                st.text(f" {backup['name']} - {backup['date']} ({backup['size']/1024/1024:.2f} MB)")
         else:
             st.info("No backups found yet.")
 
     elif page == "Reset System Admin Password":
-        st.header("🔁 Reset System Admin Password")
-        st.error("⚠️ This will reset the main system admin account password to the default. No other data will be deleted.")
+        st.header(" Reset System Admin Password")
+        st.error(" This will reset the main system admin account password to the default. No other data will be deleted.")
         st.info("Default credentials will be: Username: `admin`, Password: `admin123`")
 
         confirm_password = st.text_input("Enter master admin password to proceed:", type="password")
@@ -2236,19 +2236,19 @@ if st.session_state.user_role == 'master_admin':
                         session.add(new_admin)
                         session.commit()
                         log_audit(session, None, "MASTER_ADMIN_CREATE_ADMIN", f"Created default admin id {new_admin.id}")
-                        st.success("✅ Default admin created with credentials:")
+                        st.success(" Default admin created with credentials:")
                         st.info("Username: `admin` — Password: `admin123`")
 
                     session.close()
                     st.info("You will remain logged in as Master Admin. Use the admin credentials to login separately if needed.")
                 except Exception as e:
-                    st.error(f"❌ Error resetting admin password: {str(e)}")
+                    st.error(f" Error resetting admin password: {str(e)}")
             else:
-                st.error("❌ Incorrect master admin password")
+                st.error(" Incorrect master admin password")
     
     elif page == "Wipe All Data & Cache":
-        st.header("🧹 Wipe All Data & Cache")
-        st.error("⚠️ This will DELETE the database, ALL backups, uploads, exports, and common cache folders under the application directory. This is irreversible.")
+        st.header(" Wipe All Data & Cache")
+        st.error(" This will DELETE the database, ALL backups, uploads, exports, and common cache folders under the application directory. This is irreversible.")
         st.info("Use this when you need a completely clean app state for presentation. The app code files will NOT be deleted.")
 
         st.markdown("**Type the confirmation phrase to proceed:**")
@@ -2260,7 +2260,7 @@ if st.session_state.user_role == 'master_admin':
                 master_hash = hashlib.sha256("@mikaelJ46".encode()).hexdigest()
                 if hashlib.sha256(confirm_password.encode()).hexdigest() == master_hash:
                     try:
-                        st.warning("🔄 Performing full wipe. This may take a few seconds...")
+                        st.warning(" Performing full wipe. This may take a few seconds...")
 
                         # Close sessions and dispose engine
                         try:
@@ -2358,17 +2358,17 @@ if st.session_state.user_role == 'master_admin':
                             log_audit(log_sess, None, "MASTER_ADMIN_WIPE", "Full wipe of database, backups, uploads, exports, and caches via master admin")
                             log_sess.close()
 
-                            st.success("✅ Full wipe completed. App state is now clean.")
+                            st.success(" Full wipe completed. App state is now clean.")
                             st.info("Default admin account has been (re)created. Username: `admin` Password: `admin123`")
                             st.session_state.logged_in = False
                             st.rerun()
                         except Exception as e:
-                            st.error(f"❌ Error reinitializing DB after wipe: {str(e)}")
+                            st.error(f" Error reinitializing DB after wipe: {str(e)}")
                     except Exception as e:
                         # Outer try: catch any error during the wipe operation
-                        st.error(f"❌ Error during full wipe: {str(e)}")
+                        st.error(f" Error during full wipe: {str(e)}")
                 else:
-                    st.error("❌ Incorrect master admin password")
+                    st.error(" Incorrect master admin password")
         else:
             st.info("Enter the exact confirmation phrase to enable wipe.")
     
@@ -3676,7 +3676,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
     session.close()
 
 elif page == "Enter Results" and st.session_state.user_role == 'teacher':
-    st.header("📊 Enter Results - Hybrid Setup & Entry")
+    st.header(" Enter Results - Hybrid Setup & Entry")
     session = Session()
     
     user = session.get(User, st.session_state.user_id)
@@ -3694,7 +3694,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
         session.close()
         st.stop()
     
-    st.info(f"📅 Current Term: **{active_term.term_name}**")
+    st.info(f" Current Term: **{active_term.term_name}**")
     
     # Get classes
     classes = pd.read_sql("SELECT DISTINCT class_name FROM students ORDER BY class_name", ENGINE)
@@ -3706,9 +3706,9 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
     # Step 1: Select Class & Subject
     col1, col2 = st.columns(2)
     with col1:
-        selected_class = st.selectbox("📍 Select Class", classes['class_name'].tolist())
+        selected_class = st.selectbox(" Select Class", classes['class_name'].tolist())
     with col2:
-        selected_subject = st.selectbox("📚 Select Subject", my_subjects)
+        selected_subject = st.selectbox(" Select Subject", my_subjects)
     
     st.divider()
     
@@ -3735,18 +3735,18 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
         st.session_state.et_total = 100.0
     
     # Step 2: Unified Component Setup (3 collapsible sections)
-    st.subheader("⚙️ Phase 1: Define Components")
+    st.subheader(" Phase 1: Define Components")
     st.write("Add all components for each assessment type. You'll see them listed in real-time.")
     
     # COURSEWORK SECTION
-    with st.expander("📝 Coursework (CW) Components", expanded=True):
+    with st.expander(" Coursework (CW) Components", expanded=True):
         col_cw1, col_cw2, col_cw3 = st.columns([2, 1, 1])
         with col_cw1:
             cw_name = st.text_input("Component name (e.g., Test 1)", value=st.session_state.cw_name, key="cw_name_input")
         with col_cw2:
             cw_total = st.number_input("Total marks", min_value=1.0, value=st.session_state.cw_total, step=0.5, key="cw_total_input")
         with col_cw3:
-            if st.button("➕ Add", key="add_cw", width='stretch'):
+            if st.button(" Add", key="add_cw", width='stretch'):
                 if cw_name and cw_total > 0:
                     st.session_state.cw_components.append({"name": cw_name, "total": cw_total})
                     st.session_state.cw_name = ""
@@ -3763,7 +3763,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                 with col_disp2:
                     st.write(f"/{comp['total']}")
                 with col_disp3:
-                    if st.button("🗑️", key=f"del_cw_{idx}", width='stretch'):
+                    if st.button("DELETE", key=f"del_cw_{idx}", width='stretch'):
                         st.session_state.cw_components.pop(idx)
                         st.rerun()
             
@@ -3773,14 +3773,14 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
             st.write("*No coursework components added yet*")
     
     # MID-TERM SECTION
-    with st.expander("📋 Mid-Term (MT) Components", expanded=True):
+    with st.expander(" Mid-Term (MT) Components", expanded=True):
         col_mt1, col_mt2, col_mt3 = st.columns([2, 1, 1])
         with col_mt1:
             mt_name = st.text_input("Component name (e.g., Paper 1)", value=st.session_state.mt_name, key="mt_name_input")
         with col_mt2:
             mt_total = st.number_input("Total marks", min_value=1.0, value=st.session_state.mt_total, step=0.5, key="mt_total_input")
         with col_mt3:
-            if st.button("➕ Add", key="add_mt", width='stretch'):
+            if st.button(" Add", key="add_mt", width='stretch'):
                 if mt_name and mt_total > 0:
                     st.session_state.mt_components.append({"name": mt_name, "total": mt_total})
                     st.session_state.mt_name = ""
@@ -3797,7 +3797,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                 with col_disp2:
                     st.write(f"/{comp['total']}")
                 with col_disp3:
-                    if st.button("🗑️", key=f"del_mt_{idx}", width='stretch'):
+                    if st.button("DELETE", key=f"del_mt_{idx}", width='stretch'):
                         st.session_state.mt_components.pop(idx)
                         st.rerun()
             
@@ -3807,14 +3807,14 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
             st.write("*No mid-term components added yet*")
     
     # END-TERM SECTION
-    with st.expander("🎓 End-Term (ET) Components", expanded=True):
+    with st.expander(" End-Term (ET) Components", expanded=True):
         col_et1, col_et2, col_et3 = st.columns([2, 1, 1])
         with col_et1:
             et_name = st.text_input("Component name (e.g., Final Exam)", value=st.session_state.et_name, key="et_name_input")
         with col_et2:
             et_total = st.number_input("Total marks", min_value=1.0, value=st.session_state.et_total, step=0.5, key="et_total_input")
         with col_et3:
-            if st.button("➕ Add", key="add_et", width='stretch'):
+            if st.button(" Add", key="add_et", width='stretch'):
                 if et_name and et_total > 0:
                     st.session_state.et_components.append({"name": et_name, "total": et_total})
                     st.session_state.et_name = ""
@@ -3831,7 +3831,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                 with col_disp2:
                     st.write(f"/{comp['total']}")
                 with col_disp3:
-                    if st.button("🗑️", key=f"del_et_{idx}", width='stretch'):
+                    if st.button("DELETE", key=f"del_et_{idx}", width='stretch'):
                         st.session_state.et_components.pop(idx)
                         st.rerun()
             
@@ -3848,14 +3848,14 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
     )
     
     if not has_components:
-        st.warning("⚠️ Please add at least one component above to continue.")
+        st.warning(" Please add at least one component above to continue.")
         session.close()
         st.stop()
     
     st.divider()
     
     # Step 3: Score Entry Phase
-    st.subheader("📝 Phase 2: Enter Scores")
+    st.subheader(" Phase 2: Enter Scores")
     st.write("Fill in scores for each student. Totals calculate automatically.")
     
     
@@ -4161,7 +4161,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
             
             # Check if student has scores
             has_any_score = any(cw_scores) or any(mt_scores) or any(et_scores)
-            status = "✓ Complete" if has_any_score else "⏳ Pending"
+            status = "✓ Complete" if has_any_score else " Pending"
             status_color = "🟢" if has_any_score else "🔴"
             
             if has_any_score:
@@ -4196,7 +4196,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
         st.write(f"Ready to save {completed_count} students' marks?")
     
     with col_save2:
-        if st.button("💾 Save All Scores", width='stretch', key="save_all_scores"):
+        if st.button(" Save All Scores", width='stretch', key="save_all_scores"):
             saved_count = 0
             errors = []
             
@@ -4307,23 +4307,23 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                 log_audit(session, st.session_state.user_id, "enter_component_marks_hybrid",
                          f"{selected_class} - {selected_subject} - {saved_count} students")
                 
-                st.success(f"✅ Scores saved for {saved_count} students!")
+                st.success(f" Scores saved for {saved_count} students!")
                 st.balloons()
                 
             except Exception as e:
                 session.rollback()
-                st.error(f"❌ Error saving scores: {str(e)}")
+                st.error(f" Error saving scores: {str(e)}")
             
             if errors:
-                st.error("⚠️ Errors for some students:")
+                st.error(" Errors for some students:")
                 for error in errors:
                     st.error(f"  • {error}")
     
     st.markdown("---")
-    st.subheader("🚀 Auto-Compile Final Marks")
+    st.subheader(" Auto-Compile Final Marks")
     st.write("After saving scores above, click below to automatically compile final marks for all students.")
     
-    if st.button("🔄 Auto-Compile All Students", width='stretch'):
+    if st.button(" Auto-Compile All Students", width='stretch'):
         compiled_count = 0
         
         progress_bar = st.progress(0)
@@ -4348,16 +4348,16 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
                     total, grade = update_compiled_marks(session, student_id, selected_subject, active_term.id, submitted_by=st.session_state.user_id)
                     compiled_count += 1
                     
-                    status_area.write(f"✅ {student['name']}: {total:.1f}/100 ({grade})")
+                    status_area.write(f" {student['name']}: {total:.1f}/100 ({grade})")
                     progress_bar.progress((idx + 1) / len(students_to_compile))
                     
                 except Exception as e:
-                    status_area.write(f"❌ {student['name']}: {str(e)}")
+                    status_area.write(f" {student['name']}: {str(e)}")
             
             log_audit(session, st.session_state.user_id, "auto_compile_marks_hybrid",
                      f"{selected_class} - {selected_subject} - {compiled_count} students")
             
-            st.success(f"✅ Final marks compiled for {compiled_count} students!")
+            st.success(f" Final marks compiled for {compiled_count} students!")
             st.balloons()
 
             # Show compiled marks table for teacher review
@@ -4376,7 +4376,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
 
                 if not compiled_df.empty:
                     st.markdown("---")
-                    st.subheader("📋 Compiled Final Marks")
+                    st.subheader(" Compiled Final Marks")
                     st.info("These are the compiled final marks for the selected class and subject.")
                     st.dataframe(compiled_df[['student_name', 'registration_number', 'coursework_out_of_20', 'midterm_out_of_20', 'endterm_out_of_60', 'total', 'grade']], width='stretch')
 
@@ -4400,7 +4400,7 @@ elif page == "Enter Results" and st.session_state.user_role == 'teacher':
     st.info("The Enter Results page has been moved. Please use the main menu.")
 
 elif page == "Comments" and st.session_state.user_role == 'teacher':
-    st.header("💬 Add Student Comments")
+    st.header(" Add Student Comments")
     session = Session()
     
     # Get active term
@@ -4410,7 +4410,7 @@ elif page == "Comments" and st.session_state.user_role == 'teacher':
         session.close()
         st.stop()
     
-    st.info(f"📅 Current Term: **{active_term.term_name}**")
+    st.info(f" Current Term: **{active_term.term_name}**")
     
     # Get teacher's subjects and classes
     current_user = session.query(User).filter_by(id=st.session_state.user_id).first()
@@ -4483,7 +4483,7 @@ elif page == "Comments" and st.session_state.user_role == 'teacher':
         st.stop()
     
     st.markdown("---")
-    st.subheader(f"📝 Comments for {selected_class} - {selected_subject}")
+    st.subheader(f" Comments for {selected_class} - {selected_subject}")
     
     # Initialize session state for comments
     if 'comments_data' not in st.session_state:
@@ -4567,7 +4567,7 @@ elif page == "Comments" and st.session_state.user_role == 'teacher':
     
     # Save comments button
     st.markdown("---")
-    if st.button("💾 Save Comments", width='stretch'):
+    if st.button(" Save Comments", width='stretch'):
         saved_count = 0
         errors = []
         
@@ -4613,14 +4613,14 @@ elif page == "Comments" and st.session_state.user_role == 'teacher':
             session.commit()
             
             if saved_count > 0:
-                st.success(f"✅ Comments saved for {saved_count} student(s)!")
+                st.success(f" Comments saved for {saved_count} student(s)!")
                 try:
                     st.balloons()
                 except Exception:
                     pass
             
             if errors:
-                with st.expander("⚠️ View errors"):
+                with st.expander(" View errors"):
                     for error in errors:
                         st.write(f"• {error}")
         
@@ -5659,7 +5659,7 @@ elif page == "Discipline Reports":
         st.subheader("All Discipline Reports (Message-style)")
 
         # Discipline Inbox (Messages) - shows incoming discipline report messages for admins
-        st.markdown("### 🚨 Discipline Inbox (Discipline Report Messages)")
+        st.markdown("###  Discipline Inbox (Discipline Report Messages)")
         try:
             disc_msgs = pd.read_sql("""
                 SELECT m.*, u.name as sender_name
@@ -5682,7 +5682,7 @@ elif page == "Discipline Reports":
                 
                 with st.expander(header_text):
                     # Show message type info
-                    st.caption(f"📌 Type: **Discipline Report** | Read: {msg.get('read')}")
+                    st.caption(f" Type: **Discipline Report** | Read: {msg.get('read')}")
                     if msg.get('related_report_id'):
                         st.caption(f"📎 Linked to Report ID: **{msg.get('related_report_id')}**")
                     
@@ -6168,7 +6168,7 @@ elif page == "Report Design" and st.session_state.user_role == 'admin':
             
             # NEW: Quick insert Empower logo
             st.markdown("---")
-            st.markdown("**🚀 Quick Insert Empower Logo**")
+            st.markdown("** Quick Insert Empower Logo**")
             if st.button("Use Empower Academy Logo", width='stretch'):
                 empower_logo_url = "https://z-cdn-media.chatglm.cn/files/a7ca3e7c-8f26-410d-94e5-84b20d17eaed_empower-logo.png?auth_key=1863023354-290424df56d14d3b9f2ee211186220cf-0-e728679b39cedb32228a3c796ca046cf"
                 logo_b64 = download_logo_from_url(empower_logo_url)
@@ -6288,10 +6288,10 @@ elif page == "Communications":
                     # Determine message type and badge
                     message_type = row.get('message_type') or ('discipline' if row.get('related_report_id') else 'standard')
                     if message_type == 'discipline':
-                        type_badge = "🚨 **DISCIPLINE REPORT**"
+                        type_badge = " **DISCIPLINE REPORT**"
                         type_color = "red"
                     else:
-                        type_badge = "📧 **MESSAGE**"
+                        type_badge = " **MESSAGE**"
                         type_color = "blue"
                     
                     read_flag = "(Unread)" if not row['read'] else "(Read)"
