@@ -31,6 +31,68 @@ import re
 # Load local settings (non-AI config) from `.env` if present
 load_dotenv()
 
+# -------------------------------
+# Conditional notification wrappers
+# -------------------------------
+# We want to silence notifications only for message/discipline flows
+# (Communications and Discipline Reports). To do that safely we:
+# 1. Reload the Streamlit module to capture the original helpers.
+# 2. Install small wrapper functions that consult a session-state
+#    flag `_suppress_notifications` to decide whether to show messages.
+import importlib
+try:
+    _st_reloaded = importlib.reload(st)
+except Exception:
+    # If reload fails for any reason, fall back to current attributes
+    _st_reloaded = st
+
+# Capture originals (fallback to current attributes if missing)
+_orig_info = getattr(_st_reloaded, 'info', lambda *a, **k: None)
+_orig_warning = getattr(_st_reloaded, 'warning', lambda *a, **k: None)
+_orig_success = getattr(_st_reloaded, 'success', lambda *a, **k: None)
+_orig_error = getattr(_st_reloaded, 'error', lambda *a, **k: None)
+
+def _should_suppress():
+    try:
+        return bool(st.session_state.get('_suppress_notifications', False))
+    except Exception:
+        return False
+
+def _wrap_info(*args, **kwargs):
+    if _should_suppress():
+        return None
+    return _orig_info(*args, **kwargs)
+
+def _wrap_warning(*args, **kwargs):
+    if _should_suppress():
+        return None
+    return _orig_warning(*args, **kwargs)
+
+def _wrap_success(*args, **kwargs):
+    if _should_suppress():
+        return None
+    return _orig_success(*args, **kwargs)
+
+def _wrap_error(*args, **kwargs):
+    if _should_suppress():
+        return None
+    return _orig_error(*args, **kwargs)
+
+# Install wrappers
+st.info = _wrap_info
+st.warning = _wrap_warning
+st.success = _wrap_success
+st.error = _wrap_error
+
+# Sidebar wrappers (if available)
+try:
+    st.sidebar.info = _wrap_info
+    st.sidebar.warning = _wrap_warning
+    st.sidebar.success = _wrap_success
+    st.sidebar.error = _wrap_error
+except Exception:
+    pass
+
 
 # -------------------------------
 # 0. ENHANCED PERSISTENT STORAGE SETUP
@@ -5538,6 +5600,8 @@ elif page == "Classroom Behavior":
 elif page == "Discipline Reports":
     st.header(" Discipline Reports")
     session = Session()
+    st.session_state['_suppress_notifications'] = True
+    try:
     
     if st.session_state.user_role == 'teacher':
         st.subheader("Submit Discipline Report")
@@ -5813,7 +5877,15 @@ elif page == "Discipline Reports":
         else:
             st.info("No discipline reports found")
 
-        session.close()
+        finally:
+            try:
+                st.session_state['_suppress_notifications'] = False
+            except Exception:
+                pass
+            try:
+                session.close()
+            except Exception:
+                pass
 
 elif page == "Generate Reports" and st.session_state.user_role == 'admin':
     st.header(" Generate Student Reports")
@@ -6267,6 +6339,8 @@ elif page == "Report Design" and st.session_state.user_role == 'admin':
 elif page == "Communications":
     st.header(" Communications")
     session = Session()
+    st.session_state['_suppress_notifications'] = True
+    try:
 
     st.subheader("Inbox")
     inbox = get_inbox(session, st.session_state.user_id)
@@ -6341,7 +6415,15 @@ elif page == "Communications":
         log_audit(session, st.session_state.user_id, "send_message", f"To: {recipient} Subject: {subject}")
         st.success("Message sent")
 
-    session.close()
+    finally:
+        try:
+            st.session_state['_suppress_notifications'] = False
+        except Exception:
+            pass
+        try:
+            session.close()
+        except Exception:
+            pass
 
 elif page == "Data Export" and st.session_state.user_role == 'admin':
     st.header(" Data Export")
