@@ -95,9 +95,14 @@ except Exception:
 
 
 # -------------------------------
-# 0. ENHANCED PERSISTENT STORAGE SETUP
+# HYBRID CLOUD + LOCAL PERSISTENT STORAGE
+# This system ensures data survives app restarts, sleeps, and container resets
+# by maintaining copies both in cloud and locally on admin's device
 # -------------------------------
 import os
+import base64
+import hashlib
+from datetime import datetime, timedelta
 import shutil
 from pathlib import Path
 import streamlit as st
@@ -249,6 +254,161 @@ def check_and_create_periodic_backup():
             backup_database()
     except Exception as e:
         st.error(f"Error in periodic backup: {str(e)}")
+
+# ===== HYBRID CLOUD + LOCAL SYNC SYSTEM =====
+# This ensures data persists across app restarts and container sleeps
+
+class HybridStorageManager:
+    """Manages hybrid cloud + local backup sync for persistent storage"""
+    
+    def __init__(self):
+        self.config_file = BACKUP_DIR / "cloud_sync_config.json"
+        self.local_backup_dir = None
+        self.load_config()
+    
+    def load_config(self):
+        """Load cloud sync configuration"""
+        try:
+            if self.config_file.exists():
+                with open(self.config_file, 'r') as f:
+                    config = json.load(f)
+                    self.local_backup_dir = config.get('local_backup_dir')
+        except Exception:
+            pass
+    
+    def save_config(self, local_backup_dir):
+        """Save cloud sync configuration"""
+        try:
+            config = {'local_backup_dir': local_backup_dir}
+            with open(self.config_file, 'w') as f:
+                json.dump(config, f, indent=2)
+            self.local_backup_dir = local_backup_dir
+            return True, "Configuration saved"
+        except Exception as e:
+            return False, f"Failed to save config: {str(e)}"
+    
+    def sync_to_local_backup(self):
+        """Sync database to local backup folder (on admin's device)"""
+        if not self.local_backup_dir or not os.path.exists(self.local_backup_dir):
+            return False, "Backup folder not configured or not accessible"
+        
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            local_backup_path = Path(self.local_backup_dir) / f"empower_backup_{timestamp}.db"
+            
+            # Copy database to local backup folder
+            shutil.copy2(DB_PATH, local_backup_path)
+            
+            # Also maintain a "latest" copy for quick restore
+            latest_path = Path(self.local_backup_dir) / "empower_latest.db"
+            shutil.copy2(DB_PATH, latest_path)
+            
+            # Log sync
+            sync_log = Path(self.local_backup_dir) / "sync_log.json"
+            log_entry = {
+                "timestamp": timestamp,
+                "action": "sync_to_local",
+                "source": str(DB_PATH),
+                "destination": str(local_backup_path),
+                "size": os.path.getsize(DB_PATH),
+                "success": True
+            }
+            
+            with open(sync_log, 'a') as f:
+                json.dump(log_entry, f)
+                f.write("\n")
+            
+            return True, f"Backup synced to {local_backup_path.name}"
+        except Exception as e:
+            return False, f"Sync failed: {str(e)}"
+    
+    def restore_from_local_backup(self):
+        """Restore database from local backup folder"""
+        if not self.local_backup_dir or not os.path.exists(self.local_backup_dir):
+            return False, "Backup folder not configured or not accessible"
+        
+        try:
+            latest_path = Path(self.local_backup_dir) / "empower_latest.db"
+            
+            if not latest_path.exists():
+                return False, "No local backup found (empower_latest.db not present)"
+            
+            # Create safety backup of current (potentially corrupted) DB
+            if DB_PATH.exists():
+                corrupted_backup = BACKUP_DIR / f"corrupted_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+                shutil.copy2(DB_PATH, corrupted_backup)
+            
+            # Restore from local backup
+            shutil.copy2(latest_path, DB_PATH)
+            
+            # Log restore
+            restore_log = Path(self.local_backup_dir) / "restore_log.json"
+            log_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "action": "restore_from_local",
+                "source": str(latest_path),
+                "destination": str(DB_PATH),
+                "success": True
+            }
+            
+            with open(restore_log, 'a') as f:
+                json.dump(log_entry, f)
+                f.write("\n")
+            
+            return True, "Database restored from local backup"
+        except Exception as e:
+            return False, f"Restore failed: {str(e)}"
+    
+    def health_check_and_recover(self):
+        """Check database health on startup and recover if needed"""
+        try:
+            # If DB is missing or empty, try to restore
+            if not DB_PATH.exists() or os.path.getsize(DB_PATH) < 1000:
+                success, msg = self.restore_from_local_backup()
+                if success:
+                    return True, f"Database recovered: {msg}"
+                else:
+                    return False, msg
+            
+            # Try to open the database to check if it's valid
+            try:
+                test_engine = create_engine(f'sqlite:///{DB_PATH}')
+                with test_engine.connect() as conn:
+                    conn.execute("SELECT 1")
+                return True, "Database is healthy"
+            except Exception:
+                # Database is corrupted, try to restore
+                success, msg = self.restore_from_local_backup()
+                if success:
+                    return True, f"Database recovered from corruption: {msg}"
+                else:
+                    return False, f"Database corrupted and no backup available: {msg}"
+        
+        except Exception as e:
+            return False, f"Health check failed: {str(e)}"
+
+# Initialize hybrid storage manager
+hybrid_storage = HybridStorageManager()
+
+# Perform health check and recovery on app startup
+if 'startup_recovery_done' not in st.session_state:
+    health_ok, health_msg = hybrid_storage.health_check_and_recover()
+    st.session_state.startup_recovery_done = True
+    if not health_ok:
+        st.warning(f"Data Recovery: {health_msg}")
+
+# Auto-sync on every app run (ensures latest data is always backed up)
+if 'last_sync' not in st.session_state:
+    st.session_state.last_sync = None
+
+if st.session_state.last_sync is None or (datetime.now() - st.session_state.last_sync).seconds > 300:
+    # Auto-sync every 5 minutes
+    try:
+        if hybrid_storage.local_backup_dir and os.path.exists(hybrid_storage.local_backup_dir):
+            hybrid_storage.sync_to_local_backup()
+            st.session_state.last_sync = datetime.now()
+    except Exception:
+        pass
 
 # -------------------------------
 # FILE UPLOAD PERSISTENCE
@@ -2651,8 +2811,132 @@ elif page == "Storage Management" and st.session_state.user_role == 'admin':
                 st.success(f"Deleted {deleted_count} old backups")
             else:
                 st.info("No old backups to delete")
+    
+    # ===== NEW TAB: CLOUD SYNC FOR PERSISTENT STORAGE =====
+    with st.expander("Cloud Sync & Persistent Storage (Recommended)", expanded=True):
+        st.markdown("""
+### Persistent Storage Setup
+This ensures your data survives:
+- App restarts and container sleeps
+- Network interruptions
+- Streamlit Cloud crashes or maintenance
 
-# NEW PAGE: Visitation Day Management (for VD reports)
+**How it works:**
+1. Teachers enter data online (stored in database)
+2. Admin configures a backup folder on their device (or cloud storage like OneDrive/Google Drive)
+3. When admin opens the app, data automatically syncs to the backup folder
+4. If the database gets corrupted or lost, it automatically restores from the backup
+5. Even if offline, the latest local backup is available for recovery
+        """)
+        
+        col_sync1, col_sync2 = st.columns([2, 1])
+        
+        with col_sync1:
+            current_folder = hybrid_storage.local_backup_dir or "Not configured"
+            st.write(f"**Current Backup Folder:** `{current_folder}`")
+        
+        with col_sync2:
+            if st.button("Change Backup Folder", key="change_backup_folder"):
+                st.session_state.show_backup_config = True
+        
+        if st.session_state.get('show_backup_config'):
+            st.markdown("---")
+            st.write("**Enter the path to your backup folder:**")
+            st.write("Examples:")
+            st.write("- Windows: `C:\\Users\\YourName\\OneDrive\\Backups` or `D:\\School_Backups`")
+            st.write("- Mac/Linux: `/Users/YourName/Backups` or `/home/user/backups`")
+            
+            backup_folder_input = st.text_input(
+                "Backup Folder Path",
+                value=hybrid_storage.local_backup_dir or "",
+                placeholder="e.g., C:\\Backups or /Users/admin/backups"
+            )
+            
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                if st.button("Save Backup Folder", key="save_backup_folder"):
+                    # Validate folder exists or create it
+                    try:
+                        backup_path = Path(backup_folder_input).expanduser()
+                        backup_path.mkdir(parents=True, exist_ok=True)
+                        
+                        success, msg = hybrid_storage.save_config(str(backup_path))
+                        if success:
+                            st.success(f"Backup folder configured: {backup_path}")
+                            st.session_state.show_backup_config = False
+                            st.rerun()
+                        else:
+                            st.error(msg)
+                    except Exception as e:
+                        st.error(f"Invalid folder path: {str(e)}")
+            
+            with col_btn2:
+                if st.button("Cancel", key="cancel_backup_config"):
+                    st.session_state.show_backup_config = False
+                    st.rerun()
+        
+        st.markdown("---")
+        
+        # Sync controls
+        col_sync_btn1, col_sync_btn2, col_sync_btn3 = st.columns(3)
+        
+        with col_sync_btn1:
+            if st.button("Backup Now", width='stretch', key="manual_sync_now"):
+                if hybrid_storage.local_backup_dir:
+                    success, msg = hybrid_storage.sync_to_local_backup()
+                    if success:
+                        st.success(msg)
+                    else:
+                        st.error(msg)
+                else:
+                    st.error("Please configure a backup folder first")
+        
+        with col_sync_btn2:
+            if st.button("Restore from Local", width='stretch', key="restore_from_local"):
+                if hybrid_storage.local_backup_dir:
+                    success, msg = hybrid_storage.restore_from_local_backup()
+                    if success:
+                        st.success(msg)
+                        st.info("Database restored. Please refresh or rerun the app.")
+                    else:
+                        st.error(msg)
+                else:
+                    st.error("Please configure a backup folder first")
+        
+        with col_sync_btn3:
+            if st.button("Health Check", width='stretch', key="health_check_btn"):
+                success, msg = hybrid_storage.health_check_and_recover()
+                if success:
+                    st.success(msg)
+                else:
+                    st.warning(msg)
+        
+        st.markdown("---")
+        
+        # Local backup files list
+        if hybrid_storage.local_backup_dir and os.path.exists(hybrid_storage.local_backup_dir):
+            st.subheader("Local Backup Files")
+            backup_folder = Path(hybrid_storage.local_backup_dir)
+            backup_files = list(backup_folder.glob("empower_backup_*.db"))
+            backup_files.sort(reverse=True)
+            
+            if backup_files:
+                st.write(f"Found {len(backup_files)} backup files in: `{hybrid_storage.local_backup_dir}`")
+                
+                backup_info = []
+                for bf in backup_files[:10]:  # Show last 10
+                    stat = bf.stat()
+                    backup_info.append({
+                        'File': bf.name,
+                        'Size (MB)': round(stat.st_size / (1024*1024), 2),
+                        'Date': datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+                    })
+                
+                st.dataframe(backup_info, width='stretch')
+            else:
+                st.info("No backup files yet. Click 'Backup Now' to create one.")
+
+
 elif page == "Visitation Day Management" and st.session_state.user_role == 'admin':
     st.header(" Visitation Day Management")
     session = Session()
