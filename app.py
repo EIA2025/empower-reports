@@ -3562,6 +3562,19 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
     read_only = False
     # Use default Plotly config for interactive charts
     plotly_config = {}
+
+    # Shared helper to render Plotly figures as static images for environments
+    # where `fig.to_image()` works, otherwise fall back to interactive charts.
+    def _display_plotly_static(fig, img_width=900, img_height=450):
+        if read_only:
+            try:
+                img_bytes = fig.to_image(format='png', width=img_width, height=img_height, scale=2)
+                st.image(img_bytes, use_column_width=True)
+            except Exception:
+                # Fallback to interactive plotly chart if image rendering isn't available
+                st.plotly_chart(fig, use_container_width=True, config=plotly_config)
+        else:
+            st.plotly_chart(fig, use_container_width=True)
     
     # Sidebar controls
     st.sidebar.subheader("Analysis Controls")
@@ -3612,18 +3625,7 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
             # Display charts in tabs
             tab1, tab2, tab3 = st.tabs(["Assessment Performance", "Grade Distribution", "Subject Performance"])
             
-            # Helper: render plotly as static image for read_only users, otherwise interactive
-            def _display_plotly_static(fig, img_width=900, img_height=450):
-                if read_only:
-                    try:
-                        img_bytes = fig.to_image(format='png', width=img_width, height=img_height, scale=2)
-                        st.image(img_bytes, use_column_width=True)
-                    except Exception:
-                        # Fallback to static plotly config if image rendering isn't available
-                        st.plotly_chart(fig, use_container_width=True, config=plotly_config)
-                else:
-                    st.plotly_chart(fig, use_container_width=True)
-
+            
             with tab1:
                 _display_plotly_static(charts['overall_performance'], img_width=900, img_height=450)
             with tab2:
