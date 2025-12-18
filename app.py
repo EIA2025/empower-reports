@@ -110,17 +110,36 @@ import json
 from datetime import datetime
 
 # Local development setup
+# Prefer a persistent per-user storage directory to avoid data loss when
+# the runtime environment is ephemeral (e.g., cloud services or containers).
+# Override with the environment variable `EMPOWER_STORAGE_DIR` if needed.
 BASE_DIR = Path(__file__).resolve().parent
-STORAGE_DIR = BASE_DIR
-DB_PATH = BASE_DIR / 'empower.db'
-BACKUP_DIR = BASE_DIR / 'backups'
-BACKUP_DIR.mkdir(exist_ok=True)
+DEFAULT_STORAGE = Path(os.getenv('EMPOWER_STORAGE_DIR', Path.home() / '.empower'))
+STORAGE_DIR = DEFAULT_STORAGE
+# Ensure storage directory exists (create parents if required)
+STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
-UPLOADS_DIR = BASE_DIR / 'uploads'
-UPLOADS_DIR.mkdir(exist_ok=True)
+# Database path in the persistent storage folder
+DB_PATH = STORAGE_DIR / 'empower.db'
 
-EXPORTS_DIR = BASE_DIR / 'exports'
-EXPORTS_DIR.mkdir(exist_ok=True)
+# If a legacy DB exists in the project folder, migrate it to the persistent storage
+legacy_db = BASE_DIR / 'empower.db'
+if legacy_db.exists() and not DB_PATH.exists():
+    try:
+        shutil.copy2(legacy_db, DB_PATH)
+    except Exception:
+        # If migration fails, continue — app will attempt recovery/backups later
+        pass
+
+# Dedicated subfolders under the persistent storage
+BACKUP_DIR = STORAGE_DIR / 'backups'
+BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+
+UPLOADS_DIR = STORAGE_DIR / 'uploads'
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+EXPORTS_DIR = STORAGE_DIR / 'exports'
+EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 st.sidebar.info(" Local Storage Mode")
 
