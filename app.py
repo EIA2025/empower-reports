@@ -3558,10 +3558,10 @@ elif page == "Performance Analytics" and st.session_state.user_role == 'admin':
         st.warning("Need terms and classes with students to analyze performance")
         session.close()
         st.stop()
-    # When viewing this page, set read_only based on role so widgets can be disabled for admins
-    read_only = (st.session_state.get('user_role') == 'admin')
-    # For admins, use a static Plotly config to prevent interactive edits/zooming
-    plotly_config = {'staticPlot': True, 'displayModeBar': False} if read_only else {}
+    # Admins have full interactive access; read_only is intentionally False
+    read_only = False
+    # Use default Plotly config for interactive charts
+    plotly_config = {}
     
     # Sidebar controls
     st.sidebar.subheader("Analysis Controls")
