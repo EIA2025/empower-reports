@@ -2051,6 +2051,17 @@ def generate_discipline_pdf(student_data, reports_df, design):
 # -------------------------------
 st.set_page_config(page_title="Empower Reports", layout="wide")
 
+# CRITICAL: Initialize default admin user on every startup to prevent login failures after restart
+# This ensures that even if the database is fresh or corrupted, users can always log in
+if 'admin_initialized_on_startup' not in st.session_state:
+    try:
+        init_admin()
+        st.session_state.admin_initialized_on_startup = True
+    except Exception as e:
+        # Log but don't fail - admin might already exist
+        st.session_state.admin_initialized_on_startup = False
+        pass
+
 st.markdown(f"<h1 style='text-align: center; color: #1e3a8a;'>Empower International Academy</h1>", unsafe_allow_html=True)
 
 # Render logo and motto under the main title (centered)
