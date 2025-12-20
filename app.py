@@ -371,12 +371,10 @@ if (current_time - st.session_state.last_auto_backup).total_seconds() > 300:
         success, msg = persistence_manager.create_automatic_backup(backup_type='periodic')
         if success:
             st.session_state.last_auto_backup = current_time
-        st.error(f"Error in periodic backup: {str(e)}")
 
-# ===== HYBRID CLOUD + LOCAL SYNC SYSTEM =====
-# This ensures data persists across app restarts and container sleeps
+# ===== FILE UPLOAD PERSISTENCE =====
 
-class HybridStorageManager:
+def persist_uploaded_file(uploaded_file, subfolder=""):
     """Manages hybrid cloud + local backup sync for persistent storage"""
     
     def __init__(self):
