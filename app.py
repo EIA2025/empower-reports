@@ -109,13 +109,16 @@ import streamlit as st
 import json
 from datetime import datetime
 
-# Local development setup
+# ============================================
+# CRITICAL: PERSISTENT STORAGE SETUP
+# ============================================
 # Prefer a persistent per-user storage directory to avoid data loss when
 # the runtime environment is ephemeral (e.g., cloud services or containers).
 # Override with the environment variable `EMPOWER_STORAGE_DIR` if needed.
 BASE_DIR = Path(__file__).resolve().parent
-DEFAULT_STORAGE = Path(os.getenv('EMPOWER_STORAGE_DIR', Path.home() / '.empower'))
+DEFAULT_STORAGE = Path(os.getenv('EMPOWER_STORAGE_DIR', Path.home() / '.empower_data'))
 STORAGE_DIR = DEFAULT_STORAGE
+
 # Ensure storage directory exists (create parents if required)
 STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -127,7 +130,7 @@ legacy_db = BASE_DIR / 'empower.db'
 if legacy_db.exists() and not DB_PATH.exists():
     try:
         shutil.copy2(legacy_db, DB_PATH)
-    except Exception:
+    except Exception as e:
         # If migration fails, continue — app will attempt recovery/backups later
         pass
 
@@ -141,7 +144,8 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 EXPORTS_DIR = STORAGE_DIR / 'exports'
 EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-st.sidebar.info(" Local Storage Mode")
+# Inform user of storage location
+st.sidebar.info(f"📦 Storage: {STORAGE_DIR.name}")
 
 # Store paths in session state for easy access
 if 'storage_paths' not in st.session_state:
@@ -156,98 +160,200 @@ if 'storage_paths' not in st.session_state:
 # -------------------------------
 # BACKUP AND RECOVERY FUNCTIONS
 # -------------------------------
-def backup_database():
-    """Create a backup of database"""
-    try:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = BACKUP_DIR / f"empower_backup_{timestamp}.db"
+# ============================================
+# AUTOMATIC BACKUP AND RECOVERY SYSTEM
+# ============================================
+class RobustPersistenceManager:
+    """Manages automatic backups and recovery to prevent data loss
+    with multiple layers of protection"""
+    
+    def __init__(self):
+        self.db_path = DB_PATH
+        self.backup_dir = BACKUP_DIR
+        self.last_backup_file = self.backup_dir / 'LATEST_BACKUP.db'
+        self.backup_log = self.backup_dir / 'backup_log.json'
+        self.backup_interval_seconds = 300  # 5 minutes
         
-        # Copy database file
-        shutil.copy2(DB_PATH, backup_path)
+    def should_create_backup(self):
+        """Check if we need to create a new backup"""
+        if not self.last_backup_file.exists():
+            return True
         
-        # Log the backup
-        with open(BACKUP_DIR / "backup_log.json", "a") as f:
-            json.dump({
-                "timestamp": timestamp,
-                "backup_file": str(backup_path),
-                "size": os.path.getsize(backup_path)
-            }, f)
-            f.write("\n")
+        # Backup every 5 minutes of activity
+        try:
+            last_modified = datetime.fromtimestamp(self.last_backup_file.stat().st_mtime)
+            age_seconds = (datetime.now() - last_modified).total_seconds()
+            return age_seconds > self.backup_interval_seconds
+        except:
+            return True
+    
+    def create_automatic_backup(self, backup_type='auto'):
+        """Create an automatic backup with robust error handling"""
+        try:
+            if not self.db_path.exists():
+                return False, "Database not found to backup"
+            
+            try:
+                # Check database is readable before backing up
+                test_engine = create_engine(f'sqlite:///{self.db_path}')
+                with test_engine.connect() as conn:
+                    conn.execute("SELECT 1")
+                test_engine.dispose()
+            except:
+                return False, "Database is corrupted"
+            
+            # Create timestamped backup
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = self.backup_dir / f"backup_{timestamp}.db"
+            
+            # Copy database file
+            shutil.copy2(self.db_path, backup_path)
+            
+            # Also update the "latest" backup for quick recovery
+            shutil.copy2(self.db_path, self.last_backup_file)
+            
+            # Log the backup
+            log_entry = {
+                'timestamp': timestamp,
+                'backup_file': str(backup_path),
+                'size_bytes': os.path.getsize(backup_path),
+                'type': backup_type,
+                'success': True
+            }
+            
+            # Load existing log and append
+            log_data = []
+            if self.backup_log.exists():
+                try:
+                    with open(self.backup_log, 'r') as f:
+                        log_data = json.load(f)
+                except:
+                    log_data = []
+            
+            log_data.append(log_entry)
+            
+            # Keep only last 100 backup entries in log
+            log_data = log_data[-100:]
+            
+            with open(self.backup_log, 'w') as f:
+                json.dump(log_data, f, indent=2)
+            
+            # Clean old backups (keep last 30)
+            self._clean_old_backups()
+            
+            return True, f"Backup created successfully"
         
-        return True, f"Backup created: {backup_path}"
-    except Exception as e:
-        return False, f"Backup failed: {str(e)}"
+        except Exception as e:
+            return False, f"Backup failed: {str(e)}"
+    
+    def _clean_old_backups(self):
+        """Keep only the 30 most recent backups"""
+        try:
+            backups = sorted(
+                self.backup_dir.glob("backup_*.db"),
+                key=lambda x: x.stat().st_mtime,
+                reverse=True
+            )
+            
+            # Delete old backups (keep 30)
+            for old_backup in backups[30:]:
+                try:
+                    old_backup.unlink()
+                except:
+                    pass
+        
+        except Exception:
+            pass
+    
+    def restore_from_backup(self):
+        """Restore database from most recent backup"""
+        try:
+            # Try latest backup file first
+            if self.last_backup_file.exists():
+                backup_source = self.last_backup_file
+            else:
+                # Find most recent backup
+                backups = sorted(
+                    self.backup_dir.glob("backup_*.db"),
+                    key=lambda x: x.stat().st_mtime,
+                    reverse=True
+                )
+                
+                if not backups:
+                    return False, "No backups found"
+                
+                backup_source = backups[0]
+            
+            # Verify backup is readable
+            try:
+                test_engine = create_engine(f'sqlite:///{backup_source}')
+                with test_engine.connect() as conn:
+                    conn.execute("SELECT 1")
+                test_engine.dispose()
+            except:
+                return False, "Backup file is corrupted"
+            
+            # Restore
+            shutil.copy2(backup_source, self.db_path)
+            
+            return True, f"Restored from backup"
+        
+        except Exception as e:
+            return False, f"Restore failed: {str(e)}"
+    
+    def check_database_health(self):
+        """Check if database is healthy and restore if needed"""
+        try:
+            # Check if database exists
+            if not self.db_path.exists():
+                success, msg = self.restore_from_backup()
+                if success:
+                    return True, f"Database restored: {msg}"
+                return False, "No database and no backups available"
+            
+            # Check if database is readable and has data
+            file_size = os.path.getsize(self.db_path)
+            if file_size < 1000:  # Database too small, likely empty
+                success, msg = self.restore_from_backup()
+                if success:
+                    return True, f"Empty database replaced: {msg}"
+            
+            # Try to connect and verify
+            try:
+                test_engine = create_engine(f'sqlite:///{self.db_path}')
+                with test_engine.connect() as conn:
+                    conn.execute("SELECT 1")
+                test_engine.dispose()
+                return True, "Database is healthy"
+            
+            except Exception as db_error:
+                # Database is corrupted, restore from backup
+                success, msg = self.restore_from_backup()
+                if success:
+                    return True, f"Database was corrupted, restored: {msg}"
+                return False, f"Database corrupted: {str(db_error)}"
+        
+        except Exception as e:
+            return False, f"Health check failed: {str(e)}"
 
-def list_backups():
-    """List all available backups"""
-    try:
-        backup_log_file = BACKUP_DIR / "backup_log.json"
-        if not backup_log_file.exists():
-            return []
-        
-        backups = []
-        with open(backup_log_file, "r") as f:
-            for line in f:
-                if line.strip():
-                    backup_info = json.loads(line)
-                    # Convert timestamp to readable date format
-                    backup_info["date"] = datetime.strptime(backup_info["timestamp"], "%Y%m%d_%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
-                    backup_info["name"] = os.path.basename(backup_info["backup_file"])
-                    backup_info["path"] = backup_info["backup_file"]  # Add path for restore
-                    backups.append(backup_info)
-        
-        # Return in reverse order (most recent first)
-        return sorted(backups, key=lambda x: x["timestamp"], reverse=True)
-    except Exception as e:
-        st.error(f"Error reading backups: {str(e)}")
-        return []
+# Initialize persistence manager
+persistence_manager = RobustPersistenceManager()
 
-def restore_database(backup_path):
-    """Restore database from a backup"""
-    try:
-        # Make sure backup exists
-        if not Path(backup_path).exists():
-            return False, f"Backup file not found: {backup_path}"
-        
-        # Backup the current database first
-        backup_database()
-        
-        # Restore from backup
-        shutil.copy2(backup_path, DB_PATH)
-        
-        # Log the restore
-        with open(BACKUP_DIR / "restore_log.json", "a") as f:
-            json.dump({
-                "timestamp": datetime.now().isoformat(),
-                "restored_from": backup_path,
-                "restored_at": datetime.now().isoformat()
-            }, f)
-            f.write("\n")
-        
-        return True, f"Database restored from {Path(backup_path).name}"
-    except Exception as e:
-        return False, f"Restore failed: {str(e)}"
+# ============================================
+# STARTUP RECOVERY AND HEALTH CHECK
+# ============================================
 
-def auto_backup_before_critical_operation(operation_name):
-    """Automatically create a backup before critical operations"""
-    try:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = BACKUP_DIR / f"auto_backup_{operation_name}_{timestamp}.db"
+# Perform IMMEDIATE health check on startup - BEFORE any other operations
+if 'startup_health_check_done' not in st.session_state:
+    with st.spinner("🔄 Checking database integrity..."):
+        health_ok, health_msg = persistence_manager.check_database_health()
         
-        # Copy database file
-        shutil.copy2(DB_PATH, backup_path)
+        if not health_ok:
+            st.error(f"⚠️ Database Status: {health_msg}")
         
-        # Log the backup
-        with open(BACKUP_DIR / "backup_log.json", "a") as f:
-            json.dump({
-                "timestamp": timestamp,
-                "backup_file": str(backup_path),
-                "size": os.path.getsize(backup_path),
-                "type": "auto",
-                "operation": operation_name
-            }, f)
-            f.write("\n")
-        
+        st.session_state.startup_health_check_done = True
+        st.session_state.last_health_check = datetime.now()
+        st.session_state.last_auto_backup = datetime.now()
         return True
     except Exception as e:
         st.warning(f"Auto-backup failed for operation '{operation_name}': {str(e)}")
@@ -341,93 +447,24 @@ class HybridStorageManager:
         except Exception as e:
             return False, f"Sync failed: {str(e)}"
     
-    def restore_from_local_backup(self):
-        """Restore database from local backup folder"""
-        if not self.local_backup_dir or not os.path.exists(self.local_backup_dir):
-            return False, "Backup folder not configured or not accessible"
-        
-        try:
-            latest_path = Path(self.local_backup_dir) / "empower_latest.db"
-            
-            if not latest_path.exists():
-                return False, "No local backup found (empower_latest.db not present)"
-            
-            # Create safety backup of current (potentially corrupted) DB
-            if DB_PATH.exists():
-                corrupted_backup = BACKUP_DIR / f"corrupted_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
-                shutil.copy2(DB_PATH, corrupted_backup)
-            
-            # Restore from local backup
-            shutil.copy2(latest_path, DB_PATH)
-            
-            # Log restore
-            restore_log = Path(self.local_backup_dir) / "restore_log.json"
-            log_entry = {
-                "timestamp": datetime.now().isoformat(),
-                "action": "restore_from_local",
-                "source": str(latest_path),
-                "destination": str(DB_PATH),
-                "success": True
-            }
-            
-            with open(restore_log, 'a') as f:
-                json.dump(log_entry, f)
-                f.write("\n")
-            
-            return True, "Database restored from local backup"
-        except Exception as e:
-            return False, f"Restore failed: {str(e)}"
-    
-    def health_check_and_recover(self):
-        """Check database health on startup and recover if needed"""
-        try:
-            # If DB is missing or empty, try to restore
-            if not DB_PATH.exists() or os.path.getsize(DB_PATH) < 1000:
-                success, msg = self.restore_from_local_backup()
-                if success:
-                    return True, f"Database recovered: {msg}"
-                else:
-                    return False, msg
-            
-            # Try to open the database to check if it's valid
-            try:
-                test_engine = create_engine(f'sqlite:///{DB_PATH}')
-                with test_engine.connect() as conn:
-                    conn.execute("SELECT 1")
-                return True, "Database is healthy"
-            except Exception:
-                # Database is corrupted, try to restore
-                success, msg = self.restore_from_local_backup()
-                if success:
-                    return True, f"Database recovered from corruption: {msg}"
-                else:
-                    return False, f"Database corrupted and no backup available: {msg}"
-        
-        except Exception as e:
-            return False, f"Health check failed: {str(e)}"
+        return True, f"Restore from local backup successful"
 
-# Initialize hybrid storage manager
-hybrid_storage = HybridStorageManager()
+# ============================================
+# PERIODIC AUTOMATIC BACKUPS DURING APP RUN
+# ============================================
 
-# Perform health check and recovery on app startup
-if 'startup_recovery_done' not in st.session_state:
-    health_ok, health_msg = hybrid_storage.health_check_and_recover()
-    st.session_state.startup_recovery_done = True
-    if not health_ok:
-        st.warning(f"Data Recovery: {health_msg}")
+# Check and create periodic backups
+if 'last_auto_backup' not in st.session_state:
+    st.session_state.last_auto_backup = datetime.now()
 
-# Auto-sync on every app run (ensures latest data is always backed up)
-if 'last_sync' not in st.session_state:
-    st.session_state.last_sync = None
+current_time = datetime.now()
 
-if st.session_state.last_sync is None or (datetime.now() - st.session_state.last_sync).seconds > 300:
-    # Auto-sync every 5 minutes
-    try:
-        if hybrid_storage.local_backup_dir and os.path.exists(hybrid_storage.local_backup_dir):
-            hybrid_storage.sync_to_local_backup()
-            st.session_state.last_sync = datetime.now()
-    except Exception:
-        pass
+# Create automatic backup every 5 minutes during app activity
+if (current_time - st.session_state.last_auto_backup).total_seconds() > 300:
+    if persistence_manager.should_create_backup():
+        success, msg = persistence_manager.create_automatic_backup(backup_type='periodic')
+        if success:
+            st.session_state.last_auto_backup = current_time
 
 # -------------------------------
 # FILE UPLOAD PERSISTENCE
@@ -497,9 +534,20 @@ if not os.path.exists(EXPORTS_DIR):
 check_and_create_periodic_backup()
 
 # -------------------------------
+# ============================================
 # 1. DATABASE & MODELS
-# -------------------------------
-ENGINE = create_engine(f'sqlite:///{DB_PATH}', connect_args={'check_same_thread': False})
+# ============================================
+# Create engine with robust configuration
+# pool_pre_ping: Verify connections before use (prevents stale connection errors)
+# pool_recycle: Recycle connections every 3600 seconds to prevent timeouts
+# connect_args: SQLite-specific settings for robustness
+ENGINE = create_engine(
+    f'sqlite:///{DB_PATH}',
+    connect_args={'check_same_thread': False, 'timeout': 30},
+    pool_pre_ping=True,
+    pool_recycle=3600
+)
+
 Base = declarative_base()
 Session = sessionmaker(bind=ENGINE)
 
@@ -2234,17 +2282,78 @@ with st.sidebar:
         st.session_state.username = None
         st.rerun()
 
-# Add storage info to sidebar
+# Add storage info and backup controls to sidebar
 st.sidebar.markdown("---")
-st.sidebar.markdown("###  Storage Status")
+st.sidebar.markdown("### 💾 Data Protection")
 
 try:
     db_size = os.path.getsize(DB_PATH) / (1024 * 1024)  # MB
-    st.sidebar.metric("Database", f"{db_size:.2f} MB")
+    st.sidebar.metric("Database Size", f"{db_size:.2f} MB")
 except Exception:
-    st.sidebar.metric("Database", "Unknown")
+    st.sidebar.metric("Database Size", "Unknown")
 
-st.sidebar.info(" Local Storage")
+# Manual backup button
+col1, col2 = st.sidebar.columns([1, 1])
+
+with col1:
+    if st.button("🔄 Backup Now", use_container_width=True):
+        with st.spinner("Creating backup..."):
+            success, msg = persistence_manager.create_automatic_backup(backup_type='manual')
+            if success:
+                st.sidebar.success("✅ Backup created!")
+            else:
+                st.sidebar.error(f"❌ Backup failed: {msg}")
+
+with col2:
+    if st.button("📋 View Backups", use_container_width=True):
+        st.session_state.show_backup_manager = True
+
+# Show backup status
+if persistence_manager.last_backup_file.exists():
+    try:
+        last_backup = datetime.fromtimestamp(
+            persistence_manager.last_backup_file.stat().st_mtime
+        )
+        age = datetime.now() - last_backup
+        
+        if age.total_seconds() < 300:  # Less than 5 minutes
+            st.sidebar.success(f"✅ Last backup: {int(age.total_seconds())} sec ago")
+        elif age.total_seconds() < 3600:  # Less than 1 hour
+            st.sidebar.success(f"✅ Last backup: {int(age.total_seconds() / 60)} min ago")
+        elif age.total_seconds() < 86400:  # Less than 1 day
+            st.sidebar.info(f"📦 Last backup: {int(age.total_seconds() / 3600)} hours ago")
+        else:
+            st.sidebar.warning(f"⚠️ Last backup: {age.days} days ago")
+    except Exception:
+        st.sidebar.warning("⚠️ Backup status unknown")
+else:
+    st.sidebar.warning("⚠️ No backups yet")
+
+# Show available backups in expander
+try:
+    backup_log_file = BACKUP_DIR / "backup_log.json"
+    if backup_log_file.exists():
+        with open(backup_log_file, 'r') as f:
+            logs = json.load(f)
+        
+        recent_backups = logs[-5:] if logs else []  # Show last 5
+        
+        if recent_backups:
+            with st.sidebar.expander("📚 Recent Backups"):
+                for backup in reversed(recent_backups):
+                    timestamp_str = backup.get('timestamp', '?')
+                    try:
+                        backup_time = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
+                        display_time = backup_time.strftime("%Y-%m-%d %H:%M")
+                    except:
+                        display_time = timestamp_str
+                    
+                    size_mb = backup.get('size_bytes', 0) / (1024 * 1024)
+                    st.caption(f"📄 {display_time} ({size_mb:.2f} MB)")
+except Exception as e:
+    pass
+
+st.sidebar.info(" Storage Location: ~/.empower_data")
 
 # -------------------------------
 # 9. MAIN MENU
