@@ -354,30 +354,23 @@ if 'startup_health_check_done' not in st.session_state:
         st.session_state.startup_health_check_done = True
         st.session_state.last_health_check = datetime.now()
         st.session_state.last_auto_backup = datetime.now()
-        return True
-    except Exception as e:
-        st.warning(f"Auto-backup failed for operation '{operation_name}': {str(e)}")
-        return False
 
-def check_and_create_periodic_backup():
-    """Create a backup if it's been more than a day since the last one"""
-    try:
-        # Check if we need a new backup
-        backups = list_backups()
-        
-        if not backups:
-            # No backups exist, create one
-            backup_database()
-            return
-        
-        # Check most recent backup
-        most_recent = backups[0]
-        backup_date = datetime.strptime(most_recent["date"], "%Y-%m-%d %H:%M:%S")
-        
-        # If more than 24 hours since last backup, create a new one
-        if (datetime.now() - backup_date).days >= 1:
-            backup_database()
-    except Exception as e:
+# ============================================
+# PERIODIC AUTOMATIC BACKUPS DURING APP RUN
+# ============================================
+
+# Check and create periodic backups
+if 'last_auto_backup' not in st.session_state:
+    st.session_state.last_auto_backup = datetime.now()
+
+current_time = datetime.now()
+
+# Create automatic backup every 5 minutes during app activity
+if (current_time - st.session_state.last_auto_backup).total_seconds() > 300:
+    if persistence_manager.should_create_backup():
+        success, msg = persistence_manager.create_automatic_backup(backup_type='periodic')
+        if success:
+            st.session_state.last_auto_backup = current_time
         st.error(f"Error in periodic backup: {str(e)}")
 
 # ===== HYBRID CLOUD + LOCAL SYNC SYSTEM =====
