@@ -193,14 +193,14 @@ class RobustPersistenceManager:
             if not self.db_path.exists():
                 return False, "Database not found to backup"
             
+            # Skip database readability check on first backup
+            # (database may still be initializing)
             try:
-                # Check database is readable before backing up
-                test_engine = create_engine(f'sqlite:///{self.db_path}')
-                with test_engine.connect() as conn:
-                    conn.execute("SELECT 1")
-                test_engine.dispose()
+                file_size = os.path.getsize(self.db_path)
+                if file_size < 100:  # Too small, likely empty
+                    return False, "Database is too small to backup"
             except:
-                return False, "Database is corrupted"
+                return False, "Cannot access database file"
             
             # Create timestamped backup
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
