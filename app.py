@@ -523,13 +523,8 @@ if not os.path.exists(UPLOADS_DIR):
 if not os.path.exists(EXPORTS_DIR):
     os.makedirs(EXPORTS_DIR)
 
-# Check for periodic backup
-check_and_create_periodic_backup()
-
+# FILE UPLOAD PERSISTENCE
 # -------------------------------
-# ============================================
-# 1. DATABASE & MODELS
-# ============================================
 # Create engine with robust configuration
 # pool_pre_ping: Verify connections before use (prevents stale connection errors)
 # pool_recycle: Recycle connections every 3600 seconds to prevent timeouts
