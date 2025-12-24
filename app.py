@@ -110,14 +110,26 @@ import json
 from datetime import datetime
 
 # ============================================
-# CRITICAL: PERSISTENT STORAGE SETUP
+# CRITICAL: PERSISTENT STORAGE SETUP FOR STREAMLIT CLOUD
 # ============================================
-# Prefer a persistent per-user storage directory to avoid data loss when
-# the runtime environment is ephemeral (e.g., cloud services or containers).
+# On Streamlit Cloud, we MUST use the .streamlit folder which persists across restarts
+# On local machines, we use ~/.empower_data/ which also persists
 # Override with the environment variable `EMPOWER_STORAGE_DIR` if needed.
+
 BASE_DIR = Path(__file__).resolve().parent
-DEFAULT_STORAGE = Path(os.getenv('EMPOWER_STORAGE_DIR', Path.home() / '.empower_data'))
-STORAGE_DIR = DEFAULT_STORAGE
+
+# Determine storage location based on environment
+if os.path.exists('.streamlit'):
+    # Running on Streamlit Cloud or has .streamlit folder
+    STORAGE_DIR = Path('.streamlit') / 'data' / 'empower'
+elif 'STREAMLIT_SERVER_HEADLESS' in os.environ:
+    # Also Streamlit Cloud (headless server)
+    STORAGE_DIR = Path('.streamlit') / 'data' / 'empower'
+else:
+    # Local development or other environment
+    STORAGE_DIR = Path(os.getenv('EMPOWER_STORAGE_DIR', Path.home() / '.empower_data'))
+
+STORAGE_DIR = Path(os.getenv('EMPOWER_STORAGE_DIR', STORAGE_DIR))
 
 # Ensure storage directory exists (create parents if required)
 STORAGE_DIR.mkdir(parents=True, exist_ok=True)
@@ -144,8 +156,8 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 EXPORTS_DIR = STORAGE_DIR / 'exports'
 EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Inform user of storage location
-st.sidebar.info(f"📦 Storage: {STORAGE_DIR.name}")
+# Inform user of storage location (helps with debugging)
+st.sidebar.info(f"💾 Storage: {'Streamlit Cloud' if '.streamlit' in str(STORAGE_DIR) else 'Local'}")
 
 # Store paths in session state for easy access
 if 'storage_paths' not in st.session_state:
