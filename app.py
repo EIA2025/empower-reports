@@ -13,7 +13,7 @@ from pathlib import Path
 import csv
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, flash, send_file, jsonify, abort)
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, update
 from sqlalchemy.orm import sessionmaker
 import requests
 
@@ -468,8 +468,10 @@ def add_term():
         try:
             is_active = 'is_active' in request.form
             if is_active:
-                db.query(AcademicTerm).update({'is_active': False}, synchronize_session=False)
+                stmt = update(AcademicTerm).values(is_active=False)
+                db.execute(stmt)
                 db.commit()
+            
             t = AcademicTerm(
                 year=int(request.form['year']),
                 term_number=int(request.form['term_number']),
@@ -500,8 +502,10 @@ def add_term():
 def activate_term(tid):
     db = SessionLocal()
     try:
-        db.query(AcademicTerm).update({'is_active': False}, synchronize_session=False)
+        stmt = update(AcademicTerm).values(is_active=False)
+        db.execute(stmt)
         db.commit()
+        
         t = db.query(AcademicTerm).get(tid)
         if t:
             t.is_active = True
