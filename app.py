@@ -76,6 +76,12 @@ def init_db():
     finally:
         db.close()
 
+# Initialize database on app startup (needed for Gunicorn)
+try:
+    init_db()
+except Exception as e:
+    print(f"Database initialization warning: {e}")
+
 # ── Grading ───────────────────────────────────────────────────────────────────
 def get_grade(avg):
     if avg is None:
@@ -137,10 +143,15 @@ def login():
         return redirect(url_for('dashboard'))
 
     db = SessionLocal()
-    design = db.query(ReportDesign).first()
+    try:
+        design = db.query(ReportDesign).first()
+    except Exception:
+        design = None
+    finally:
+        db.close()
+    
     logo_b64 = design.logo_data if design else None
     school_name = design.school_name if design else "Empower International Academy"
-    db.close()
 
     if request.method == 'POST':
         action = request.form.get('action', 'login')
