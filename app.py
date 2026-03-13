@@ -30,6 +30,23 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'empower-secret-key-change-in-production')
 
+# ── Jinja2 globals ────────────────────────────────────────────────────────────
+app.jinja_env.globals['now'] = datetime.now
+
+@app.context_processor
+def inject_logo():
+    """Inject logo_b64 and school_name into every template automatically."""
+    try:
+        db = SessionLocal()
+        design = db.query(ReportDesign).first()
+        db.close()
+        return {
+            'global_logo_b64': design.logo_data if design else None,
+            'global_school_name': design.school_name if design else 'Empower International Academy',
+        }
+    except Exception:
+        return {'global_logo_b64': None, 'global_school_name': 'Empower International Academy'}
+
 # ── Database ──────────────────────────────────────────────────────────────────
 DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://localhost/empower')
 # Render provides postgres:// but SQLAlchemy 1.4+ needs postgresql://
