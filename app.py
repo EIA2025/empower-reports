@@ -468,7 +468,7 @@ def add_term():
         try:
             is_active = 'is_active' in request.form
             if is_active:
-                db.query(AcademicTerm).update({'is_active': False})
+                db.query(AcademicTerm).update({'is_active': False}, synchronize_session=False)
             t = AcademicTerm(
                 year=int(request.form['year']),
                 term_number=int(request.form['term_number']),
@@ -495,13 +495,15 @@ def add_term():
 @admin_required
 def activate_term(tid):
     db = SessionLocal()
-    db.query(AcademicTerm).update({'is_active': False})
-    t = db.query(AcademicTerm).get(tid)
-    if t:
-        t.is_active = True
-        db.commit()
-        flash(f'{t.term_name} set as active term.', 'success')
-    db.close()
+    try:
+        db.query(AcademicTerm).update({'is_active': False}, synchronize_session=False)
+        t = db.query(AcademicTerm).get(tid)
+        if t:
+            t.is_active = True
+            db.commit()
+            flash(f'{t.term_name} set as active term.', 'success')
+    finally:
+        db.close()
     return redirect(url_for('terms'))
 
 
