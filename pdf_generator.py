@@ -1,7 +1,6 @@
 # pdf_generator.py - ReportLab PDF generation for Empower Reports
 import io
 import base64
-import pandas as pd
 import requests
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table,
@@ -96,8 +95,8 @@ def generate_pdf_report(student_data, term_data, marks, design,
     # Results Table
     if is_vd_report:
         results_data = [['SUBJECTS', 'MOT', 'GRADE', 'Comment', 'Teacher']]
-        if marks is not None and not marks.empty:
-            for _, row in marks.iterrows():
+        if marks:
+            for row in marks:
                 mot = float(row.get('midterm_out_of_20') or 0)
                 mot_scaled = round((mot / 20.0) * 100.0, 1) if mot else 0.0
                 grade = get_grade(mot_scaled)
@@ -111,8 +110,8 @@ def generate_pdf_report(student_data, term_data, marks, design,
         col_w = [1.6*inch, 0.5*inch, 0.5*inch, 1.8*inch, 1.1*inch]
     else:
         results_data = [['SUBJECTS', 'CW/20', 'MOT/20', 'EOT/60', 'TOTAL', 'GR', 'Comment', 'Teacher']]
-        if marks is not None and not marks.empty:
-            for _, row in marks.iterrows():
+        if marks:
+            for row in marks:
                 cw = row.get('coursework_out_of_20') or 0
                 mt = row.get('midterm_out_of_20') or 0
                 et = row.get('endterm_out_of_60') or 0
@@ -283,7 +282,11 @@ def generate_pdf_report(student_data, term_data, marks, design,
     return buffer.getvalue()
 
 
-def generate_discipline_pdf(student_data, reports_df, design):
+def generate_discipline_pdf(student_data, reports, design):
+    """
+    reports: list of dicts with keys: incident_date, incident_type,
+             description, action_taken, status, admin_notes
+    """
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4,
                              topMargin=0.3*inch, bottomMargin=0.3*inch,
@@ -334,11 +337,13 @@ def generate_discipline_pdf(student_data, reports_df, design):
     story.append(stbl)
     story.append(Spacer(1, 0.1*inch))
 
-    if reports_df is None or (hasattr(reports_df, 'empty') and reports_df.empty):
+    if not reports:
         story.append(Paragraph('No discipline reports available.', styles['Normal']))
     else:
         tbl_data = [['Date', 'Type', 'Description', 'Action Taken', 'Status', 'Admin Notes']]
-        for _, r in reports_df.iterrows():
+        for r in reports:
+            if not isinstance(r, dict):
+                r = dict(r._mapping)
             desc = Paragraph((r.get('description') or '')[:300], ParagraphStyle('Sm', fontSize=8))
             action = Paragraph((r.get('action_taken') or '')[:200], ParagraphStyle('Sm', fontSize=8))
             notes = Paragraph((r.get('admin_notes') or '')[:200], ParagraphStyle('Sm', fontSize=8))

@@ -10,8 +10,7 @@ from datetime import datetime
 from functools import wraps
 from pathlib import Path
 
-import pandas as pd
-import numpy as np
+import csv
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, flash, send_file, jsonify, abort)
 from sqlalchemy import create_engine, text
@@ -79,9 +78,12 @@ def init_db():
 
 # ── Grading ───────────────────────────────────────────────────────────────────
 def get_grade(avg):
-    if avg is None or (isinstance(avg, float) and pd.isna(avg)):
+    if avg is None:
         return "U"
-    avg = float(avg)
+    try:
+        avg = float(avg)
+    except (TypeError, ValueError):
+        return "U"
     if avg >= 90: return "A*"
     elif avg >= 80: return "A"
     elif avg >= 70: return "B"
@@ -1040,12 +1042,12 @@ def generate_reports():
                     flash('Student not found.', 'error')
                     return redirect(url_for('generate_reports'))
 
-                marks_df = _get_marks_df(db, s.id, term_id)
+                marks_list = _get_marks_list(db, s.id, term_id)
                 behavior = _get_behavior_dict(db, s.id, term_id)
                 decision = _get_decision(db, s.id, term_id)
                 student_data = {'id': s.id, 'name': s.name, 'class_name': s.class_name,
                                  'registration_number': s.registration_number}
-                pdf_bytes = generate_pdf_report(student_data, term_data, marks_df, design,
+                pdf_bytes = generate_pdf_report(student_data, term_data, marks_list, design,
                                                   behavior_data=behavior, decision_data=decision,
                                                   is_vd_report=is_vd)
                 fname = f"{s.name.replace(' ','_')}_report.pdf"
@@ -1059,13 +1061,13 @@ def generate_reports():
                 zip_buf = io.BytesIO()
                 with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
                     for s in students:
-                        marks_df = _get_marks_df(db, s.id, term_id)
+                        marks_list = _get_marks_list(db, s.id, term_id)
                         behavior = _get_behavior_dict(db, s.id, term_id)
                         decision = _get_decision(db, s.id, term_id)
                         student_data = {'id': s.id, 'name': s.name, 'class_name': s.class_name,
                                          'registration_number': s.registration_number}
                         try:
-                            pdf_bytes = generate_pdf_report(student_data, term_data, marks_df, design,
+                            pdf_bytes = generate_pdf_report(student_data, term_data, marks_list, design,
                                                               behavior_data=behavior, decision_data=decision,
                                                               is_vd_report=is_vd)
                             zf.writestr(f"{s.name.replace(' ','_')}_report.pdf", pdf_bytes)
@@ -1083,7 +1085,8 @@ def generate_reports():
         db.close()
 
 
-def _get_marks_df(db, student_id, term_id):
+def _get_marks_list(db, student_id, term_id):
+    """Return marks as a plain list of dicts (no pandas needed)."""
     rows = db.execute(text("""
         SELECT m.subject, m.coursework_out_of_20, m.midterm_out_of_20,
                m.endterm_out_of_60, m.total, m.grade, m.comment,
@@ -1092,9 +1095,7 @@ def _get_marks_df(db, student_id, term_id):
         WHERE m.student_id=:sid AND m.term_id=:tid
         ORDER BY m.subject
     """), {'sid': student_id, 'tid': term_id}).fetchall()
-    if not rows:
-        return pd.DataFrame()
-    return pd.DataFrame([dict(r._mapping) for r in rows])
+    return [dict(r._mapping) for r in rows]
 
 
 def _get_behavior_dict(db, student_id, term_id):
@@ -1156,23 +1157,43 @@ def analytics():
 
         if selected_class and selected_term_id:
             tid = int(selected_term_id)
-            rows = db.execute(text("""
-                SELECT s.name, m.subject, m.coursework_out_of_20, m.midterm_out_of_20,
-                       m.endterm_out_of_60, m.total, m.grade
+
+            # All aggregations done in SQL — no pandas needed
+            agg = db.execute(text("""
+                SELECT
+                    ROUND(AVG(m.total)::numeric, 1)               AS avg_total,
+                    ROUND(AVG(m.coursework_out_of_20)::numeric, 1) AS avg_cw,
+                    ROUND(AVG(m.midterm_out_of_20)::numeric, 1)    AS avg_mt,
+                    ROUND(AVG(m.endterm_out_of_60)::numeric, 1)    AS avg_et,
+                    COUNT(DISTINCT m.student_id)                   AS total_students
                 FROM marks m JOIN students s ON m.student_id = s.id
                 WHERE s.class_name=:cls AND m.term_id=:tid
-            """), {'cls': selected_class, 'tid': tid}).fetchall()
-            if rows:
-                df = pd.DataFrame([dict(r._mapping) for r in rows])
+            """), {'cls': selected_class, 'tid': tid}).fetchone()
+
+            if agg and agg.total_students:
                 performance = {
-                    'avg_total': round(df['total'].mean(), 1),
-                    'avg_cw': round(df['coursework_out_of_20'].mean(), 1),
-                    'avg_mt': round(df['midterm_out_of_20'].mean(), 1),
-                    'avg_et': round(df['endterm_out_of_60'].mean(), 1),
-                    'total_students': df['name'].nunique(),
+                    'avg_total':    float(agg.avg_total or 0),
+                    'avg_cw':       float(agg.avg_cw or 0),
+                    'avg_mt':       float(agg.avg_mt or 0),
+                    'avg_et':       float(agg.avg_et or 0),
+                    'total_students': int(agg.total_students),
                 }
-                grade_dist = df['grade'].value_counts().reset_index().rename(columns={'index':'grade','grade':'count'}).to_dict('records')
-                subject_avgs = df.groupby('subject')['total'].mean().round(1).reset_index().rename(columns={'total':'avg'}).to_dict('records')
+
+                gd_rows = db.execute(text("""
+                    SELECT m.grade, COUNT(*) AS cnt
+                    FROM marks m JOIN students s ON m.student_id = s.id
+                    WHERE s.class_name=:cls AND m.term_id=:tid
+                    GROUP BY m.grade ORDER BY m.grade
+                """), {'cls': selected_class, 'tid': tid}).fetchall()
+                grade_dist = [{'grade': r.grade, 'count': int(r.cnt)} for r in gd_rows]
+
+                sa_rows = db.execute(text("""
+                    SELECT m.subject, ROUND(AVG(m.total)::numeric, 1) AS avg
+                    FROM marks m JOIN students s ON m.student_id = s.id
+                    WHERE s.class_name=:cls AND m.term_id=:tid
+                    GROUP BY m.subject ORDER BY m.subject
+                """), {'cls': selected_class, 'tid': tid}).fetchall()
+                subject_avgs = [{'subject': r.subject, 'avg': float(r.avg or 0)} for r in sa_rows]
 
             top_rows = db.execute(text("""
                 SELECT s.name, s.class_name, AVG(m.total) as avg_total
@@ -1199,40 +1220,53 @@ def data_export():
     db = SessionLocal()
     try:
         export_type = request.args.get('type', 'students')
-        fmt = request.args.get('format', 'csv')
 
         if export_type == 'students':
-            rows = db.execute(text("SELECT id, name, class_name, registration_number, gender, enrollment_date FROM students ORDER BY class_name, name")).fetchall()
-            df = pd.DataFrame([dict(r._mapping) for r in rows])
+            rows = db.execute(text(
+                "SELECT id, name, class_name, registration_number, gender, enrollment_date "
+                "FROM students ORDER BY class_name, name")).fetchall()
+            headers = ['id', 'name', 'class_name', 'registration_number', 'gender', 'enrollment_date']
+
         elif export_type == 'marks':
             rows = db.execute(text("""
-                SELECT s.name as student, s.class_name, m.subject,
+                SELECT s.name AS student, s.class_name, m.subject,
                        m.coursework_out_of_20, m.midterm_out_of_20,
                        m.endterm_out_of_60, m.total, m.grade, t.term_name
-                FROM marks m JOIN students s ON m.student_id=s.id
+                FROM marks m
+                JOIN students s ON m.student_id=s.id
                 JOIN academic_terms t ON m.term_id=t.id
                 ORDER BY s.class_name, s.name, t.term_name
             """)).fetchall()
-            df = pd.DataFrame([dict(r._mapping) for r in rows])
+            headers = ['student', 'class_name', 'subject', 'coursework_out_of_20',
+                       'midterm_out_of_20', 'endterm_out_of_60', 'total', 'grade', 'term_name']
+
         elif export_type == 'discipline':
             rows = db.execute(text("""
                 SELECT dr.incident_date, dr.incident_type, dr.description,
                        dr.action_taken, dr.status, dr.created_at,
-                       s.name as student, s.class_name, u.name as reporter
+                       s.name AS student, s.class_name, u.name AS reporter
                 FROM discipline_reports dr
                 JOIN students s ON dr.student_id=s.id
                 LEFT JOIN users u ON dr.reported_by=u.id
                 ORDER BY dr.created_at DESC
             """)).fetchall()
-            df = pd.DataFrame([dict(r._mapping) for r in rows])
+            headers = ['incident_date', 'incident_type', 'description', 'action_taken',
+                       'status', 'created_at', 'student', 'class_name', 'reporter']
         else:
-            df = pd.DataFrame()
+            rows = []
+            headers = []
 
-        buf = io.BytesIO()
-        df.to_csv(buf, index=False)
-        buf.seek(0)
+        # Build CSV in memory using stdlib csv — no pandas required
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(headers)
+        for r in rows:
+            writer.writerow([getattr(r, h, '') for h in headers])
+
+        output = io.BytesIO(buf.getvalue().encode('utf-8'))
+        output.seek(0)
         fname = f"{export_type}_export.csv"
-        return send_file(buf, download_name=fname, as_attachment=True, mimetype='text/csv')
+        return send_file(output, download_name=fname, as_attachment=True, mimetype='text/csv')
     finally:
         db.close()
 

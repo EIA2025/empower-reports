@@ -4,6 +4,7 @@
 <h2 class="fw-bold mb-0"><i class="bi bi-envelope me-2"></i>Communications</h2>
 <button class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#composeModal"><i class="bi bi-pencil me-1"></i>Compose</button>
 </div>
+
 <div class="card"><div class="card-body p-0">
 <table class="table table-hover mb-0">
 <thead><tr><th>From</th><th>Subject</th><th>Type</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
@@ -15,12 +16,16 @@
 <td>{% if m.is_broadcast %}<span class="badge bg-info">Broadcast</span>{% else %}<span class="badge bg-secondary">Direct</span>{% endif %}</td>
 <td><small>{{ m.created_at[:16] if m.created_at else '' }}</small></td>
 <td>{% if not m.read %}<span class="badge bg-primary">New</span>{% endif %}</td>
-<td>
-<button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#msgModal{{ m.id }}">Open</button>
-</td></tr>
-<div class="modal fade" id="msgModal{{ m.id }}">
-<div class="modal-dialog"><div class="modal-content">
-<div class="modal-header"><h5 class="modal-title">{{ m.subject }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<td><button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#msgModal{{ m.id }}">Open</button></td>
+</tr>
+{% else %}
+<tr><td colspan="6" class="text-center text-muted py-4">No messages</td></tr>
+{% endfor %}
+</tbody></table></div></div>
+
+{% for m in inbox %}
+<div class="modal fade" id="msgModal{{ m.id }}"><div class="modal-dialog"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">{{ m.subject or '(no subject)' }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
 <div class="modal-body">
 <p class="text-muted small">From: {{ m.sender_name or 'System' }} &mdash; {{ m.created_at[:16] if m.created_at else '' }}</p>
 <hr><div style="white-space:pre-wrap">{{ m.body }}</div>
@@ -33,20 +38,16 @@
 </form>
 </div>
 </div></div></div>
-{% else %}
-<tr><td colspan="6" class="text-center text-muted py-4">No messages</td></tr>
 {% endfor %}
-</tbody></table></div></div>
 
-<!-- Compose Modal -->
-<div class="modal fade" id="composeModal">
-<div class="modal-dialog"><div class="modal-content">
+<div class="modal fade" id="composeModal"><div class="modal-dialog"><div class="modal-content">
 <div class="modal-header"><h5 class="modal-title">Compose Message</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
 <div class="modal-body">
 <form method="POST">
 <input type="hidden" name="action" value="send">
 <div class="mb-3 form-check">
-<input type="checkbox" class="form-check-input" name="broadcast" id="broadcastCheck" onchange="document.getElementById('recipientField').style.display=this.checked?'none':'block'">
+<input type="checkbox" class="form-check-input" name="broadcast" id="broadcastCheck"
+  onchange="document.getElementById('recipientField').style.display=this.checked?'none':'block'">
 <label class="form-check-label" for="broadcastCheck">Send to All Users (Broadcast)</label>
 </div>
 <div id="recipientField" class="mb-3">
