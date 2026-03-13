@@ -469,6 +469,7 @@ def add_term():
             is_active = 'is_active' in request.form
             if is_active:
                 db.query(AcademicTerm).update({'is_active': False}, synchronize_session=False)
+                db.commit()
             t = AcademicTerm(
                 year=int(request.form['year']),
                 term_number=int(request.form['term_number']),
@@ -480,10 +481,13 @@ def add_term():
             )
             db.add(t)
             db.commit()
-            flash('Term added.', 'success')
+            flash('Term added successfully!', 'success')
         except Exception as e:
             db.rollback()
-            flash(f'Error: {e}', 'error')
+            import traceback
+            print(f"Error adding term: {e}")
+            traceback.print_exc()
+            flash(f'Error adding term: {str(e)}', 'error')
         finally:
             db.close()
         return redirect(url_for('terms'))
@@ -497,11 +501,17 @@ def activate_term(tid):
     db = SessionLocal()
     try:
         db.query(AcademicTerm).update({'is_active': False}, synchronize_session=False)
+        db.commit()
         t = db.query(AcademicTerm).get(tid)
         if t:
             t.is_active = True
             db.commit()
             flash(f'{t.term_name} set as active term.', 'success')
+        else:
+            flash('Term not found.', 'error')
+    except Exception as e:
+        db.rollback()
+        flash(f'Error: {str(e)}', 'error')
     finally:
         db.close()
     return redirect(url_for('terms'))
@@ -512,12 +522,19 @@ def activate_term(tid):
 @admin_required
 def delete_term(tid):
     db = SessionLocal()
-    t = db.query(AcademicTerm).get(tid)
-    if t:
-        db.delete(t)
-        db.commit()
-        flash('Term deleted.', 'success')
-    db.close()
+    try:
+        t = db.query(AcademicTerm).get(tid)
+        if t:
+            db.delete(t)
+            db.commit()
+            flash('Term deleted successfully.', 'success')
+        else:
+            flash('Term not found.', 'error')
+    except Exception as e:
+        db.rollback()
+        flash(f'Error: {str(e)}', 'error')
+    finally:
+        db.close()
     return redirect(url_for('terms'))
 
 
