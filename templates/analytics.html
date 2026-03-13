@@ -1,0 +1,65 @@
+{% extends "base.html" %}{% block title %}Performance Analytics{% endblock %}
+{% block content %}
+<h2 class="fw-bold mb-3"><i class="bi bi-graph-up me-2"></i>Performance Analytics</h2>
+<div class="card mb-3"><div class="card-body">
+<form class="row g-2" method="GET">
+<div class="col-md-4"><label class="form-label">Class</label>
+<select name="class_name" class="form-select" onchange="this.form.submit()">
+{% for c in classes %}<option value="{{ c }}" {{ 'selected' if c==selected_class }}>{{ c }}</option>{% endfor %}
+</select></div>
+<div class="col-md-4"><label class="form-label">Term</label>
+<select name="term_id" class="form-select" onchange="this.form.submit()">
+{% for t in terms %}<option value="{{ t.id }}" {{ 'selected' if t.id|string==selected_term_id }}>{{ t.term_name }}</option>{% endfor %}
+</select></div>
+</form></div></div>
+
+{% if performance %}
+<div class="row g-3 mb-3">
+<div class="col-md-3"><div class="card text-center p-3"><div class="display-6 fw-bold text-primary">{{ performance.avg_total }}</div><div class="text-muted small">Class Average</div></div></div>
+<div class="col-md-3"><div class="card text-center p-3"><div class="display-6 fw-bold text-success">{{ performance.avg_cw }}</div><div class="text-muted small">Avg CW /20</div></div></div>
+<div class="col-md-3"><div class="card text-center p-3"><div class="display-6 fw-bold text-warning">{{ performance.avg_mt }}</div><div class="text-muted small">Avg MOT /20</div></div></div>
+<div class="col-md-3"><div class="card text-center p-3"><div class="display-6 fw-bold" style="color:var(--brand)">{{ performance.avg_et }}</div><div class="text-muted small">Avg EOT /60</div></div></div>
+</div>
+
+<div class="row g-3">
+<div class="col-md-6">
+<div class="card"><div class="card-header">Grade Distribution</div>
+<div class="card-body"><canvas id="gradeChart" height="220"></canvas></div></div>
+</div>
+<div class="col-md-6">
+<div class="card"><div class="card-header">Subject Averages</div>
+<div class="card-body"><canvas id="subjectChart" height="220"></canvas></div></div>
+</div>
+<div class="col-md-12">
+<div class="card"><div class="card-header"><i class="bi bi-trophy me-1"></i>Top Students</div>
+<div class="card-body p-0">
+<table class="table mb-0">
+<thead><tr><th>Rank</th><th>Name</th><th>Average</th></tr></thead>
+<tbody>
+{% for s in top_students %}
+<tr><td><span class="badge bg-{{ 'warning text-dark' if loop.index==1 else 'secondary' }}">{{ loop.index }}</span></td><td>{{ s.name }}</td><td><span class="badge bg-success">{{ s.avg }}</span></td></tr>
+{% endfor %}
+</tbody></table></div></div>
+</div>
+</div>
+{% else %}
+<div class="alert alert-info">Select a class and term with marks data to view analytics.</div>
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+{% if performance %}
+<script>
+const gradeData = {{ grade_dist | safe }};
+const subjectData = {{ subject_avgs | safe }};
+new Chart(document.getElementById('gradeChart'),{type:'bar',data:{
+  labels:gradeData.map(d=>d.grade||d[0]),
+  datasets:[{label:'Students',data:gradeData.map(d=>d.count||d[1]),
+  backgroundColor:['#2ecc71','#3498db','#f39c12','#e67e22','#e74c3c','#c0392b','#95a5a6']}]
+},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+new Chart(document.getElementById('subjectChart'),{type:'bar',data:{
+  labels:subjectData.map(d=>d.subject||d[0]),
+  datasets:[{label:'Average',data:subjectData.map(d=>d.avg||d[1]),backgroundColor:'#9b59b6'}]
+},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100}}}});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% block title %}Academic Calendar{% endblock %}{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h2 class="fw-bold mb-0"><i class="bi bi-calendar3 me-2"></i>Academic Calendar</h2>
+<a href="{{ url_for('add_term') }}" class="btn btn-brand"><i class="bi bi-plus-lg me-1"></i>Add Term</a>
+</div>
+<div class="card"><div class="card-body p-0">
+<table class="table table-hover mb-0">
+<thead><tr><th>Term Name</th><th>Year</th><th>Term</th><th>Start</th><th>End</th><th>Next Term Begins</th><th>Status</th><th>Actions</th></tr></thead>
+<tbody>
+{% for t in terms %}
+<tr>
+<td class="fw-semibold">{{ t.term_name }}</td><td>{{ t.year }}</td><td>{{ t.term_number }}</td>
+<td>{{ t.start_date }}</td><td>{{ t.end_date }}</td><td>{{ t.next_term_begins }}</td>
+<td>{% if t.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</td>
+<td>
+{% if not t.is_active %}
+<form method="POST" action="{{ url_for('activate_term', tid=t.id) }}" class="d-inline">
+<button class="btn btn-sm btn-success">Activate</button></form>
+{% endif %}
+<form method="POST" action="{{ url_for('delete_term', tid=t.id) }}" class="d-inline" onsubmit="return confirm('Delete term?')">
+<button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
+</td>
+</tr>
+{% else %}<tr><td colspan="8" class="text-center text-muted py-4">No terms yet</td></tr>
+{% endfor %}
+</tbody></table></div></div>{% endblock %}

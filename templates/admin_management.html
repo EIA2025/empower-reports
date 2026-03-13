@@ -1,0 +1,36 @@
+{% extends "base.html" %}{% block title %}Admin Management{% endblock %}
+{% block content %}
+<h2 class="fw-bold mb-3"><i class="bi bi-gear me-2"></i>Admin Management</h2>
+<div class="row g-3">
+<div class="col-md-4">
+<div class="card"><div class="card-header">Add Admin User</div>
+<div class="card-body">
+<form method="POST">
+<input type="hidden" name="action" value="add_admin">
+<div class="mb-3"><label class="form-label">Name</label><input type="text" name="name" class="form-control" required></div>
+<div class="mb-3"><label class="form-label">Username/Email</label><input type="text" name="email" class="form-control" required></div>
+<div class="mb-3"><label class="form-label">Password</label><input type="password" name="password" class="form-control" required></div>
+<button type="submit" class="btn btn-brand w-100">Add Admin</button>
+</form></div></div>
+</div>
+<div class="col-md-8">
+<div class="card mb-3"><div class="card-header">Admin Users</div>
+<div class="card-body p-0">
+<table class="table mb-0">
+<thead><tr><th>Name</th><th>Username</th></tr></thead>
+<tbody>
+{% for a in admins %}<tr><td>{{ a.name }}</td><td>{{ a.email }}</td></tr>
+{% else %}<tr><td colspan="2" class="text-center text-muted">No admins</td></tr>{% endfor %}
+</tbody></table></div></div>
+<div class="card"><div class="card-header">Audit Log (Last 50)</div>
+<div class="card-body p-0" style="max-height:300px;overflow-y:auto">
+<table class="table table-sm mb-0">
+<thead><tr><th>Time</th><th>Action</th><th>Details</th></tr></thead>
+<tbody>
+{% for log in audit_logs %}
+<tr><td><small>{{ log.timestamp.strftime('%Y-%m-%d %H:%M') if log.timestamp else '' }}</small></td>
+<td><code>{{ log.action }}</code></td><td><small>{{ log.details }}</small></td></tr>
+{% endfor %}
+</tbody></table></div></div>
+</div></div>
+{% endblock %}

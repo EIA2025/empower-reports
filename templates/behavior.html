@@ -1,0 +1,57 @@
+{% extends "base.html" %}{% block title %}Classroom Behavior{% endblock %}
+{% block content %}
+<h2 class="fw-bold mb-3"><i class="bi bi-clipboard-check me-2"></i>Classroom Behavior</h2>
+<div class="card mb-3"><div class="card-body">
+<form class="row g-2" method="GET">
+<div class="col-md-4"><label class="form-label">Class</label>
+<select name="class_name" class="form-select" onchange="this.form.submit()">
+{% for c in classes %}<option value="{{ c }}" {{ 'selected' if c==selected_class }}>{{ c }}</option>{% endfor %}
+</select></div>
+<div class="col-md-4"><label class="form-label">Term</label>
+<select name="term_id" class="form-select" onchange="this.form.submit()">
+{% for t in terms %}<option value="{{ t.id }}" {{ 'selected' if t.id|string==selected_term_id }}>{{ t.term_name }}</option>{% endfor %}
+</select></div>
+</form></div></div>
+
+{% if students_list %}
+<div class="accordion" id="behaviorAccordion">
+{% for s in students_list %}
+<div class="accordion-item">
+  <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#beh{{ s.id }}">
+    {{ s.name }}
+    {% set filled = behavior_data.get(s.id, {}) | length %}
+    {% if filled %}<span class="badge bg-success ms-2">{{ filled }} rated</span>{% endif %}
+  </button></h2>
+  <div id="beh{{ s.id }}" class="accordion-collapse collapse">
+    <div class="accordion-body">
+      <form method="POST">
+        <input type="hidden" name="student_id" value="{{ s.id }}">
+        <input type="hidden" name="term_id" value="{{ selected_term_id }}">
+        <div class="table-responsive"><table class="table table-sm">
+          <thead><tr><th>Component</th><th>Excellent</th><th>Good</th><th>Satisfactory</th><th>Cause of Concern</th></tr></thead>
+          <tbody>
+          {% for comp in components %}
+          {% set cur = behavior_data.get(s.id, {}).get(comp.name) %}
+          <tr>
+            <td class="fw-semibold">{{ comp.display_label }}</td>
+            {% for val in ['Excellent','Good','Satisfactory','Cause of Concern'] %}
+            <td class="text-center">
+              <input type="radio" name="comp_{{ comp.id }}" value="{{ val }}" class="form-check-input"
+                {{ 'checked' if cur==val else '' }}>
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table></div>
+        <button type="submit" class="btn btn-brand btn-sm">Save Behavior</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info">Select a class and term to rate behavior.</div>
+{% endif %}
+{% endblock %}

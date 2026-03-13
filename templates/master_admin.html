@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% block title %}Master Admin{% endblock %}
+{% block content %}
+<div class="alert alert-danger"><i class="bi bi-shield-lock me-2"></i><strong>Master Admin Panel</strong> — Full system access. Use with extreme caution.</div>
+<div class="row g-3 mb-4">
+<div class="col-md-4"><div class="card text-center p-3"><div class="display-5 fw-bold text-primary">{{ total_users }}</div><div class="text-muted small">Total Users</div></div></div>
+<div class="col-md-4"><div class="card text-center p-3"><div class="display-5 fw-bold text-success">{{ total_students }}</div><div class="text-muted small">Total Students</div></div></div>
+<div class="col-md-4"><div class="card text-center p-3"><div class="display-5 fw-bold text-warning">{{ total_terms }}</div><div class="text-muted small">Total Terms</div></div></div>
+</div>
+<div class="row g-3">
+<div class="col-md-6">
+<div class="card border-warning"><div class="card-header bg-warning text-dark">Reset Admin Password</div>
+<div class="card-body">
+<p class="text-muted">Resets the main admin account to: <code>admin / admin123</code></p>
+<form method="POST">
+<input type="hidden" name="action" value="reset_admin_pw">
+<div class="mb-3"><label class="form-label">Master Admin Password</label><input type="password" name="master_password" class="form-control" required></div>
+<button type="submit" class="btn btn-warning w-100">Reset Admin Password</button>
+</form></div></div>
+</div>
+<div class="col-md-6">
+<div class="card border-danger"><div class="card-header bg-danger text-white">⚠ Factory Reset Database</div>
+<div class="card-body">
+<p class="text-danger fw-semibold">This will PERMANENTLY DELETE ALL DATA and reset to factory defaults!</p>
+<form method="POST" onsubmit="return confirm('ARE YOU ABSOLUTELY SURE? This deletes ALL data permanently!')">
+<input type="hidden" name="action" value="factory_reset">
+<div class="mb-3"><label class="form-label">Type <code>DELETE ALL DATA</code> to confirm</label><input type="text" name="confirm_text" class="form-control" required></div>
+<div class="mb-3"><label class="form-label">Master Admin Password</label><input type="password" name="master_password" class="form-control" required></div>
+<button type="submit" class="btn btn-danger w-100">PERMANENTLY DELETE ALL DATA</button>
+</form></div></div>
+</div>
+</div>
+{% endblock %}

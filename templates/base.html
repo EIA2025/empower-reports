@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Empower Reports{% endblock %}</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --brand: #8B4513; --brand-dark: #6b3310; --brand-light: #f5ebe0; }
+  body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
+  .sidebar { min-height: 100vh; background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%); color: #fff; }
+  .sidebar .nav-link { color: rgba(255,255,255,.8); border-radius: 8px; margin: 2px 8px; transition: all .2s; }
+  .sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background: rgba(255,255,255,.15); }
+  .sidebar .nav-link i { margin-right: 8px; }
+  .brand-logo { width: 60px; height: 60px; object-fit: contain; }
+  .card { border: none; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .card-header { background: var(--brand); color: #fff; border-radius: 12px 12px 0 0 !important; }
+  .btn-brand { background: var(--brand); color: #fff; border: none; }
+  .btn-brand:hover { background: var(--brand-dark); color: #fff; }
+  .badge-role { font-size:.75em; padding: 3px 8px; border-radius: 20px; }
+  .table th { background: var(--brand-light); color: var(--brand-dark); font-weight: 600; }
+  .notif-badge { font-size: .65em; }
+  .flash-messages { position: fixed; top: 70px; right: 20px; z-index: 9999; min-width: 300px; }
+  @media(max-width:768px) { .sidebar { min-height: auto; } }
+</style>
+{% block extra_css %}{% endblock %}
+</head>
+<body>
+{% if session.user_id is defined and session.get('username') %}
+<div class="container-fluid">
+  <div class="row">
+    <!-- Sidebar -->
+    <nav class="col-md-2 sidebar py-3 d-none d-md-block">
+      <div class="text-center mb-3">
+        <div class="fw-bold fs-6">Empower Reports</div>
+        <small class="opacity-75">{{ session.get('user_role','').title() }}</small>
+      </div>
+      <hr class="border-white opacity-25">
+      <ul class="nav flex-column">
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}"><i class="bi bi-speedometer2"></i>Dashboard</a></li>
+
+        {% if session.get('user_role') == 'master_admin' %}
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='master_admin' %}active{% endif %}" href="{{ url_for('master_admin') }}"><i class="bi bi-shield-lock"></i>Master Admin</a></li>
+
+        {% elif session.get('user_role') == 'admin' %}
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='analytics' %}active{% endif %}" href="{{ url_for('analytics') }}"><i class="bi bi-graph-up"></i>Analytics</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='admin_management' %}active{% endif %}" href="{{ url_for('admin_management') }}"><i class="bi bi-gear"></i>Admin Mgmt</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='behavior_components' %}active{% endif %}" href="{{ url_for('behavior_components') }}"><i class="bi bi-sliders"></i>Behavior Setup</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='staff' %}active{% endif %}" href="{{ url_for('staff') }}"><i class="bi bi-people"></i>Staff</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='students' %}active{% endif %}" href="{{ url_for('students') }}"><i class="bi bi-mortarboard"></i>Students</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='terms' %}active{% endif %}" href="{{ url_for('terms') }}"><i class="bi bi-calendar3"></i>Academic Calendar</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='marks' %}active{% endif %}" href="{{ url_for('marks') }}"><i class="bi bi-pencil-square"></i>Enter Results</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='comments' %}active{% endif %}" href="{{ url_for('comments') }}"><i class="bi bi-chat-text"></i>Comments</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='behavior' %}active{% endif %}" href="{{ url_for('behavior') }}"><i class="bi bi-clipboard-check"></i>Behavior</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='decisions' %}active{% endif %}" href="{{ url_for('decisions') }}"><i class="bi bi-check2-circle"></i>Decisions</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='discipline' %}active{% endif %}" href="{{ url_for('discipline') }}"><i class="bi bi-exclamation-triangle"></i>Discipline</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='visitation' %}active{% endif %}" href="{{ url_for('visitation') }}"><i class="bi bi-person-badge"></i>Visitation Day</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='generate_reports' %}active{% endif %}" href="{{ url_for('generate_reports') }}"><i class="bi bi-file-pdf"></i>Generate Reports</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='communications' %}active{% endif %}" href="{{ url_for('communications') }}"><i class="bi bi-envelope"></i>Communications</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='report_design' %}active{% endif %}" href="{{ url_for('report_design') }}"><i class="bi bi-palette"></i>Report Design</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('data_export', type='students') }}"><i class="bi bi-download"></i>Data Export</a></li>
+
+        {% else %}
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='marks' %}active{% endif %}" href="{{ url_for('marks') }}"><i class="bi bi-pencil-square"></i>Enter Results</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='comments' %}active{% endif %}" href="{{ url_for('comments') }}"><i class="bi bi-chat-text"></i>Comments</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='behavior' %}active{% endif %}" href="{{ url_for('behavior') }}"><i class="bi bi-clipboard-check"></i>Behavior</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='behavior_components' %}active{% endif %}" href="{{ url_for('behavior_components') }}"><i class="bi bi-sliders"></i>Behavior Setup</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='decisions' %}active{% endif %}" href="{{ url_for('decisions') }}"><i class="bi bi-check2-circle"></i>Decisions</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='discipline' %}active{% endif %}" href="{{ url_for('discipline') }}"><i class="bi bi-exclamation-triangle"></i>Discipline</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='communications' %}active{% endif %}" href="{{ url_for('communications') }}"><i class="bi bi-envelope"></i>Communications</a></li>
+        {% endif %}
+
+        <li class="nav-item"><a class="nav-link {% if request.endpoint=='change_login' %}active{% endif %}" href="{{ url_for('change_login') }}"><i class="bi bi-key"></i>Change Login</a></li>
+      </ul>
+      <hr class="border-white opacity-25">
+      <div class="px-3">
+        <small class="opacity-75">{{ session.get('username') }}</small><br>
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light mt-1 w-100"><i class="bi bi-box-arrow-right"></i> Logout</a>
+      </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="col-md-10 px-4 py-3">
+      <!-- Flash messages -->
+      <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% for cat, msg in messages %}
+            <div class="alert alert-{{ 'danger' if cat=='error' else cat }} alert-dismissible fade show shadow" role="alert">
+              {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        {% endwith %}
+      </div>
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% else %}
+  {% block auth_content %}{% endblock %}
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

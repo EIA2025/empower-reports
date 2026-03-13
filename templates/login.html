@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block auth_content %}
+<div class="min-vh-100 d-flex align-items-center" style="background: linear-gradient(135deg,#1e3a8a 0%,#1e40af 60%,#8B4513 100%);">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-md-5">
+        <!-- School header -->
+        <div class="text-center text-white mb-4">
+          {% if logo_b64 %}
+            <img src="data:image/png;base64,{{ logo_b64 }}" class="brand-logo mb-3 rounded-circle" alt="School Logo">
+          {% else %}
+            <div class="display-4 mb-2">🏫</div>
+          {% endif %}
+          <h2 class="fw-bold">{{ school_name }}</h2>
+          <p class="opacity-75 mb-0">EXCELLENCE &nbsp;|&nbsp; INTEGRITY &nbsp;|&nbsp; ACTION</p>
+        </div>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% for cat, msg in messages %}
+            <div class="alert alert-{{ 'danger' if cat=='error' else cat }} alert-dismissible fade show" role="alert">
+              {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        {% endwith %}
+
+        <!-- Login tabs -->
+        <div class="card shadow-lg">
+          <div class="card-body p-4">
+            <ul class="nav nav-tabs mb-3" id="loginTabs">
+              <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#loginTab">Login</button></li>
+              <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#forgotTab">Forgot Password</button></li>
+              <li class="nav-item"><button class="nav-link text-danger" data-bs-toggle="tab" data-bs-target="#masterTab">Master Admin</button></li>
+            </ul>
+            <div class="tab-content">
+              <!-- Normal Login -->
+              <div class="tab-pane fade show active" id="loginTab">
+                <form method="POST">
+                  <input type="hidden" name="action" value="login">
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold">Username</label>
+                    <input type="text" name="username" class="form-control" placeholder="Enter username" required autofocus>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold">Password</label>
+                    <input type="password" name="password" class="form-control" placeholder="Enter password" required>
+                  </div>
+                  <button type="submit" class="btn btn-brand w-100 fw-semibold">
+                    <i class="bi bi-box-arrow-in-right me-2"></i>Login
+                  </button>
+                </form>
+              </div>
+
+              <!-- Forgot Password -->
+              <div class="tab-pane fade" id="forgotTab">
+                <form method="POST">
+                  <input type="hidden" name="action" value="forgot">
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold">Account Username/Email</label>
+                    <input type="text" name="recover_email" class="form-control" required>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold">Recovery Method</label>
+                    <select name="recover_method" class="form-select">
+                      <option value="phone">Phone Number</option>
+                      <option value="city">City of Birth</option>
+                      <option value="nickname">Nickname / Pet Name</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold">Your Answer</label>
+                    <input type="text" name="recover_answer" class="form-control" required>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold">New Password</label>
+                    <input type="password" name="new_password" class="form-control" required>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold">Confirm Password</label>
+                    <input type="password" name="confirm_password" class="form-control" required>
+                  </div>
+                  <button type="submit" class="btn btn-warning w-100">Reset Password</button>
+                </form>
+              </div>
+
+              <!-- Master Admin -->
+              <div class="tab-pane fade" id="masterTab">
+                <div class="alert alert-warning"><i class="bi bi-shield-exclamation"></i> Master Admin Recovery — Use only if you forgot the admin password!</div>
+                <form method="POST">
+                  <input type="hidden" name="action" value="master_admin">
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold">Master Admin Password</label>
+                    <input type="password" name="master_password" class="form-control" required>
+                  </div>
+                  <button type="submit" class="btn btn-danger w-100">Unlock Master Admin</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="text-center text-white opacity-50 mt-3 small">Empower Reports v4.0</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

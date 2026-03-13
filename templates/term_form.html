@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block title %}Add Term{% endblock %}{% block content %}
+<div class="mb-3"><a href="{{ url_for('terms') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a></div>
+<div class="card" style="max-width:560px"><div class="card-header">Add Academic Term</div>
+<div class="card-body"><form method="POST">
+<div class="row g-3">
+<div class="col-md-6"><label class="form-label">Year *</label><input type="number" name="year" class="form-control" required value="{{ now().year if not term else term.year }}"></div>
+<div class="col-md-6"><label class="form-label">Term Number *</label><select name="term_number" class="form-select"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+<div class="col-12"><label class="form-label">Term Name *</label><input type="text" name="term_name" class="form-control" placeholder="e.g. Term 1 2025" required></div>
+<div class="col-md-6"><label class="form-label">Start Date *</label><input type="date" name="start_date" class="form-control" required></div>
+<div class="col-md-6"><label class="form-label">End Date *</label><input type="date" name="end_date" class="form-control" required></div>
+<div class="col-12"><label class="form-label">Next Term Begins</label><input type="date" name="next_term_begins" class="form-control"></div>
+<div class="col-12"><div class="form-check"><input type="checkbox" class="form-check-input" name="is_active" id="is_active"><label class="form-check-label" for="is_active">Set as Active Term</label></div></div>
+</div><hr>
+<button type="submit" class="btn btn-brand w-100">Add Term</button>
+</form></div></div>{% endblock %}

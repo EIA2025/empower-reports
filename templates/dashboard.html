@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Empower Reports{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-bold mb-0">Dashboard</h2>
+    <small class="text-muted">Welcome back, {{ session.get('username') }}</small>
+  </div>
+  {% if active_term %}
+    <span class="badge bg-success fs-6"><i class="bi bi-calendar-check me-1"></i>{{ active_term.term_name }} — Active</span>
+  {% else %}
+    <span class="badge bg-warning text-dark fs-6"><i class="bi bi-exclamation-triangle me-1"></i>No Active Term</span>
+  {% endif %}
+</div>
+
+<!-- Stats row -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card text-center p-3">
+      <div class="display-5 text-primary fw-bold">{{ total_students }}</div>
+      <div class="text-muted small mt-1"><i class="bi bi-mortarboard me-1"></i>Students</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center p-3">
+      <div class="display-5 text-success fw-bold">{{ total_teachers }}</div>
+      <div class="text-muted small mt-1"><i class="bi bi-people me-1"></i>Teachers</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center p-3">
+      <div class="display-5 text-warning fw-bold">{{ total_marks }}</div>
+      <div class="text-muted small mt-1"><i class="bi bi-pencil-square me-1"></i>Mark Records</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center p-3">
+      {% set unread = notifs | selectattr('read', 'equalto', False) | list | length %}
+      <div class="display-5 fw-bold" style="color:var(--brand)">{{ unread }}</div>
+      <div class="text-muted small mt-1"><i class="bi bi-bell me-1"></i>Unread Notifications</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Top Students -->
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-trophy me-2"></i>Top Students{% if active_term %} — {{ active_term.term_name }}{% endif %}</div>
+      <div class="card-body p-0">
+        {% if top_students %}
+        <table class="table mb-0">
+          <thead><tr><th>#</th><th>Name</th><th>Class</th><th>Avg</th></tr></thead>
+          <tbody>
+            {% for s in top_students %}
+            <tr>
+              <td><span class="badge bg-{{ 'warning text-dark' if loop.index==1 else 'secondary' }}">{{ loop.index }}</span></td>
+              <td>{{ s.name }}</td><td>{{ s.class_name }}</td>
+              <td><span class="badge bg-success">{{ s.avg }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center text-muted py-4">No marks data yet</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Grade Distribution Chart -->
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-bar-chart me-2"></i>Grade Distribution</div>
+      <div class="card-body">
+        {% if grade_dist %}
+        <canvas id="gradeChart" height="180"></canvas>
+        {% else %}
+        <div class="text-center text-muted py-4">No grade data yet</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Notifications -->
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-bell me-2"></i>Recent Notifications</div>
+      <div class="card-body p-0">
+        {% if notifs %}
+        <table class="table mb-0">
+          <thead><tr><th>From</th><th>Subject</th><th>Type</th><th>Date</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for n in notifs %}
+            <tr class="{{ 'table-light' if not n.read else '' }}">
+              <td>{{ n.sender_name or 'System' }}</td>
+              <td>{{ n.subject or '(no subject)' }}</td>
+              <td><span class="badge bg-{{ 'danger' if n.message_type=='discipline' else 'info' }}">{{ n.message_type or 'message' }}</span></td>
+              <td><small class="text-muted">{{ n.created_at[:10] if n.created_at else '' }}</small></td>
+              <td>{% if not n.read %}<span class="badge bg-primary">New</span>{% else %}<span class="badge bg-secondary">Read</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center text-muted py-4">No notifications</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if grade_dist %}
+<script>
+const gradeData = {{ grade_dist | tojson }};
+new Chart(document.getElementById('gradeChart'), {
+  type: 'bar',
+  data: {
+    labels: gradeData.map(d => d.grade),
+    datasets: [{
+      label: 'Students',
+      data: gradeData.map(d => d.count),
+      backgroundColor: ['#2ecc71','#3498db','#f39c12','#e67e22','#e74c3c','#c0392b','#95a5a6'],
+    }]
+  },
+  options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+});
+</script>
+{% endif %}
+{% endblock %}

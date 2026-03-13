@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% block title %}Behavior Components{% endblock %}
+{% block content %}
+<h2 class="fw-bold mb-3"><i class="bi bi-sliders me-2"></i>Behavior Components</h2>
+<div class="row g-3">
+<div class="col-md-5">
+<div class="card"><div class="card-header">Add New Component</div>
+<div class="card-body"><form method="POST">
+<input type="hidden" name="action" value="add">
+<div class="mb-3"><label class="form-label">Display Label *</label>
+<input type="text" name="display_label" class="form-control" required placeholder="e.g. Time Management"></div>
+<div class="mb-3"><label class="form-label">Display Order</label>
+<input type="number" name="display_order" class="form-control" value="99"></div>
+<button type="submit" class="btn btn-brand w-100"><i class="bi bi-plus-lg me-1"></i>Add Component</button>
+</form></div></div>
+</div>
+<div class="col-md-7">
+<div class="card"><div class="card-header">Existing Components</div>
+<div class="card-body p-0">
+<table class="table mb-0">
+<thead><tr><th>Order</th><th>Label</th><th>Name (key)</th><th>Status</th><th>Actions</th></tr></thead>
+<tbody>
+{% for c in components %}
+<tr>
+<td>{{ c.display_order }}</td>
+<td class="fw-semibold">{{ c.display_label }}</td>
+<td><code>{{ c.name }}</code></td>
+<td>{% if c.active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</td>
+<td>
+<form method="POST" class="d-inline">
+<input type="hidden" name="action" value="toggle">
+<input type="hidden" name="component_id" value="{{ c.id }}">
+<button class="btn btn-sm btn-outline-{{ 'warning' if c.active else 'success' }}">{{ 'Disable' if c.active else 'Enable' }}</button>
+</form>
+<form method="POST" class="d-inline" onsubmit="return confirm('Delete?')">
+<input type="hidden" name="action" value="delete">
+<input type="hidden" name="component_id" value="{{ c.id }}">
+<button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+</form>
+</td></tr>
+{% endfor %}
+</tbody></table>
+</div></div></div></div>
+{% endblock %}

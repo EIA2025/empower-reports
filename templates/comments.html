@@ -1,0 +1,37 @@
+{% extends "base.html" %}{% block title %}Comments{% endblock %}
+{% block content %}
+<h2 class="fw-bold mb-3"><i class="bi bi-chat-text me-2"></i>Subject Comments</h2>
+<div class="card mb-3"><div class="card-body">
+<form class="row g-2" method="GET">
+<div class="col-md-4"><label class="form-label">Class</label>
+<select name="class_name" class="form-select" onchange="this.form.submit()">
+{% for c in classes %}<option value="{{ c }}" {{ 'selected' if c==selected_class }}>{{ c }}</option>{% endfor %}
+</select></div>
+<div class="col-md-4"><label class="form-label">Term</label>
+<select name="term_id" class="form-select" onchange="this.form.submit()">
+{% for t in terms %}<option value="{{ t.id }}" {{ 'selected' if t.id|string==selected_term_id }}>{{ t.term_name }}</option>{% endfor %}
+</select></div>
+</form></div></div>
+{% if marks_rows %}
+<div class="card"><div class="card-header">Comments — {{ selected_class }}</div>
+<div class="card-body p-0">
+<table class="table mb-0">
+<thead><tr><th>Student</th><th>Subject</th><th>Comment</th><th>Save</th></tr></thead>
+<tbody>
+{% for r in marks_rows %}
+<tr>
+<td class="fw-semibold align-middle">{{ r.student_name }}</td>
+<td class="align-middle">{{ r.subject }}</td>
+<form method="POST">
+<input type="hidden" name="student_id" value="{{ r.student_id }}">
+<input type="hidden" name="term_id" value="{{ selected_term_id }}">
+<input type="hidden" name="subject" value="{{ r.subject }}">
+<td><input type="text" name="comment" class="form-control form-control-sm" value="{{ r.comment or '' }}" placeholder="e.g. Good improvement..."></td>
+<td><button type="submit" class="btn btn-sm btn-brand">Save</button></td>
+</form></tr>
+{% endfor %}
+</tbody></table></div></div>
+{% else %}
+<div class="alert alert-info">Select class and term. Marks must be entered before adding comments.</div>
+{% endif %}
+{% endblock %}

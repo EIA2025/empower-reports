@@ -1,0 +1,70 @@
+{% extends "base.html" %}{% block title %}Enter Results{% endblock %}
+{% block content %}
+<h2 class="fw-bold mb-3"><i class="bi bi-pencil-square me-2"></i>Enter Results</h2>
+<div class="card mb-3"><div class="card-body">
+<form class="row g-2" method="GET">
+<div class="col-md-4"><label class="form-label">Class</label>
+<select name="class_name" class="form-select" onchange="this.form.submit()">
+{% for c in classes %}<option value="{{ c }}" {{ 'selected' if c==selected_class }}>{{ c }}</option>{% endfor %}
+</select></div>
+<div class="col-md-4"><label class="form-label">Term</label>
+<select name="term_id" class="form-select" onchange="this.form.submit()">
+{% for t in terms %}<option value="{{ t.id }}" {{ 'selected' if t.id|string==selected_term_id }}>{{ t.term_name }}</option>{% endfor %}
+</select></div>
+</form></div></div>
+
+{% if students_list %}
+<div class="card"><div class="card-header">Results Entry — {{ selected_class }}</div>
+<div class="card-body p-0">
+<div class="accordion" id="studentsAccordion">
+{% for s in students_list %}
+<div class="accordion-item">
+  <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#s{{ s.id }}">
+    {{ s.name }} <span class="badge bg-secondary ms-2">{{ s.reg }}</span>
+  </button></h2>
+  <div id="s{{ s.id }}" class="accordion-collapse collapse">
+    <div class="accordion-body">
+      {% for subject in s.subjects %}
+      {% if not subjects_filter or subject in subjects_filter %}
+      {% set mk = marks_data.get((s.id, subject), {}) %}
+      <div class="card mb-2"><div class="card-header py-2 bg-light fw-semibold">{{ subject }}</div>
+      <div class="card-body py-2">
+        <div class="row g-2">
+          {% for comp_type, label, base in [('coursework','CW',20),('midterm','MOT',20),('endterm','EOT',60)] %}
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">{{ label }} /{{ base }}</label>
+            <div class="d-flex gap-1 align-items-center">
+              <form method="POST" class="d-flex gap-1" style="flex:1">
+                <input type="hidden" name="student_id" value="{{ s.id }}">
+                <input type="hidden" name="subject" value="{{ subject }}">
+                <input type="hidden" name="term_id" value="{{ selected_term_id }}">
+                <input type="hidden" name="component_type" value="{{ comp_type }}">
+                <input type="hidden" name="component_name" value="{{ label }}">
+                <input type="number" name="score" class="form-control form-control-sm" min="0" max="{{ base }}" step="0.1"
+                  value="{{ '%.1f'|format(mk.get(comp_type+'_out_of_'+base|string, 0)) if mk else '' }}" placeholder="Score">
+                <input type="number" name="total" class="form-control form-control-sm" min="1" max="9999" step="0.1"
+                  value="{{ base }}" placeholder="Total">
+                <button type="submit" class="btn btn-sm btn-brand">✓</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+          <div class="col-md-12 mt-1">
+            {% if mk %}
+            <small class="text-muted">Total: <strong>{{ mk.get('total','') }}</strong> &nbsp;
+            Grade: <span class="badge bg-{{ 'success' if mk.get('grade') in ['A*','A'] else 'warning text-dark' if mk.get('grade') in ['B','C'] else 'danger' }}">{{ mk.get('grade','') }}</span></small>
+            {% endif %}
+          </div>
+        </div>
+      </div></div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div></div></div>
+{% else %}
+<div class="alert alert-info"><i class="bi bi-info-circle me-2"></i>Select a class and term to enter results.</div>
+{% endif %}
+{% endblock %}

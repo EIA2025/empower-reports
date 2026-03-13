@@ -1,0 +1,88 @@
+{% extends "base.html" %}{% block title %}Discipline Reports{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h2 class="fw-bold mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Discipline Reports</h2>
+<button class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#addModal"><i class="bi bi-plus-lg me-1"></i>File Report</button>
+</div>
+
+<div class="card"><div class="card-body p-0">
+<table class="table table-hover mb-0">
+<thead><tr><th>Date</th><th>Student</th><th>Class</th><th>Type</th><th>Status</th><th>Reporter</th><th>Actions</th></tr></thead>
+<tbody>
+{% for r in reports %}
+<tr>
+<td>{{ r.incident_date }}</td>
+<td class="fw-semibold">{{ r.student_name }}</td>
+<td><span class="badge bg-primary">{{ r.class_name }}</span></td>
+<td>{{ r.incident_type }}</td>
+<td><span class="badge bg-{{ 'warning text-dark' if r.status=='Pending' else 'success' if r.status=='Resolved' else 'secondary' }}">{{ r.status }}</span></td>
+<td>{{ r.reporter_name or 'Unknown' }}</td>
+<td>
+{% if role == 'admin' %}
+<button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ r.id }}">Update</button>
+{% endif %}
+<button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#viewModal{{ r.id }}">View</button>
+</td>
+</tr>
+
+<!-- View Modal -->
+<div class="modal fade" id="viewModal{{ r.id }}">
+<div class="modal-dialog"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">Incident Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body">
+<p><strong>Student:</strong> {{ r.student_name }} ({{ r.class_name }})</p>
+<p><strong>Date:</strong> {{ r.incident_date }}</p>
+<p><strong>Type:</strong> {{ r.incident_type }}</p>
+<p><strong>Description:</strong> {{ r.description }}</p>
+<p><strong>Action Taken:</strong> {{ r.action_taken }}</p>
+<p><strong>Admin Notes:</strong> {{ r.admin_notes or 'None' }}</p>
+<p><strong>Status:</strong> {{ r.status }}</p>
+</div>
+</div></div></div>
+
+{% if role == 'admin' %}
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal{{ r.id }}">
+<div class="modal-dialog"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">Update Report</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body">
+<form method="POST">
+<input type="hidden" name="action" value="update_status">
+<input type="hidden" name="report_id" value="{{ r.id }}">
+<div class="mb-3"><label class="form-label">Status</label>
+<select name="status" class="form-select">
+{% for s in ['Pending','Under Review','Resolved','Dismissed'] %}
+<option value="{{ s }}" {{ 'selected' if r.status==s }}>{{ s }}</option>{% endfor %}
+</select></div>
+<div class="mb-3"><label class="form-label">Admin Notes</label>
+<textarea name="admin_notes" class="form-control" rows="3">{{ r.admin_notes or '' }}</textarea></div>
+<button type="submit" class="btn btn-brand w-100">Update</button>
+</form></div></div></div></div>
+{% endif %}
+{% else %}
+<tr><td colspan="7" class="text-center text-muted py-4">No reports yet</td></tr>
+{% endfor %}
+</tbody></table></div></div>
+
+<!-- Add Report Modal -->
+<div class="modal fade" id="addModal">
+<div class="modal-dialog"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">File Discipline Report</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body">
+<form method="POST">
+<input type="hidden" name="action" value="add">
+<div class="mb-3"><label class="form-label">Student *</label>
+<select name="student_id" class="form-select" required>
+{% for s in students %}<option value="{{ s.id }}">{{ s.name }} ({{ s.class_name }})</option>{% endfor %}
+</select></div>
+<div class="mb-3"><label class="form-label">Incident Date *</label><input type="date" name="incident_date" class="form-control" required></div>
+<div class="mb-3"><label class="form-label">Incident Type *</label>
+<select name="incident_type" class="form-select">
+{% for t in ['Misconduct','Tardiness','Bullying','Cheating','Vandalism','Disrespect','Truancy','Violence','Other'] %}
+<option value="{{ t }}">{{ t }}</option>{% endfor %}
+</select></div>
+<div class="mb-3"><label class="form-label">Description *</label><textarea name="description" class="form-control" rows="3" required></textarea></div>
+<div class="mb-3"><label class="form-label">Action Taken</label><textarea name="action_taken" class="form-control" rows="2"></textarea></div>
+<button type="submit" class="btn btn-brand w-100">Submit Report</button>
+</form></div></div></div></div>
+{% endblock %}

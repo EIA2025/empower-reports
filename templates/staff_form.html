@@ -1,0 +1,39 @@
+{% extends "base.html" %}{% block title %}{{ 'Edit' if user else 'Add' }} Staff{% endblock %}{% block content %}
+<div class="mb-3"><a href="{{ url_for('staff') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a></div>
+<div class="card" style="max-width:640px"><div class="card-header">{{ 'Edit' if user else 'Add' }} Staff Member</div>
+<div class="card-body"><form method="POST">
+<div class="row g-3">
+<div class="col-md-6"><label class="form-label">Full Name *</label><input type="text" name="name" class="form-control" value="{{ user.name if user else '' }}" required></div>
+<div class="col-md-6"><label class="form-label">Username/Email *</label><input type="text" name="email" class="form-control" value="{{ user.email if user else '' }}" required></div>
+<div class="col-md-6"><label class="form-label">Role *</label>
+<select name="role" class="form-select">
+<option value="teacher" {{ 'selected' if user and user.role=='teacher' else '' }}>Teacher</option>
+<option value="admin" {{ 'selected' if user and user.role=='admin' else '' }}>Admin</option>
+</select></div>
+<div class="col-md-6"><label class="form-label">Phone</label><input type="text" name="phone_number" class="form-control" value="{{ user.phone_number if user else '' }}" placeholder="+256XXXXXXXXX"></div>
+<div class="col-md-6"><label class="form-label">Gender</label>
+<select name="gender" class="form-select"><option value="">--</option>
+<option value="Male" {{ 'selected' if user and user.gender=='Male' }}>Male</option>
+<option value="Female" {{ 'selected' if user and user.gender=='Female' }}>Female</option>
+</select></div>
+<div class="col-md-6"><label class="form-label">Class Teacher For</label><input type="text" name="class_teacher_for" class="form-control" value="{{ user.class_teacher_for if user else '' }}" placeholder="e.g. S3A"></div>
+<div class="col-12"><label class="form-label">Subjects Taught (comma-separated)</label><input type="text" name="subjects_taught_raw" id="subs_input" class="form-control" placeholder="Mathematics, English, ..."><div id="subs_tags" class="mt-2 d-flex flex-wrap gap-1"></div><div id="subs_hidden"></div></div>
+<div class="col-12"><label class="form-label">Password {{ '(leave blank to keep)' if user else '*' }}</label><input type="password" name="password" class="form-control" {{ '' if user else 'required' }}></div>
+</div><hr>
+<button type="submit" class="btn btn-brand w-100">{{ 'Update' if user else 'Add' }} Staff</button>
+</form></div></div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const existingSubs = "{{ user.subjects_taught if user else '' }}".split(',').map(s=>s.trim()).filter(Boolean);
+let subs=[...existingSubs];
+function render(){
+  document.getElementById('subs_tags').innerHTML=subs.map((s,i)=>`<span class="badge bg-info">${s} <span style="cursor:pointer" onclick="rm(${i})">×</span></span>`).join('');
+  document.getElementById('subs_hidden').innerHTML=subs.map(s=>`<input type="hidden" name="subjects_taught" value="${s}">`).join('');
+}
+function rm(i){subs.splice(i,1);render();}
+document.getElementById('subs_input').addEventListener('keydown',function(e){
+  if(e.key==='Enter'||e.key===','){e.preventDefault();const v=this.value.trim().replace(/,$/,'');if(v&&!subs.includes(v)){subs.push(v);render();}this.value='';}
+});
+render();
+</script>{% endblock %}
