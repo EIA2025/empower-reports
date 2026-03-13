@@ -466,33 +466,53 @@ def add_term():
     if request.method == 'POST':
         db = SessionLocal()
         try:
+            year = int(request.form.get('year', ''))
+            term_number = int(request.form.get('term_number', ''))
+            term_name = request.form.get('term_name', '').strip()
+            start_date = request.form.get('start_date', '').strip()
+            end_date = request.form.get('end_date', '').strip()
+            next_term_begins = request.form.get('next_term_begins', '').strip()
             is_active = 'is_active' in request.form
+            
+            # Validate input
+            if not all([year, term_number, term_name, start_date, end_date]):
+                flash('Please fill in all required fields.', 'error')
+                db.close()
+                return render_template('term_form.html', term=None)
+            
+            # If setting as active, deactivate all others
             if is_active:
-                stmt = update(AcademicTerm).values(is_active=False)
-                db.execute(stmt)
+                existing_terms = db.query(AcademicTerm).filter(AcademicTerm.is_active == True).all()
+                for term in existing_terms:
+                    term.is_active = False
                 db.commit()
             
-            t = AcademicTerm(
-                year=int(request.form['year']),
-                term_number=int(request.form['term_number']),
-                term_name=request.form['term_name'],
-                start_date=request.form['start_date'],
-                end_date=request.form['end_date'],
-                next_term_begins=request.form.get('next_term_begins', ''),
+            # Add new term
+            new_term = AcademicTerm(
+                year=year,
+                term_number=term_number,
+                term_name=term_name,
+                start_date=start_date,
+                end_date=end_date,
+                next_term_begins=next_term_begins,
                 is_active=is_active,
             )
-            db.add(t)
+            db.add(new_term)
             db.commit()
             flash('Term added successfully!', 'success')
+        except ValueError as ve:
+            db.rollback()
+            flash(f'Invalid input: {str(ve)}', 'error')
         except Exception as e:
             db.rollback()
-            import traceback
             print(f"Error adding term: {e}")
+            import traceback
             traceback.print_exc()
-            flash(f'Error adding term: {str(e)}', 'error')
+            flash(f'Database error: {str(e)}', 'error')
         finally:
             db.close()
         return redirect(url_for('terms'))
+    
     return render_template('term_form.html', term=None)
 
 
@@ -502,19 +522,23 @@ def add_term():
 def activate_term(tid):
     db = SessionLocal()
     try:
-        stmt = update(AcademicTerm).values(is_active=False)
-        db.execute(stmt)
+        # Deactivate all other terms
+        existing_terms = db.query(AcademicTerm).filter(AcademicTerm.is_active == True).all()
+        for term in existing_terms:
+            term.is_active = False
         db.commit()
         
-        t = db.query(AcademicTerm).get(tid)
-        if t:
-            t.is_active = True
+        # Activate the selected term
+        target_term = db.query(AcademicTerm).filter(AcademicTerm.id == tid).first()
+        if target_term:
+            target_term.is_active = True
             db.commit()
-            flash(f'{t.term_name} set as active term.', 'success')
+            flash(f'{target_term.term_name} set as active term.', 'success')
         else:
             flash('Term not found.', 'error')
     except Exception as e:
         db.rollback()
+        print(f"Error activating term: {e}")
         flash(f'Error: {str(e)}', 'error')
     finally:
         db.close()
@@ -1498,4 +1522,5 @@ def comments():
 if __name__ == '__main__':
     with app.app_context():
         init_db()
-    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(debug=debug_mode, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
