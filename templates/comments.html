@@ -3,7 +3,7 @@
 <h2 class="fw-bold mb-3"><i class="bi bi-chat-text me-2"></i>Subject Comments</h2>
 <div class="card mb-3"><div class="card-body">
 <form class="row g-2" method="GET">
-<div class="col-md-4"><label class="form-label">Class</label>
+<div class="col-md-4"><label class="form-label">Year / Class</label>
 <select name="class_name" class="form-select" onchange="this.form.submit()">
 {% for c in classes %}<option value="{{ c }}" {{ 'selected' if c==selected_class }}>{{ c }}</option>{% endfor %}
 </select></div>

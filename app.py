@@ -30,6 +30,23 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'empower-secret-key-change-in-production')
 
+# ── Jinja2 globals ────────────────────────────────────────────────────────────
+app.jinja_env.globals['now'] = datetime.now
+
+@app.context_processor
+def inject_logo():
+    """Inject logo_b64 and school_name into every template automatically."""
+    try:
+        db = SessionLocal()
+        design = db.query(ReportDesign).first()
+        db.close()
+        return {
+            'global_logo_b64': design.logo_data if design else None,
+            'global_school_name': design.school_name if design else 'Empower International Academy',
+        }
+    except Exception:
+        return {'global_logo_b64': None, 'global_school_name': 'Empower International Academy'}
+
 # ── Database ──────────────────────────────────────────────────────────────────
 DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://localhost/empower')
 # Render provides postgres:// but SQLAlchemy 1.4+ needs postgresql://
@@ -81,6 +98,18 @@ try:
     init_db()
 except Exception as e:
     print(f"Database initialization warning: {e}")
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def _get_all_teacher_subjects(db):
+    """Return sorted list of all unique subjects taught by any teacher."""
+    users = db.query(User).filter(User.subjects_taught != None, User.subjects_taught != '').all()
+    subjects = set()
+    for u in users:
+        for s in (u.subjects_taught or '').split(','):
+            s = s.strip()
+            if s:
+                subjects.add(s)
+    return sorted(subjects)
 
 # ── Grading ───────────────────────────────────────────────────────────────────
 def get_grade(avg):
@@ -307,7 +336,10 @@ def add_student():
         finally:
             db.close()
         return redirect(url_for('students'))
-    return render_template('student_form.html', student=None)
+    db = SessionLocal()
+    all_subjects = _get_all_teacher_subjects(db)
+    db.close()
+    return render_template('student_form.html', student=None, all_subjects=all_subjects)
 
 
 @app.route('/students/<int:sid>/edit', methods=['GET', 'POST'])
@@ -337,8 +369,9 @@ def edit_student(sid):
             db.close()
         return redirect(url_for('students'))
     subjects = json.loads(s.subjects) if s.subjects else []
+    all_subjects = _get_all_teacher_subjects(db)
     db.close()
-    return render_template('student_form.html', student=s, subjects=subjects)
+    return render_template('student_form.html', student=s, subjects=subjects, all_subjects=all_subjects)
 
 
 @app.route('/students/<int:sid>/delete', methods=['POST'])
@@ -597,6 +630,8 @@ def marks():
 
         students_list = []
         marks_data = {}
+        component_data = {}   # (student_id, subject, comp_type) -> list of {name,score,total}
+        subject_components = {}  # (subject, comp_type) -> [comp_name, ...]
         if selected_class and selected_term_id:
             rows = db.execute(text(
                 "SELECT id, name, registration_number, subjects FROM students "
@@ -605,7 +640,7 @@ def marks():
                 subs = json.loads(r.subjects) if r.subjects else []
                 students_list.append({'id': r.id, 'name': r.name,
                                        'reg': r.registration_number, 'subjects': subs})
-            # Fetch existing marks
+            # Fetch existing compiled marks
             mrows = db.execute(text("""
                 SELECT m.student_id, m.subject, m.coursework_out_of_20, m.midterm_out_of_20,
                        m.endterm_out_of_60, m.total, m.grade, m.comment
@@ -614,6 +649,35 @@ def marks():
             """), {'tid': int(selected_term_id), 'cls': selected_class}).fetchall()
             for r in mrows:
                 marks_data[(r.student_id, r.subject)] = dict(r._mapping)
+
+            # Fetch all component marks for this class/term so teachers can see sub-tests
+            crows = db.execute(text("""
+                SELECT cm.student_id, cm.subject, cm.component_type, cm.component_name,
+                       cm.score, cm.total
+                FROM component_marks cm
+                WHERE cm.term_id=:tid
+                AND cm.student_id IN (SELECT id FROM students WHERE class_name=:cls)
+                ORDER BY cm.component_name
+            """), {'tid': int(selected_term_id), 'cls': selected_class}).fetchall()
+            for r in crows:
+                key = (r.student_id, r.subject, r.component_type)
+                if key not in component_data:
+                    component_data[key] = []
+                component_data[key].append({
+                    'name': r.component_name,
+                    'score': r.score,
+                    'total': r.total,
+                })
+
+            # Build unique component name sets per (subject, comp_type) across the class
+            # So all students see the same columns even if only some have data
+            for (sid, subj, ctype), comps in component_data.items():
+                key = (subj, ctype)
+                if key not in subject_components:
+                    subject_components[key] = []
+                for c in comps:
+                    if c['name'] not in subject_components[key]:
+                        subject_components[key].append(c['name'])
 
         if request.method == 'POST':
             try:
@@ -651,6 +715,8 @@ def marks():
                                 selected_class=selected_class,
                                 selected_term_id=selected_term_id,
                                 students_list=students_list, marks_data=marks_data,
+                                component_data=component_data,
+                                subject_components=subject_components,
                                 subjects_filter=subjects_filter)
     finally:
         db.close()
@@ -696,6 +762,121 @@ def _recompile_mark(db, student_id, subject, term_id, submitted_by=None):
                     total=total, grade=grade, submitted_by=submitted_by,
                     submitted_at=datetime.now().isoformat()))
     db.commit()
+
+
+@app.route('/marks/components', methods=['POST'])
+@login_required
+def manage_mark_component():
+    """Add or delete a named sub-component (e.g. Test 1, Test 2) for a subject/category."""
+    db = SessionLocal()
+    try:
+        action = request.form.get('action')  # 'add' or 'delete'
+        student_id = int(request.form['student_id'])
+        subject = request.form['subject']
+        term_id = int(request.form['term_id'])
+        comp_type = request.form['component_type']
+        uid = session.get('user_id')
+        class_name = request.form.get('class_name', '')
+        selected_term_id = request.form.get('selected_term_id', str(term_id))
+
+        if action == 'delete':
+            comp_name = request.form['component_name']
+            row = db.query(ComponentMark).filter_by(
+                student_id=student_id, subject=subject,
+                term_id=term_id, component_type=comp_type,
+                component_name=comp_name).first()
+            if row:
+                db.delete(row)
+                db.commit()
+                _recompile_mark(db, student_id, subject, term_id, uid)
+                flash(f'Component "{comp_name}" removed.', 'success')
+        elif action == 'add':
+            comp_name = request.form.get('component_name', '').strip()
+            score = float(request.form.get('score', 0) or 0)
+            total = float(request.form.get('total', 100) or 100)
+            if not comp_name:
+                flash('Component name is required.', 'error')
+            else:
+                exists = db.query(ComponentMark).filter_by(
+                    student_id=student_id, subject=subject,
+                    term_id=term_id, component_type=comp_type,
+                    component_name=comp_name).first()
+                if exists:
+                    exists.score = score
+                    exists.total = total
+                else:
+                    db.add(ComponentMark(
+                        student_id=student_id, subject=subject,
+                        term_id=term_id, component_type=comp_type,
+                        component_name=comp_name, score=score,
+                        total=total, submitted_by=uid))
+                db.commit()
+                _recompile_mark(db, student_id, subject, term_id, uid)
+                flash(f'Component "{comp_name}" saved.', 'success')
+    except Exception as e:
+        db.rollback()
+        flash(f'Error: {e}', 'error')
+    finally:
+        db.close()
+    return redirect(url_for('marks', class_name=class_name, term_id=selected_term_id))
+
+
+@app.route('/marks/bulk', methods=['POST'])
+@login_required
+def save_bulk_marks():
+    """Save all component scores from the table view at once."""
+    db = SessionLocal()
+    try:
+        term_id = int(request.form['term_id'])
+        class_name = request.form.get('class_name', '')
+        uid = session.get('user_id')
+        scores = {}
+        totals = {}
+        for key, val in request.form.items():
+            if key.startswith('score__'):
+                parts = key.split('__', 4)
+                if len(parts) == 5:
+                    _, sid, subj, ctype, cname = parts
+                    scores[(int(sid), subj, ctype, cname)] = val
+            elif key.startswith('total__'):
+                parts = key.split('__', 4)
+                if len(parts) == 5:
+                    _, sid, subj, ctype, cname = parts
+                    totals[(int(sid), subj, ctype, cname)] = val
+        saved = 0
+        affected = set()
+        for (sid, subj, ctype, cname), score_val in scores.items():
+            try:
+                score = float(score_val) if score_val.strip() else None
+                total_val = totals.get((sid, subj, ctype, cname), '100')
+                total = float(total_val) if total_val.strip() else 100.0
+                if score is None:
+                    continue
+                existing = db.query(ComponentMark).filter_by(
+                    student_id=sid, subject=subj, term_id=term_id,
+                    component_type=ctype, component_name=cname).first()
+                if existing:
+                    existing.score = score
+                    existing.total = total
+                else:
+                    db.add(ComponentMark(
+                        student_id=sid, subject=subj, term_id=term_id,
+                        component_type=ctype, component_name=cname,
+                        score=score, total=total, submitted_by=uid))
+                affected.add((sid, subj))
+                saved += 1
+            except (ValueError, TypeError):
+                continue
+        db.commit()
+        for (sid, subj) in affected:
+            _recompile_mark(db, sid, subj, term_id, uid)
+        flash(f'{saved} score(s) saved successfully.', 'success')
+    except Exception as e:
+        db.rollback()
+        flash(f'Error saving marks: {e}', 'error')
+    finally:
+        db.close()
+    return redirect(url_for('marks', class_name=class_name, term_id=term_id))
 
 
 # ── Routes: Behavior ──────────────────────────────────────────────────────────
