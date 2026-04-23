@@ -51,12 +51,10 @@ if _is_supabase and 'sslmode' not in DATABASE_URL:
 
 engine = create_engine(
     DATABASE_URL,
-    poolclass=NullPool,                    # no persistent connection pool — safe for pgBouncer
+    poolclass=NullPool,          # no persistent pool — correct for pgBouncer transaction mode
     connect_args={
         "options": "-c statement_timeout=30000 -c lock_timeout=10000",
     },
-    # Disable SQLAlchemy server-side prepared statements so pgBouncer stays happy
-    execution_options={"no_parameters": False},
     echo=False,
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=True, autocommit=False)
@@ -1483,7 +1481,18 @@ def comments():
 
 
 # ── App entry point ───────────────────────────────────────────────────────────
-if __name__ == '__main__':
-    with app.app_context():
+# init_db() must run whether started via gunicorn OR python app.py directly.
+# Gunicorn imports this module — it never hits __main__ — so we call init_db
+# unconditionally at module level, wrapped in app_context.
+with app.app_context():
+    try:
         init_db()
+    except Exception as _init_err:
+        # Log clearly so Render's log shows the real error
+        import traceback
+        print("STARTUP ERROR — init_db() failed:")
+        traceback.print_exc()
+        raise  # re-raise so gunicorn marks the worker as failed immediately
+
+if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
