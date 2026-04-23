@@ -1,176 +1,60 @@
 {% extends "base.html" %}
 {% block title %}{{ 'Edit' if student else 'Add' }} Student{% endblock %}
 {% block content %}
-<div class="mb-3">
-  <a href="{{ url_for('students') }}" class="btn btn-outline-secondary btn-sm">
-    <i class="bi bi-arrow-left me-1"></i>Back
-  </a>
-</div>
-<div class="card" style="max-width:680px">
+<div class="mb-3"><a href="{{ url_for('students') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a></div>
+<div class="card" style="max-width:640px">
   <div class="card-header">{{ 'Edit' if student else 'Add New' }} Student</div>
   <div class="card-body">
     <form method="POST">
       <div class="row g-3">
-
-        <div class="col-md-8">
-          <label class="form-label">Full Name *</label>
-          <input type="text" name="name" class="form-control"
-            value="{{ student.name if student else '' }}" required>
-        </div>
-
-        <div class="col-md-4">
-          <label class="form-label">Year / Class *</label>
-          <input type="text" name="class_name" class="form-control"
-            value="{{ student.class_name if student else '' }}"
-            placeholder="e.g. S3A, Year 4" required>
-          <small class="text-muted">This is the student's year/stream group</small>
-        </div>
-
-        <div class="col-md-6">
-          <label class="form-label">Registration No *</label>
-          <input type="text" name="registration_number" class="form-control"
-            value="{{ student.registration_number if student else '' }}" required>
-        </div>
-
-        <div class="col-md-6">
-          <label class="form-label">Gender</label>
+        <div class="col-md-8"><label class="form-label">Full Name *</label><input type="text" name="name" class="form-control" value="{{ student.name if student else '' }}" required></div>
+        <div class="col-md-4"><label class="form-label">Year</label><input type="number" name="year" class="form-control" value="{{ student.year if student else '' }}"></div>
+        <div class="col-md-6"><label class="form-label">Class *</label><input type="text" name="class_name" class="form-control" value="{{ student.class_name if student else '' }}" required></div>
+        <div class="col-md-6"><label class="form-label">Registration No *</label><input type="text" name="registration_number" class="form-control" value="{{ student.registration_number if student else '' }}" required></div>
+        <div class="col-md-6"><label class="form-label">Gender</label>
           <select name="gender" class="form-select">
             <option value="">-- Select --</option>
-            <option value="Male" {{ 'selected' if student and student.gender=='Male' }}>Male</option>
-            <option value="Female" {{ 'selected' if student and student.gender=='Female' }}>Female</option>
+            <option value="Male" {{ 'selected' if student and student.gender=='Male' else '' }}>Male</option>
+            <option value="Female" {{ 'selected' if student and student.gender=='Female' else '' }}>Female</option>
           </select>
         </div>
-
-        <div class="col-md-6">
-          <label class="form-label">Enrollment Date</label>
-          <input type="date" name="enrollment_date" class="form-control"
-            value="{{ student.enrollment_date if student else '' }}">
-        </div>
-
-        <div class="col-md-6">
-          <label class="form-label">Academic Year (number)</label>
-          <input type="number" name="year" class="form-control"
-            value="{{ student.year if student else '' }}" placeholder="e.g. 2025">
-        </div>
-
-        {# Subjects — checkboxes from teachers' assigned subjects #}
+        <div class="col-md-6"><label class="form-label">Enrollment Date</label><input type="date" name="enrollment_date" class="form-control" value="{{ student.enrollment_date if student else '' }}"></div>
         <div class="col-12">
-          <label class="form-label fw-semibold">
-            Subjects
-            <span class="text-muted fw-normal small ms-1">(tick all subjects this student takes)</span>
-          </label>
-
-          {% if all_subjects %}
-          <div class="border rounded p-3 bg-light">
-            <div class="row g-2">
-              {% for subj in all_subjects %}
-              <div class="col-md-4 col-6">
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox"
-                    name="subjects" value="{{ subj }}"
-                    id="subj_{{ loop.index }}"
-                    {{ 'checked' if subjects is defined and subj in subjects }}>
-                  <label class="form-check-label small" for="subj_{{ loop.index }}">
-                    {{ subj }}
-                  </label>
-                </div>
-              </div>
-              {% endfor %}
-            </div>
-            <div class="mt-2 d-flex gap-2">
-              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll(true)">
-                <i class="bi bi-check-all me-1"></i>Select All
-              </button>
-              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll(false)">
-                <i class="bi bi-x-lg me-1"></i>Clear All
-              </button>
-            </div>
-          </div>
-          {% else %}
-          <div class="alert alert-warning mb-0">
-            <i class="bi bi-exclamation-triangle me-2"></i>
-            No subjects found. Please assign subjects to teachers first under
-            <a href="{{ url_for('staff') }}">Staff</a>, then return here.
-          </div>
-          {% endif %}
-
-          {# Also allow typing a custom subject not yet in any teacher's list #}
-          <div class="mt-2">
-            <label class="form-label small text-muted">
-              Add a custom subject not in the list above:
-            </label>
-            <div class="d-flex gap-2">
-              <input type="text" id="custom_subj_input" class="form-control form-control-sm"
-                placeholder="Type subject name then press Enter" style="max-width:260px">
-              <button type="button" class="btn btn-outline-brand btn-sm" onclick="addCustomSubject()">
-                <i class="bi bi-plus-lg"></i> Add
-              </button>
-            </div>
-            <div id="custom_subjects_container" class="mt-2 d-flex flex-wrap gap-1"></div>
-            <div id="custom_hidden"></div>
-          </div>
+          <label class="form-label">Subjects (comma-separated)</label>
+          <input type="text" id="subjects_input" class="form-control" placeholder="Mathematics, English, Science ...">
+          <div id="subjects_tags" class="mt-2 d-flex flex-wrap gap-1"></div>
+          <div id="subjects_hidden"></div>
         </div>
-
       </div>
       <hr>
-      <button type="submit" class="btn btn-brand w-100">
-        {{ 'Update' if student else 'Add' }} Student
-      </button>
+      <button type="submit" class="btn btn-brand w-100">{{ 'Update' if student else 'Add' }} Student</button>
     </form>
   </div>
 </div>
 {% endblock %}
 {% block extra_js %}
 <script>
-function toggleAll(checked) {
-  document.querySelectorAll('input[name="subjects"][type="checkbox"]').forEach(cb => {
-    cb.checked = checked;
+const existingSubjects = {{ subjects | tojson if subjects is defined else '[]' }};
+let subs = [...existingSubjects];
+function renderTags(){
+  const tc = document.getElementById('subjects_tags');
+  const hc = document.getElementById('subjects_hidden');
+  tc.innerHTML = '';
+  hc.innerHTML = '';
+  subs.forEach((s,i) => {
+    tc.innerHTML += `<span class="badge bg-primary">${s} <span style="cursor:pointer" onclick="removeSub(${i})">×</span></span>`;
+    hc.innerHTML += `<input type="hidden" name="subjects" value="${s}">`;
   });
 }
-
-// Custom subjects (not in teachers list)
-const existingSubjects = {{ subjects | tojson if subjects is defined else '[]' }};
-const knownSubjects = {{ all_subjects | tojson if all_subjects else '[]' }};
-let customSubs = existingSubjects.filter(s => !knownSubjects.includes(s));
-
-function renderCustom() {
-  const container = document.getElementById('custom_subjects_container');
-  const hidden = document.getElementById('custom_hidden');
-  container.innerHTML = customSubs.map((s, i) =>
-    `<span class="badge bg-primary d-inline-flex align-items-center gap-1">
-      ${s}
-      <span style="cursor:pointer" onclick="removeCustom(${i})" title="Remove">×</span>
-    </span>`
-  ).join('');
-  hidden.innerHTML = customSubs.map(s =>
-    `<input type="hidden" name="subjects" value="${s}">`
-  ).join('');
-}
-
-function removeCustom(i) {
-  customSubs.splice(i, 1);
-  renderCustom();
-}
-
-function addCustomSubject() {
-  const input = document.getElementById('custom_subj_input');
-  const val = input.value.trim();
-  if (val && !customSubs.includes(val) && !knownSubjects.includes(val)) {
-    customSubs.push(val);
-    renderCustom();
-  } else if (knownSubjects.includes(val)) {
-    // Tick the checkbox instead
-    document.querySelectorAll('input[name="subjects"][type="checkbox"]').forEach(cb => {
-      if (cb.value === val) cb.checked = true;
-    });
+function removeSub(i){ subs.splice(i,1); renderTags(); }
+document.getElementById('subjects_input').addEventListener('keydown', function(e){
+  if(e.key === 'Enter' || e.key === ','){
+    e.preventDefault();
+    const v = this.value.trim().replace(/,$/,'');
+    if(v && !subs.includes(v)){ subs.push(v); renderTags(); }
+    this.value = '';
   }
-  input.value = '';
-}
-
-document.getElementById('custom_subj_input').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') { e.preventDefault(); addCustomSubject(); }
 });
-
-renderCustom();
+renderTags();
 </script>
 {% endblock %}

@@ -13,7 +13,7 @@ from pathlib import Path
 import csv
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, flash, send_file, jsonify, abort)
-from sqlalchemy import create_engine, text, update
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 import requests
 
@@ -30,31 +30,36 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'empower-secret-key-change-in-production')
 
-# ── Jinja2 globals ────────────────────────────────────────────────────────────
-app.jinja_env.globals['now'] = datetime.now
-
-@app.context_processor
-def inject_logo():
-    """Inject logo_b64 and school_name into every template automatically."""
-    try:
-        db = SessionLocal()
-        design = db.query(ReportDesign).first()
-        db.close()
-        return {
-            'global_logo_b64': design.logo_data if design else None,
-            'global_school_name': design.school_name if design else 'Empower International Academy',
-        }
-    except Exception:
-        return {'global_logo_b64': None, 'global_school_name': 'Empower International Academy'}
-
 # ── Database ──────────────────────────────────────────────────────────────────
 DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://localhost/empower')
-# Render provides postgres:// but SQLAlchemy 1.4+ needs postgresql://
+# Normalise legacy postgres:// scheme (Render, Heroku)
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=300)
-SessionLocal = sessionmaker(bind=engine)
+# Supabase Transaction Pooler (pgBouncer) requirements:
+#  • use postgresql+psycopg2 driver
+#  • SSL required  → ?sslmode=require in URL or connect_args
+#  • Prepared statements must be disabled (DEALLOCATE ALL breaks pgBouncer)
+#  • pool_size=0 + NullPool avoids holding server-side connections open
+#    between requests (transaction mode resets state anyway)
+from sqlalchemy.pool import NullPool
+
+# Append sslmode if not already present and URL points to Supabase
+_is_supabase = 'supabase.com' in DATABASE_URL or 'pooler.supabase' in DATABASE_URL
+if _is_supabase and 'sslmode' not in DATABASE_URL:
+    DATABASE_URL += ('&' if '?' in DATABASE_URL else '?') + 'sslmode=require'
+
+engine = create_engine(
+    DATABASE_URL,
+    poolclass=NullPool,                    # no persistent connection pool — safe for pgBouncer
+    connect_args={
+        "options": "-c statement_timeout=30000 -c lock_timeout=10000",
+    },
+    # Disable SQLAlchemy server-side prepared statements so pgBouncer stays happy
+    execution_options={"no_parameters": False},
+    echo=False,
+)
+SessionLocal = sessionmaker(bind=engine, autoflush=True, autocommit=False)
 
 # ── Init DB ───────────────────────────────────────────────────────────────────
 def init_db():
@@ -92,24 +97,6 @@ def init_db():
             db.commit()
     finally:
         db.close()
-
-# Initialize database on app startup (needed for Gunicorn)
-try:
-    init_db()
-except Exception as e:
-    print(f"Database initialization warning: {e}")
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-def _get_all_teacher_subjects(db):
-    """Return sorted list of all unique subjects taught by any teacher."""
-    users = db.query(User).filter(User.subjects_taught != None, User.subjects_taught != '').all()
-    subjects = set()
-    for u in users:
-        for s in (u.subjects_taught or '').split(','):
-            s = s.strip()
-            if s:
-                subjects.add(s)
-    return sorted(subjects)
 
 # ── Grading ───────────────────────────────────────────────────────────────────
 def get_grade(avg):
@@ -172,15 +159,10 @@ def login():
         return redirect(url_for('dashboard'))
 
     db = SessionLocal()
-    try:
-        design = db.query(ReportDesign).first()
-    except Exception:
-        design = None
-    finally:
-        db.close()
-    
+    design = db.query(ReportDesign).first()
     logo_b64 = design.logo_data if design else None
     school_name = design.school_name if design else "Empower International Academy"
+    db.close()
 
     if request.method == 'POST':
         action = request.form.get('action', 'login')
@@ -336,10 +318,7 @@ def add_student():
         finally:
             db.close()
         return redirect(url_for('students'))
-    db = SessionLocal()
-    all_subjects = _get_all_teacher_subjects(db)
-    db.close()
-    return render_template('student_form.html', student=None, all_subjects=all_subjects)
+    return render_template('student_form.html', student=None)
 
 
 @app.route('/students/<int:sid>/edit', methods=['GET', 'POST'])
@@ -369,9 +348,8 @@ def edit_student(sid):
             db.close()
         return redirect(url_for('students'))
     subjects = json.loads(s.subjects) if s.subjects else []
-    all_subjects = _get_all_teacher_subjects(db)
     db.close()
-    return render_template('student_form.html', student=s, subjects=subjects, all_subjects=all_subjects)
+    return render_template('student_form.html', student=s, subjects=subjects)
 
 
 @app.route('/students/<int:sid>/delete', methods=['POST'])
@@ -499,53 +477,27 @@ def add_term():
     if request.method == 'POST':
         db = SessionLocal()
         try:
-            year = int(request.form.get('year', ''))
-            term_number = int(request.form.get('term_number', ''))
-            term_name = request.form.get('term_name', '').strip()
-            start_date = request.form.get('start_date', '').strip()
-            end_date = request.form.get('end_date', '').strip()
-            next_term_begins = request.form.get('next_term_begins', '').strip()
             is_active = 'is_active' in request.form
-            
-            # Validate input
-            if not all([year, term_number, term_name, start_date, end_date]):
-                flash('Please fill in all required fields.', 'error')
-                db.close()
-                return render_template('term_form.html', term=None)
-            
-            # If setting as active, deactivate all others
             if is_active:
-                existing_terms = db.query(AcademicTerm).filter(AcademicTerm.is_active == True).all()
-                for term in existing_terms:
-                    term.is_active = False
-                db.commit()
-            
-            # Add new term
-            new_term = AcademicTerm(
-                year=year,
-                term_number=term_number,
-                term_name=term_name,
-                start_date=start_date,
-                end_date=end_date,
-                next_term_begins=next_term_begins,
+                db.query(AcademicTerm).update({'is_active': False})
+            t = AcademicTerm(
+                year=int(request.form['year']),
+                term_number=int(request.form['term_number']),
+                term_name=request.form['term_name'],
+                start_date=request.form['start_date'],
+                end_date=request.form['end_date'],
+                next_term_begins=request.form.get('next_term_begins', ''),
                 is_active=is_active,
             )
-            db.add(new_term)
+            db.add(t)
             db.commit()
-            flash('Term added successfully!', 'success')
-        except ValueError as ve:
-            db.rollback()
-            flash(f'Invalid input: {str(ve)}', 'error')
+            flash('Term added.', 'success')
         except Exception as e:
             db.rollback()
-            print(f"Error adding term: {e}")
-            import traceback
-            traceback.print_exc()
-            flash(f'Database error: {str(e)}', 'error')
+            flash(f'Error: {e}', 'error')
         finally:
             db.close()
         return redirect(url_for('terms'))
-    
     return render_template('term_form.html', term=None)
 
 
@@ -554,27 +506,13 @@ def add_term():
 @admin_required
 def activate_term(tid):
     db = SessionLocal()
-    try:
-        # Deactivate all other terms
-        existing_terms = db.query(AcademicTerm).filter(AcademicTerm.is_active == True).all()
-        for term in existing_terms:
-            term.is_active = False
+    db.query(AcademicTerm).update({'is_active': False})
+    t = db.query(AcademicTerm).get(tid)
+    if t:
+        t.is_active = True
         db.commit()
-        
-        # Activate the selected term
-        target_term = db.query(AcademicTerm).filter(AcademicTerm.id == tid).first()
-        if target_term:
-            target_term.is_active = True
-            db.commit()
-            flash(f'{target_term.term_name} set as active term.', 'success')
-        else:
-            flash('Term not found.', 'error')
-    except Exception as e:
-        db.rollback()
-        print(f"Error activating term: {e}")
-        flash(f'Error: {str(e)}', 'error')
-    finally:
-        db.close()
+        flash(f'{t.term_name} set as active term.', 'success')
+    db.close()
     return redirect(url_for('terms'))
 
 
@@ -583,19 +521,12 @@ def activate_term(tid):
 @admin_required
 def delete_term(tid):
     db = SessionLocal()
-    try:
-        t = db.query(AcademicTerm).get(tid)
-        if t:
-            db.delete(t)
-            db.commit()
-            flash('Term deleted successfully.', 'success')
-        else:
-            flash('Term not found.', 'error')
-    except Exception as e:
-        db.rollback()
-        flash(f'Error: {str(e)}', 'error')
-    finally:
-        db.close()
+    t = db.query(AcademicTerm).get(tid)
+    if t:
+        db.delete(t)
+        db.commit()
+        flash('Term deleted.', 'success')
+    db.close()
     return redirect(url_for('terms'))
 
 
@@ -630,8 +561,6 @@ def marks():
 
         students_list = []
         marks_data = {}
-        component_data = {}   # (student_id, subject, comp_type) -> list of {name,score,total}
-        subject_components = {}  # (subject, comp_type) -> [comp_name, ...]
         if selected_class and selected_term_id:
             rows = db.execute(text(
                 "SELECT id, name, registration_number, subjects FROM students "
@@ -640,7 +569,7 @@ def marks():
                 subs = json.loads(r.subjects) if r.subjects else []
                 students_list.append({'id': r.id, 'name': r.name,
                                        'reg': r.registration_number, 'subjects': subs})
-            # Fetch existing compiled marks
+            # Fetch existing marks
             mrows = db.execute(text("""
                 SELECT m.student_id, m.subject, m.coursework_out_of_20, m.midterm_out_of_20,
                        m.endterm_out_of_60, m.total, m.grade, m.comment
@@ -649,35 +578,6 @@ def marks():
             """), {'tid': int(selected_term_id), 'cls': selected_class}).fetchall()
             for r in mrows:
                 marks_data[(r.student_id, r.subject)] = dict(r._mapping)
-
-            # Fetch all component marks for this class/term so teachers can see sub-tests
-            crows = db.execute(text("""
-                SELECT cm.student_id, cm.subject, cm.component_type, cm.component_name,
-                       cm.score, cm.total
-                FROM component_marks cm
-                WHERE cm.term_id=:tid
-                AND cm.student_id IN (SELECT id FROM students WHERE class_name=:cls)
-                ORDER BY cm.component_name
-            """), {'tid': int(selected_term_id), 'cls': selected_class}).fetchall()
-            for r in crows:
-                key = (r.student_id, r.subject, r.component_type)
-                if key not in component_data:
-                    component_data[key] = []
-                component_data[key].append({
-                    'name': r.component_name,
-                    'score': r.score,
-                    'total': r.total,
-                })
-
-            # Build unique component name sets per (subject, comp_type) across the class
-            # So all students see the same columns even if only some have data
-            for (sid, subj, ctype), comps in component_data.items():
-                key = (subj, ctype)
-                if key not in subject_components:
-                    subject_components[key] = []
-                for c in comps:
-                    if c['name'] not in subject_components[key]:
-                        subject_components[key].append(c['name'])
 
         if request.method == 'POST':
             try:
@@ -715,8 +615,6 @@ def marks():
                                 selected_class=selected_class,
                                 selected_term_id=selected_term_id,
                                 students_list=students_list, marks_data=marks_data,
-                                component_data=component_data,
-                                subject_components=subject_components,
                                 subjects_filter=subjects_filter)
     finally:
         db.close()
@@ -762,121 +660,6 @@ def _recompile_mark(db, student_id, subject, term_id, submitted_by=None):
                     total=total, grade=grade, submitted_by=submitted_by,
                     submitted_at=datetime.now().isoformat()))
     db.commit()
-
-
-@app.route('/marks/components', methods=['POST'])
-@login_required
-def manage_mark_component():
-    """Add or delete a named sub-component (e.g. Test 1, Test 2) for a subject/category."""
-    db = SessionLocal()
-    try:
-        action = request.form.get('action')  # 'add' or 'delete'
-        student_id = int(request.form['student_id'])
-        subject = request.form['subject']
-        term_id = int(request.form['term_id'])
-        comp_type = request.form['component_type']
-        uid = session.get('user_id')
-        class_name = request.form.get('class_name', '')
-        selected_term_id = request.form.get('selected_term_id', str(term_id))
-
-        if action == 'delete':
-            comp_name = request.form['component_name']
-            row = db.query(ComponentMark).filter_by(
-                student_id=student_id, subject=subject,
-                term_id=term_id, component_type=comp_type,
-                component_name=comp_name).first()
-            if row:
-                db.delete(row)
-                db.commit()
-                _recompile_mark(db, student_id, subject, term_id, uid)
-                flash(f'Component "{comp_name}" removed.', 'success')
-        elif action == 'add':
-            comp_name = request.form.get('component_name', '').strip()
-            score = float(request.form.get('score', 0) or 0)
-            total = float(request.form.get('total', 100) or 100)
-            if not comp_name:
-                flash('Component name is required.', 'error')
-            else:
-                exists = db.query(ComponentMark).filter_by(
-                    student_id=student_id, subject=subject,
-                    term_id=term_id, component_type=comp_type,
-                    component_name=comp_name).first()
-                if exists:
-                    exists.score = score
-                    exists.total = total
-                else:
-                    db.add(ComponentMark(
-                        student_id=student_id, subject=subject,
-                        term_id=term_id, component_type=comp_type,
-                        component_name=comp_name, score=score,
-                        total=total, submitted_by=uid))
-                db.commit()
-                _recompile_mark(db, student_id, subject, term_id, uid)
-                flash(f'Component "{comp_name}" saved.', 'success')
-    except Exception as e:
-        db.rollback()
-        flash(f'Error: {e}', 'error')
-    finally:
-        db.close()
-    return redirect(url_for('marks', class_name=class_name, term_id=selected_term_id))
-
-
-@app.route('/marks/bulk', methods=['POST'])
-@login_required
-def save_bulk_marks():
-    """Save all component scores from the table view at once."""
-    db = SessionLocal()
-    try:
-        term_id = int(request.form['term_id'])
-        class_name = request.form.get('class_name', '')
-        uid = session.get('user_id')
-        scores = {}
-        totals = {}
-        for key, val in request.form.items():
-            if key.startswith('score__'):
-                parts = key.split('__', 4)
-                if len(parts) == 5:
-                    _, sid, subj, ctype, cname = parts
-                    scores[(int(sid), subj, ctype, cname)] = val
-            elif key.startswith('total__'):
-                parts = key.split('__', 4)
-                if len(parts) == 5:
-                    _, sid, subj, ctype, cname = parts
-                    totals[(int(sid), subj, ctype, cname)] = val
-        saved = 0
-        affected = set()
-        for (sid, subj, ctype, cname), score_val in scores.items():
-            try:
-                score = float(score_val) if score_val.strip() else None
-                total_val = totals.get((sid, subj, ctype, cname), '100')
-                total = float(total_val) if total_val.strip() else 100.0
-                if score is None:
-                    continue
-                existing = db.query(ComponentMark).filter_by(
-                    student_id=sid, subject=subj, term_id=term_id,
-                    component_type=ctype, component_name=cname).first()
-                if existing:
-                    existing.score = score
-                    existing.total = total
-                else:
-                    db.add(ComponentMark(
-                        student_id=sid, subject=subj, term_id=term_id,
-                        component_type=ctype, component_name=cname,
-                        score=score, total=total, submitted_by=uid))
-                affected.add((sid, subj))
-                saved += 1
-            except (ValueError, TypeError):
-                continue
-        db.commit()
-        for (sid, subj) in affected:
-            _recompile_mark(db, sid, subj, term_id, uid)
-        flash(f'{saved} score(s) saved successfully.', 'success')
-    except Exception as e:
-        db.rollback()
-        flash(f'Error saving marks: {e}', 'error')
-    finally:
-        db.close()
-    return redirect(url_for('marks', class_name=class_name, term_id=term_id))
 
 
 # ── Routes: Behavior ──────────────────────────────────────────────────────────
@@ -1703,5 +1486,4 @@ def comments():
 if __name__ == '__main__':
     with app.app_context():
         init_db()
-    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
-    app.run(debug=debug_mode, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

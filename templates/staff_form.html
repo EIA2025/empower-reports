@@ -16,7 +16,7 @@
 <option value="Male" {{ 'selected' if user and user.gender=='Male' }}>Male</option>
 <option value="Female" {{ 'selected' if user and user.gender=='Female' }}>Female</option>
 </select></div>
-<div class="col-md-6"><label class="form-label">Year Teacher For</label><input type="text" name="class_teacher_for" class="form-control" value="{{ user.class_teacher_for if user else '' }}" placeholder="e.g. S3A"></div>
+<div class="col-md-6"><label class="form-label">Class Teacher For</label><input type="text" name="class_teacher_for" class="form-control" value="{{ user.class_teacher_for if user else '' }}" placeholder="e.g. S3A"></div>
 <div class="col-12"><label class="form-label">Subjects Taught (comma-separated)</label><input type="text" name="subjects_taught_raw" id="subs_input" class="form-control" placeholder="Mathematics, English, ..."><div id="subs_tags" class="mt-2 d-flex flex-wrap gap-1"></div><div id="subs_hidden"></div></div>
 <div class="col-12"><label class="form-label">Password {{ '(leave blank to keep)' if user else '*' }}</label><input type="password" name="password" class="form-control" {{ '' if user else 'required' }}></div>
 </div><hr>
