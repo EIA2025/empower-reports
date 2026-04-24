@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Dashboard - Empower Reports{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
@@ -15,25 +16,25 @@
 
 <!-- Stats row -->
 <div class="row g-3 mb-4">
-  <div class="col-md-3">
+  <div class="col-6 col-md-3">
     <div class="card text-center p-3">
       <div class="display-5 text-primary fw-bold">{{ total_students }}</div>
       <div class="text-muted small mt-1"><i class="bi bi-mortarboard me-1"></i>Students</div>
     </div>
   </div>
-  <div class="col-md-3">
+  <div class="col-6 col-md-3">
     <div class="card text-center p-3">
       <div class="display-5 text-success fw-bold">{{ total_teachers }}</div>
       <div class="text-muted small mt-1"><i class="bi bi-people me-1"></i>Teachers</div>
     </div>
   </div>
-  <div class="col-md-3">
+  <div class="col-6 col-md-3">
     <div class="card text-center p-3">
       <div class="display-5 text-warning fw-bold">{{ total_marks }}</div>
       <div class="text-muted small mt-1"><i class="bi bi-pencil-square me-1"></i>Mark Records</div>
     </div>
   </div>
-  <div class="col-md-3">
+  <div class="col-6 col-md-3">
     <div class="card text-center p-3">
       {% set unread = notifs | selectattr('read', 'equalto', False) | list | length %}
       <div class="display-5 fw-bold" style="color:var(--brand)">{{ unread }}</div>
@@ -83,7 +84,7 @@
   </div>
 
   <!-- Notifications -->
-  <div class="col-md-12">
+  <div class="col-12">
     <div class="card">
       <div class="card-header"><i class="bi bi-bell me-2"></i>Recent Notifications</div>
       <div class="card-body p-0">
@@ -109,6 +110,7 @@
     </div>
   </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}

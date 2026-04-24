@@ -23,11 +23,77 @@
   .notif-badge { font-size: .65em; }
   .flash-messages { position: fixed; top: 70px; right: 20px; z-index: 9999; min-width: 300px; }
   @media(max-width:768px) { .sidebar { min-height: auto; } }
+
+  /* ── EIA watermark badge — shown on every page ── */
+  .eia-watermark {
+    position: fixed;
+    bottom: 24px;
+    right: 28px;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1e3a8a 0%, #8B4513 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 1.35rem;
+    letter-spacing: 2px;
+    box-shadow: 0 4px 18px rgba(139,69,19,.35);
+    opacity: 0.82;
+    z-index: 1050;
+    user-select: none;
+    pointer-events: none;
+  }
+  .eia-watermark span.sub {
+    font-size: .45rem;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    opacity: .85;
+    margin-top: -2px;
+    text-transform: uppercase;
+  }
+
+  /* ── Login page EIA badge (top-right corner) ── */
+  .eia-login-badge {
+    position: absolute;
+    top: 18px;
+    right: 22px;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #fff3 0%, #fff1 100%);
+    border: 2px solid rgba(255,255,255,.45);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 1.1rem;
+    letter-spacing: 2px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.18);
+    user-select: none;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+  }
+  .eia-login-badge span.sub {
+    font-size: .42rem;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    opacity: .85;
+    margin-top: -2px;
+    text-transform: uppercase;
+  }
 </style>
 {% block extra_css %}{% endblock %}
 </head>
 <body>
-{% if session.user_id is defined and session.get('username') %}
+
+{% if session.get('user_id') %}
+{# ── Authenticated layout (sidebar + main) ── #}
 <div class="container-fluid">
   <div class="row">
     <!-- Sidebar -->
@@ -61,11 +127,10 @@
         <li class="nav-item"><a class="nav-link {% if request.endpoint=='report_design' %}active{% endif %}" href="{{ url_for('report_design') }}"><i class="bi bi-palette"></i>Report Design</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('data_export', type='students') }}"><i class="bi bi-download"></i>Data Export</a></li>
 
-        {% else %}
+        {% else %}{# teacher #}
         <li class="nav-item"><a class="nav-link {% if request.endpoint=='marks' %}active{% endif %}" href="{{ url_for('marks') }}"><i class="bi bi-pencil-square"></i>Enter Results</a></li>
         <li class="nav-item"><a class="nav-link {% if request.endpoint=='comments' %}active{% endif %}" href="{{ url_for('comments') }}"><i class="bi bi-chat-text"></i>Comments</a></li>
         <li class="nav-item"><a class="nav-link {% if request.endpoint=='behavior' %}active{% endif %}" href="{{ url_for('behavior') }}"><i class="bi bi-clipboard-check"></i>Behavior</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='behavior_components' %}active{% endif %}" href="{{ url_for('behavior_components') }}"><i class="bi bi-sliders"></i>Behavior Setup</a></li>
         <li class="nav-item"><a class="nav-link {% if request.endpoint=='decisions' %}active{% endif %}" href="{{ url_for('decisions') }}"><i class="bi bi-check2-circle"></i>Decisions</a></li>
         <li class="nav-item"><a class="nav-link {% if request.endpoint=='discipline' %}active{% endif %}" href="{{ url_for('discipline') }}"><i class="bi bi-exclamation-triangle"></i>Discipline</a></li>
         <li class="nav-item"><a class="nav-link {% if request.endpoint=='communications' %}active{% endif %}" href="{{ url_for('communications') }}"><i class="bi bi-envelope"></i>Communications</a></li>
@@ -82,7 +147,6 @@
 
     <!-- Main content -->
     <main class="col-md-10 px-4 py-3">
-      <!-- Flash messages -->
       <div class="flash-messages">
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% for cat, msg in messages %}
@@ -96,9 +160,24 @@
     </main>
   </div>
 </div>
+
 {% else %}
+{# ── Unauthenticated layout (login page) ── #}
+<div style="position:relative;">
+  <!-- EIA badge on login page — top right corner -->
+  <div class="eia-login-badge">
+    EIA
+    <span class="sub">Reports</span>
+  </div>
   {% block auth_content %}{% endblock %}
+</div>
 {% endif %}
+
+<!-- EIA watermark — always visible on every page -->
+<div class="eia-watermark">
+  EIA
+  <span class="sub">Reports</span>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
