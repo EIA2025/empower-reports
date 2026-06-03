@@ -11,6 +11,7 @@ from functools import wraps
 from pathlib import Path
 
 import csv
+import traceback
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, flash, send_file, jsonify, abort)
 from sqlalchemy import create_engine, text
@@ -482,8 +483,8 @@ def add_term():
                 year=int(request.form['year']),
                 term_number=int(request.form['term_number']),
                 term_name=request.form['term_name'],
-                start_date=request.form['start_date'],
-                end_date=request.form['end_date'],
+                start_date=request.form.get('start_date', ''),
+                end_date=request.form.get('end_date', ''),
                 next_term_begins=request.form.get('next_term_begins', ''),
                 is_active=is_active,
             )
@@ -492,7 +493,8 @@ def add_term():
             flash('Term added.', 'success')
         except Exception as e:
             db.rollback()
-            flash(f'Error: {e}', 'error')
+            app.logger.error('Failed to add term: %s\n%s', e, traceback.format_exc())
+            flash('Error saving term. Check the server logs for details.', 'error')
         finally:
             db.close()
         return redirect(url_for('terms'))
