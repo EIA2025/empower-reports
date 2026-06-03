@@ -325,7 +325,7 @@ def add_student():
 @admin_required
 def edit_student(sid):
     db = SessionLocal()
-    s = db.query(Student).get(sid)
+    s = db.get(Student, sid)
     if not s:
         db.close()
         abort(404)
@@ -356,7 +356,7 @@ def edit_student(sid):
 @admin_required
 def delete_student(sid):
     db = SessionLocal()
-    s = db.query(Student).get(sid)
+    s = db.get(Student, sid)
     if s:
         db.delete(s)
         db.commit()
@@ -417,7 +417,7 @@ def add_staff():
 @admin_required
 def edit_staff(uid):
     db = SessionLocal()
-    u = db.query(User).get(uid)
+    u = db.get(User, uid)
     if not u:
         db.close()
         abort(404)
@@ -449,7 +449,7 @@ def edit_staff(uid):
 @admin_required
 def delete_staff(uid):
     db = SessionLocal()
-    u = db.query(User).get(uid)
+    u = db.get(User, uid)
     if u:
         db.delete(u)
         db.commit()
@@ -498,7 +498,7 @@ def add_term():
         finally:
             db.close()
         return redirect(url_for('terms'))
-    return render_template('term_form.html', term=None)
+    return render_template('term_form.html', term=None, now=datetime.now)
 
 
 @app.route('/terms/<int:tid>/activate', methods=['POST'])
@@ -507,7 +507,7 @@ def add_term():
 def activate_term(tid):
     db = SessionLocal()
     db.query(AcademicTerm).update({'is_active': False})
-    t = db.query(AcademicTerm).get(tid)
+    t = db.get(AcademicTerm, tid)
     if t:
         t.is_active = True
         db.commit()
@@ -521,7 +521,7 @@ def activate_term(tid):
 @admin_required
 def delete_term(tid):
     db = SessionLocal()
-    t = db.query(AcademicTerm).get(tid)
+    t = db.get(AcademicTerm, tid)
     if t:
         db.delete(t)
         db.commit()
@@ -538,7 +538,7 @@ def marks():
     try:
         role = session['user_role']
         uid = session.get('user_id')
-        user = db.query(User).get(uid) if uid else None
+        user = db.get(User, uid) if uid else None
         terms = db.query(AcademicTerm).order_by(AcademicTerm.year.desc(), AcademicTerm.term_number).all()
         active_term = db.query(AcademicTerm).filter_by(is_active=True).first()
 
@@ -677,7 +677,7 @@ def behavior():
         if role == 'admin':
             classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
         else:
-            u = db.query(User).get(uid)
+            u = db.get(User, uid)
             classes = [c.strip() for c in (u.class_teacher_for or '').split(',') if c.strip()] if u else []
             if not classes:
                 classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
@@ -749,13 +749,13 @@ def behavior_components():
                 flash('Component added.', 'success')
             elif action == 'toggle':
                 cid = int(request.form['component_id'])
-                c = db.query(BehaviorComponent).get(cid)
+                c = db.get(BehaviorComponent, cid)
                 if c:
                     c.active = not c.active
                     db.commit()
             elif action == 'delete':
                 cid = int(request.form['component_id'])
-                c = db.query(BehaviorComponent).get(cid)
+                c = db.get(BehaviorComponent, cid)
                 if c:
                     db.delete(c)
                     db.commit()
@@ -793,7 +793,7 @@ def discipline():
                 flash('Discipline report filed.', 'success')
             elif action == 'update_status' and role == 'admin':
                 rid = int(request.form['report_id'])
-                r = db.query(DisciplineReport).get(rid)
+                r = db.get(DisciplineReport, rid)
                 if r:
                     r.status = request.form['status']
                     r.admin_notes = request.form.get('admin_notes', '')
@@ -845,7 +845,7 @@ def communications():
                 flash('Message sent.', 'success')
             elif action == 'mark_read':
                 mid = int(request.form['message_id'])
-                m = db.query(Message).get(mid)
+                m = db.get(Message, mid)
                 if m:
                     m.read = True
                     db.commit()
@@ -879,7 +879,7 @@ def decisions():
         if role == 'admin':
             classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
         else:
-            u = db.query(User).get(uid)
+            u = db.get(User, uid)
             classes = [c.strip() for c in (u.class_teacher_for or '').split(',') if c.strip()] if u else []
             if not classes:
                 classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
@@ -1045,7 +1045,7 @@ def generate_reports():
             selected_class = request.form.get('class_name')
             student_id = request.form.get('student_id')
 
-            term = db.query(AcademicTerm).get(term_id)
+            term = db.get(AcademicTerm, term_id)
             if not term:
                 flash('Term not found.', 'error')
                 return redirect(url_for('generate_reports'))
@@ -1059,7 +1059,7 @@ def generate_reports():
 
             if student_id:
                 # Single student PDF
-                s = db.query(Student).get(int(student_id))
+                s = db.get(Student, int(student_id))
                 if not s:
                     flash('Student not found.', 'error')
                     return redirect(url_for('generate_reports'))
@@ -1303,7 +1303,7 @@ def change_login():
         if not uid:
             flash('Please log in first.', 'error')
             return redirect(url_for('login'))
-        user = db.query(User).get(uid)
+        user = db.get(User, uid)
         if not user:
             flash('User not found.', 'error')
             return redirect(url_for('dashboard'))
@@ -1445,7 +1445,7 @@ def comments():
         if role == 'admin':
             classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
         else:
-            u = db.query(User).get(uid)
+            u = db.get(User, uid)
             classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
 
         selected_class = request.args.get('class_name') or (classes[0] if classes else None)
