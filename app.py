@@ -60,62 +60,280 @@ engine = create_engine(
 SessionLocal = sessionmaker(bind=engine, autoflush=True, autocommit=False)
 
 # ── Init DB ───────────────────────────────────────────────────────────────────
-def init_db():
-    # Step 1: create all tables (safe to run repeatedly — CREATE TABLE IF NOT EXISTS)
-    Base.metadata.create_all(engine)
+def _get_raw_conn():
+    """Get a raw psycopg2 connection directly — bypasses NullPool routing."""
+    import psycopg2
+    # Build DSN from the DATABASE_URL
+    url = DATABASE_URL
+    # Strip sslmode from URL — pass as connect arg instead
+    import re as _re
+    url_clean = _re.sub(r'[?&]sslmode=\w+', '', url)
+    return psycopg2.connect(url_clean, sslmode='require')
 
-    # Step 2: seed default data using raw SQL (ORM .add() is unreliable with NullPool)
-    db = SessionLocal()
+
+def init_db():
+    """Create all tables and seed default data using a SINGLE raw connection.
+
+    We bypass SQLAlchemy's NullPool entirely here because with pgBouncer
+    transaction mode, DDL (CREATE TABLE) and subsequent DML (INSERT/SELECT)
+    must run on the SAME backend connection — otherwise the new connection
+    may land on a pooler backend that hasn't committed the schema yet.
+    """
+    import psycopg2
+    import time
+
+    # Retry up to 5 times with back-off (cold Supabase can be slow)
+    for attempt in range(5):
+        try:
+            conn = _get_raw_conn()
+            break
+        except psycopg2.OperationalError as e:
+            if attempt == 4:
+                raise
+            print(f"DB connect attempt {attempt+1} failed, retrying in 3s: {e}")
+            time.sleep(3)
+
     try:
-        # Seed default behavior components
-        count = db.execute(text('SELECT COUNT(*) FROM behavior_components')).scalar()
-        if count == 0:
+        cur = conn.cursor()
+
+        # ── Create all tables ────────────────────────────────────────────────
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(200),
+            email VARCHAR(200) UNIQUE,
+            role VARCHAR(50),
+            password_hash VARCHAR(256),
+            subjects_taught TEXT,
+            class_teacher_for TEXT,
+            gender VARCHAR(20),
+            phone_number VARCHAR(30),
+            recovery_phone VARCHAR(30),
+            recovery_nickname VARCHAR(100),
+            recovery_city VARCHAR(100)
+        )""")
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS students (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(200),
+            year INTEGER,
+            class_name VARCHAR(100),
+            registration_number VARCHAR(100),
+            subjects TEXT,
+            gender VARCHAR(20),
+            enrollment_date VARCHAR(50)
+        )""")
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS academic_terms (
+            id SERIAL PRIMARY KEY,
+            year INTEGER,
+            term_number INTEGER,
+            term_name VARCHAR(100),
+            start_date VARCHAR(50),
+            end_date VARCHAR(50),
+            next_term_begins VARCHAR(50),
+            is_active BOOLEAN DEFAULT false
+        )""")
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS component_marks (
+            id SERIAL PRIMARY KEY,
+            student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+            subject VARCHAR(100),
+            term_id INTEGER REFERENCES academic_terms(id) ON DELETE CASCADE,
+            component_type VARCHAR(50),
+            component_name VARCHAR(100),
+            score FLOAT,
+            total FLOAT,
+            submitted_by INTEGER
+        )""")
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS marks (
+            id SERIAL PRIMARY KEY,
+            student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+            subject VARCHAR(100),
+            term_id INTEGER REFERENCES academic_terms(id) ON DELETE CASCADE,
+            coursework_score FLOAT,
+            coursework_total FLOAT,
+            coursework_out_of_20 FLOAT,
+            midterm_score FLOAT,
+            midterm_total FLOAT,
+            midterm_out_of_20 FLOAT,
+            endterm_score FLOAT,
+            endterm_total FLOAT,
+            endterm_out_of_60 FLOAT,
+            total FLOAT,
+            grade VARCHAR(5),
+            comment TEXT,
+            submitted_by INTEGER,
+            submitted_at VARCHAR(50)
+        )""")
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS discipline_reports (
+            id SERIAL PRIMARY KEY,
+            student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+            reported_by INTEGER,
+            incident_date VARCHAR(50),
+            incident_type VARCHAR(100),
+            description TEXT,
+            action_taken TEXT,
+            admin_notes TEXT,
+            status VARCHAR(50) DEFAULT 'Pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS report_designs (
+            id SERIAL PRIMARY KEY,
+            school_name VARCHAR(200) DEFAULT 'School Name',
+            school_subtitle VARCHAR(200),
+            school_address VARCHAR(200),
+            school_po_box VARCHAR(100),
+            school_phone VARCHAR(50),
+            school_email VARCHAR(100),
+            school_website VARCHAR(100),
+            primary_color VARCHAR(20) DEFAULT '#3a3a9c',
+            report_footer TEXT,
+            logo_data TEXT,
+            logo_url VARCHAR(500)
+        )""")
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER,
+            action VARCHAR(200),
+            details TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS classroom_behavior (
+            id SERIAL PRIMARY KEY,
+            student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+            term_id INTEGER REFERENCES academic_terms(id) ON DELETE CASCADE,
+            evaluated_by INTEGER
+        )""")
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS behavior_components (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100),
+            display_label VARCHAR(200),
+            display_order INTEGER DEFAULT 99,
+            active BOOLEAN DEFAULT true
+        )""")
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS classroom_behavior_responses (
+            id SERIAL PRIMARY KEY,
+            student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+            term_id INTEGER REFERENCES academic_terms(id) ON DELETE CASCADE,
+            component_id INTEGER REFERENCES behavior_components(id) ON DELETE CASCADE,
+            value VARCHAR(100),
+            evaluated_by INTEGER
+        )""")
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS student_decisions (
+            id SERIAL PRIMARY KEY,
+            student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+            term_id INTEGER REFERENCES academic_terms(id) ON DELETE CASCADE,
+            decision VARCHAR(100),
+            notes TEXT,
+            decision_made_by INTEGER,
+            decision_date VARCHAR(50)
+        )""")
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS visitation_days (
+            id SERIAL PRIMARY KEY,
+            student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+            term_id INTEGER REFERENCES academic_terms(id) ON DELETE CASCADE,
+            visitation_date VARCHAR(50),
+            parent_attended BOOLEAN DEFAULT false,
+            report_given BOOLEAN DEFAULT false,
+            notes TEXT,
+            created_by INTEGER
+        )""")
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS messages (
+            id SERIAL PRIMARY KEY,
+            sender_id INTEGER,
+            recipient_id INTEGER,
+            subject VARCHAR(300),
+            body TEXT,
+            is_broadcast BOOLEAN DEFAULT false,
+            read BOOLEAN DEFAULT false,
+            message_type VARCHAR(50),
+            related_report_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
+
+        conn.commit()
+        print("Tables created/verified OK")
+
+        # ── Seed default data ────────────────────────────────────────────────
+        # Behavior components
+        cur.execute("SELECT COUNT(*) FROM behavior_components")
+        if cur.fetchone()[0] == 0:
             defaults = [
-                ("punctuality",            "Punctuality",              0),
-                ("attendance",             "Attendance",               1),
-                ("manners",                "Manners",                  2),
-                ("general_behavior",       "General Behavior",         3),
-                ("organisational_skills",  "Organisational Skills",    4),
-                ("adherence_to_uniform",   "Adherence to Uniform",     5),
-                ("leadership_skills",      "Leadership Skills",        6),
-                ("commitment_to_school",   "Commitment to School",     7),
-                ("cooperation_with_peers", "Cooperation with Peers",   8),
-                ("cooperation_with_staff", "Cooperation with Staff",   9),
-                ("participation_in_lessons","Participation in Lessons",10),
-                ("completion_of_homework", "Completion of Homework",   11),
+                ("punctuality",             "Punctuality",              0),
+                ("attendance",              "Attendance",               1),
+                ("manners",                 "Manners",                  2),
+                ("general_behavior",        "General Behavior",         3),
+                ("organisational_skills",   "Organisational Skills",    4),
+                ("adherence_to_uniform",    "Adherence to Uniform",     5),
+                ("leadership_skills",       "Leadership Skills",        6),
+                ("commitment_to_school",    "Commitment to School",     7),
+                ("cooperation_with_peers",  "Cooperation with Peers",   8),
+                ("cooperation_with_staff",  "Cooperation with Staff",   9),
+                ("participation_in_lessons","Participation in Lessons", 10),
+                ("completion_of_homework",  "Completion of Homework",   11),
             ]
             for name, label, order in defaults:
-                db.execute(text("""
-                    INSERT INTO behavior_components (name, display_label, display_order, active)
-                    VALUES (:n, :l, :o, true)
-                """), {'n': name, 'l': label, 'o': order})
-            db.commit()
+                cur.execute(
+                    "INSERT INTO behavior_components (name,display_label,display_order,active) "
+                    "VALUES (%s,%s,%s,true)", (name, label, order))
+            conn.commit()
+            print("Behavior components seeded")
 
-        # Seed default report design
-        count = db.execute(text('SELECT COUNT(*) FROM report_designs')).scalar()
-        if count == 0:
-            db.execute(text("""
-                INSERT INTO report_designs (school_name, primary_color)
-                VALUES ('Empower International Academy', '#3a3a9c')
-            """))
-            db.commit()
+        # Report design
+        cur.execute("SELECT COUNT(*) FROM report_designs")
+        if cur.fetchone()[0] == 0:
+            cur.execute(
+                "INSERT INTO report_designs (school_name,primary_color) "
+                "VALUES (%s,%s)", ('Empower International Academy', '#3a3a9c'))
+            conn.commit()
+            print("Report design seeded")
 
-        # Seed default admin user
-        existing = db.execute(text(
-            "SELECT id FROM users WHERE email='admin' LIMIT 1")).fetchone()
-        if not existing:
-            db.execute(text("""
-                INSERT INTO users (name, email, role, password_hash,
-                    subjects_taught, class_teacher_for, gender, phone_number)
-                VALUES ('Administrator', 'admin', 'admin', :pw, '', '', '', '')
-            """), {'pw': hashlib.sha256(b'admin123').hexdigest()})
-            db.commit()
+        # Default admin
+        cur.execute("SELECT id FROM users WHERE email=%s LIMIT 1", ('admin',))
+        if not cur.fetchone():
+            import hashlib as _hl
+            pw = _hl.sha256(b'admin123').hexdigest()
+            cur.execute(
+                "INSERT INTO users (name,email,role,password_hash,"
+                "subjects_taught,class_teacher_for,gender,phone_number) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                ('Administrator', 'admin', 'admin', pw, '', '', '', ''))
+            conn.commit()
+            print("Default admin seeded")
+
+        print("init_db() completed successfully")
 
     except Exception as e:
-        db.rollback()
+        conn.rollback()
         raise e
     finally:
-        db.close()
+        cur.close()
+        conn.close()
+
 
 # ── Grading ───────────────────────────────────────────────────────────────────
 def get_grade(avg):
