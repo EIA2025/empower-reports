@@ -61,38 +61,59 @@ SessionLocal = sessionmaker(bind=engine, autoflush=True, autocommit=False)
 
 # ── Init DB ───────────────────────────────────────────────────────────────────
 def init_db():
+    # Step 1: create all tables (safe to run repeatedly — CREATE TABLE IF NOT EXISTS)
     Base.metadata.create_all(engine)
+
+    # Step 2: seed default data using raw SQL (ORM .add() is unreliable with NullPool)
     db = SessionLocal()
     try:
         # Seed default behavior components
-        if db.execute(text('SELECT COUNT(*) FROM behavior_components')).scalar() == 0:
+        count = db.execute(text('SELECT COUNT(*) FROM behavior_components')).scalar()
+        if count == 0:
             defaults = [
-                ("punctuality","Punctuality"),("attendance","Attendance"),
-                ("manners","Manners"),("general_behavior","General Behavior"),
-                ("organisational_skills","Organisational Skills"),
-                ("adherence_to_uniform","Adherence to Uniform"),
-                ("leadership_skills","Leadership Skills"),
-                ("commitment_to_school","Commitment to School"),
-                ("cooperation_with_peers","Cooperation with Peers"),
-                ("cooperation_with_staff","Cooperation with Staff"),
-                ("participation_in_lessons","Participation in Lessons"),
-                ("completion_of_homework","Completion of Homework"),
+                ("punctuality",            "Punctuality",              0),
+                ("attendance",             "Attendance",               1),
+                ("manners",                "Manners",                  2),
+                ("general_behavior",       "General Behavior",         3),
+                ("organisational_skills",  "Organisational Skills",    4),
+                ("adherence_to_uniform",   "Adherence to Uniform",     5),
+                ("leadership_skills",      "Leadership Skills",        6),
+                ("commitment_to_school",   "Commitment to School",     7),
+                ("cooperation_with_peers", "Cooperation with Peers",   8),
+                ("cooperation_with_staff", "Cooperation with Staff",   9),
+                ("participation_in_lessons","Participation in Lessons",10),
+                ("completion_of_homework", "Completion of Homework",   11),
             ]
-            for idx,(name,label) in enumerate(defaults):
-                db.add(BehaviorComponent(name=name, display_label=label,
-                                         display_order=idx, active=True))
+            for name, label, order in defaults:
+                db.execute(text("""
+                    INSERT INTO behavior_components (name, display_label, display_order, active)
+                    VALUES (:n, :l, :o, true)
+                """), {'n': name, 'l': label, 'o': order})
             db.commit()
+
         # Seed default report design
-        if db.execute(text('SELECT COUNT(*) FROM report_designs')).scalar() == 0:
-            db.add(ReportDesign())
+        count = db.execute(text('SELECT COUNT(*) FROM report_designs')).scalar()
+        if count == 0:
+            db.execute(text("""
+                INSERT INTO report_designs (school_name, primary_color)
+                VALUES ('Empower International Academy', '#3a3a9c')
+            """))
             db.commit()
-        # Seed default admin
-        if not db.execute(text("SELECT * FROM users WHERE email='admin' LIMIT 1")).fetchone():
-            db.add(User(name='Administrator', email='admin', role='admin',
-                        password_hash=hashlib.sha256(b'admin123').hexdigest(),
-                        subjects_taught='', class_teacher_for='',
-                        gender='', phone_number=''))
+
+        # Seed default admin user
+        existing = db.execute(text(
+            "SELECT id FROM users WHERE email='admin' LIMIT 1")).fetchone()
+        if not existing:
+            db.execute(text("""
+                INSERT INTO users (name, email, role, password_hash,
+                    subjects_taught, class_teacher_for, gender, phone_number)
+                VALUES ('Administrator', 'admin', 'admin', :pw, '', '', '', '')
+            """), {'pw': hashlib.sha256(b'admin123').hexdigest()})
             db.commit()
+
+    except Exception as e:
+        db.rollback()
+        raise e
     finally:
         db.close()
 
@@ -139,7 +160,8 @@ def admin_required(f):
     return decorated
 
 def log_audit(db, user_id, action, details=""):
-    db.add(AuditLog(user_id=user_id, action=action, details=details))
+    db.execute(text("INSERT INTO audit_logs (user_id, action, details) VALUES (:uid,:act,:det)"),
+               {'uid':user_id,'act':action,'det':details})
     db.commit()
 
 def validate_phone(phone):
@@ -316,16 +338,18 @@ def add_student():
         db = SessionLocal()
         try:
             subjects = request.form.getlist('subjects')
-            s = Student(
-                name=request.form['name'],
-                year=int(request.form.get('year', 0) or 0),
-                class_name=request.form['class_name'],
-                registration_number=request.form['registration_number'],
-                subjects=json.dumps(subjects),
-                gender=request.form.get('gender', ''),
-                enrollment_date=request.form.get('enrollment_date', ''),
-            )
-            db.add(s)
+            db.execute(text("""
+                INSERT INTO students (name, year, class_name, registration_number, subjects, gender, enrollment_date)
+                VALUES (:name,:year,:cls,:reg,:subs,:gender,:enroll)
+            """), {
+                'name': request.form['name'],
+                'year': int(request.form.get('year',0) or 0),
+                'cls':  request.form['class_name'],
+                'reg':  request.form['registration_number'],
+                'subs': json.dumps(subjects),
+                'gender': request.form.get('gender',''),
+                'enroll': request.form.get('enrollment_date',''),
+            })
             db.commit()
             log_audit(db, session.get('user_id'), 'add_student', s.name)
             flash(f'Student {s.name} added.', 'success')
@@ -413,20 +437,22 @@ def add_staff():
                 flash(phone_or_err, 'error')
                 db.close()
                 return render_template('staff_form.html', user=None)
-            u = User(
-                name=request.form['name'],
-                email=request.form['email'],
-                role=request.form['role'],
-                password_hash=hashlib.sha256(request.form['password'].encode()).hexdigest(),
-                subjects_taught=','.join(subjects),
-                class_teacher_for=request.form.get('class_teacher_for', ''),
-                gender=request.form.get('gender', ''),
-                phone_number=phone_or_err,
-            )
-            db.add(u)
+            name = request.form['name']
+            db.execute(text("""
+                INSERT INTO users (name,email,role,password_hash,subjects_taught,class_teacher_for,gender,phone_number)
+                VALUES (:name,:email,:role,:pw,:subs,:cls,:gender,:phone)
+            """), {
+                'name': name, 'email': request.form['email'],
+                'role': request.form['role'],
+                'pw':   hashlib.sha256(request.form['password'].encode()).hexdigest(),
+                'subs': ','.join(subjects),
+                'cls':  request.form.get('class_teacher_for',''),
+                'gender': request.form.get('gender',''),
+                'phone': phone_or_err,
+            })
             db.commit()
-            log_audit(db, session.get('user_id'), 'add_staff', u.name)
-            flash(f'Staff {u.name} added.', 'success')
+            log_audit(db, session.get('user_id'), 'add_staff', name)
+            flash(f'Staff {name} added.', 'success')
         except Exception as e:
             db.rollback()
             flash(f'Error: {e}', 'error')
@@ -503,16 +529,18 @@ def add_term():
             is_active = 'is_active' in request.form
             if is_active:
                 db.execute(text("UPDATE academic_terms SET is_active=false"))
-            t = AcademicTerm(
-                year=int(request.form['year']),
-                term_number=int(request.form['term_number']),
-                term_name=request.form['term_name'],
-                start_date=request.form['start_date'],
-                end_date=request.form['end_date'],
-                next_term_begins=request.form.get('next_term_begins', ''),
-                is_active=is_active,
-            )
-            db.add(t)
+            db.execute(text("""
+                INSERT INTO academic_terms (year, term_number, term_name, start_date, end_date, next_term_begins, is_active)
+                VALUES (:yr,:tn,:nm,:sd,:ed,:ntb,:act)
+            """), {
+                'yr':  int(request.form['year']),
+                'tn':  int(request.form['term_number']),
+                'nm':  request.form['term_name'],
+                'sd':  request.form['start_date'],
+                'ed':  request.form['end_date'],
+                'ntb': request.form.get('next_term_begins',''),
+                'act': is_active,
+            })
             db.commit()
             flash('Term added successfully.', 'success')
         except Exception as e:
@@ -866,10 +894,10 @@ def behavior_components():
             action = request.form.get('action')
             if action == 'add':
                 name = re.sub(r'\s+', '_', request.form['display_label'].strip().lower())
-                db.add(BehaviorComponent(name=name,
-                                          display_label=request.form['display_label'],
-                                          display_order=int(request.form.get('display_order', 99)),
-                                          active=True))
+                db.execute(text("""
+                    INSERT INTO behavior_components (name,display_label,display_order,active)
+                    VALUES (:n,:l,:o,true)
+                """), {'n':name,'l':request.form['display_label'],'o':int(request.form.get('display_order',99))})
                 db.commit()
                 flash('Component added.', 'success')
             elif action == 'toggle':
@@ -905,15 +933,15 @@ def discipline():
         if request.method == 'POST':
             action = request.form.get('action', 'add')
             if action == 'add':
-                db.add(DisciplineReport(
-                    student_id=int(request.form['student_id']),
-                    reported_by=uid,
-                    incident_date=request.form['incident_date'],
-                    incident_type=request.form['incident_type'],
-                    description=request.form['description'],
-                    action_taken=request.form.get('action_taken', ''),
-                    status='Pending',
-                ))
+                db.execute(text("""
+                    INSERT INTO discipline_reports
+                        (student_id,reported_by,incident_date,incident_type,description,action_taken,status)
+                    VALUES (:sid,:uid,:idate,:itype,:desc,:action,'Pending')
+                """), {
+                    'sid':int(request.form['student_id']),'uid':uid,
+                    'idate':request.form['incident_date'],'itype':request.form['incident_type'],
+                    'desc':request.form['description'],'action':request.form.get('action_taken',''),
+                })
                 db.commit()
                 flash('Discipline report filed.', 'success')
             elif action == 'update_status' and role == 'admin':
@@ -958,14 +986,14 @@ def communications():
             if action == 'send':
                 is_broadcast = 'broadcast' in request.form
                 recipient_id = None if is_broadcast else int(request.form.get('recipient_id', 0))
-                db.add(Message(
-                    sender_id=uid,
-                    recipient_id=None if is_broadcast else recipient_id,
-                    subject=request.form['subject'],
-                    body=request.form['body'],
-                    is_broadcast=is_broadcast,
-                    read=False,
-                ))
+                db.execute(text("""
+                    INSERT INTO messages (sender_id,recipient_id,subject,body,is_broadcast,read)
+                    VALUES (:sid,:rid,:subj,:body,:bcast,false)
+                """), {
+                    'sid':uid,'rid':None if is_broadcast else recipient_id,
+                    'subj':request.form['subject'],'body':request.form['body'],
+                    'bcast':is_broadcast,
+                })
                 db.commit()
                 flash('Message sent.', 'success')
             elif action == 'mark_read':
@@ -1030,12 +1058,14 @@ def decisions():
                 notes = request.form.get('notes', '')
                 existing = db.execute(text('SELECT id FROM student_decisions WHERE student_id=:sid AND term_id=:tid'),{'sid':student_id,'tid':term_id}).fetchone()
                 if existing:
-                    existing.decision = decision_val; existing.notes = notes
+                    db.execute(text('UPDATE student_decisions SET decision=:dec,notes=:notes WHERE id=:id'),
+                               {'dec':decision_val,'notes':notes,'id':existing.id})
                 else:
-                    db.add(StudentDecision(student_id=student_id, term_id=term_id,
-                                            decision=decision_val, notes=notes,
-                                            decision_made_by=uid,
-                                            decision_date=datetime.now().isoformat()))
+                    db.execute(text("""
+                        INSERT INTO student_decisions (student_id,term_id,decision,notes,decision_made_by,decision_date)
+                        VALUES (:sid,:tid,:dec,:notes,:uid,:dd)
+                    """), {'sid':student_id,'tid':term_id,'dec':decision_val,
+                             'notes':notes,'uid':uid,'dd':datetime.now().isoformat()})
                 db.commit()
                 flash('Decision saved.', 'success')
             except Exception as e:
@@ -1081,17 +1111,23 @@ def visitation():
                 term_id = int(request.form['term_id'])
                 existing = db.execute(text('SELECT id FROM visitation_days WHERE student_id=:sid AND term_id=:tid'),{'sid':student_id,'tid':term_id}).fetchone()
                 if existing:
-                    existing.visitation_date = request.form.get('visitation_date', '')
-                    existing.parent_attended = 'parent_attended' in request.form
-                    existing.report_given = 'report_given' in request.form
-                    existing.notes = request.form.get('notes', '')
+                    db.execute(text("""
+                        UPDATE visitation_days SET visitation_date=:vd,parent_attended=:pa,
+                        report_given=:rg,notes=:notes WHERE id=:id
+                    """), {'vd':request.form.get('visitation_date',''),
+                             'pa':'parent_attended' in request.form,
+                             'rg':'report_given' in request.form,
+                             'notes':request.form.get('notes',''),'id':existing.id})
                 else:
-                    db.add(VisitationDay(student_id=student_id, term_id=term_id,
-                                          visitation_date=request.form.get('visitation_date', ''),
-                                          parent_attended='parent_attended' in request.form,
-                                          report_given='report_given' in request.form,
-                                          notes=request.form.get('notes', ''),
-                                          created_by=uid))
+                    db.execute(text("""
+                        INSERT INTO visitation_days
+                            (student_id,term_id,visitation_date,parent_attended,report_given,notes,created_by)
+                        VALUES (:sid,:tid,:vd,:pa,:rg,:notes,:uid)
+                    """), {'sid':student_id,'tid':term_id,
+                             'vd':request.form.get('visitation_date',''),
+                             'pa':'parent_attended' in request.form,
+                             'rg':'report_given' in request.form,
+                             'notes':request.form.get('notes',''),'uid':uid})
                 db.commit()
                 flash('Visitation record saved.', 'success')
             except Exception as e:
@@ -1115,20 +1151,23 @@ def report_design():
     try:
         design = db.execute(text('SELECT * FROM report_designs LIMIT 1')).fetchone()
         if not design:
-            design = ReportDesign()
-            db.add(design)
+            db.execute(text("INSERT INTO report_designs (school_name,primary_color) VALUES ('Empower International Academy','#3a3a9c')"))
             db.commit()
+            design = db.execute(text('SELECT * FROM report_designs LIMIT 1')).fetchone()
 
         if request.method == 'POST':
-            design.school_name = request.form.get('school_name', design.school_name)
-            design.school_subtitle = request.form.get('school_subtitle', '')
-            design.school_address = request.form.get('school_address', '')
-            design.school_po_box = request.form.get('school_po_box', '')
-            design.school_phone = request.form.get('school_phone', '')
-            design.school_email = request.form.get('school_email', '')
-            design.school_website = request.form.get('school_website', '')
-            design.primary_color = request.form.get('primary_color', '#8B4513')
-            design.report_footer = request.form.get('report_footer', '')
+            _design_updates = {
+                'sname':   request.form.get('school_name', design.school_name),
+                'ssub':    request.form.get('school_subtitle',''),
+                'saddr':   request.form.get('school_address',''),
+                'spob':    request.form.get('school_po_box',''),
+                'sphone':  request.form.get('school_phone',''),
+                'semail':  request.form.get('school_email',''),
+                'sweb':    request.form.get('school_website',''),
+                'scolor':  request.form.get('primary_color','#8B4513'),
+                'sfooter': request.form.get('report_footer',''),
+                'did':     design.id,
+            }
 
             logo_file = request.files.get('logo')
             if logo_file and logo_file.filename:
@@ -1488,14 +1527,11 @@ def admin_management():
         if request.method == 'POST':
             action = request.form.get('action')
             if action == 'add_admin':
-                new_admin = User(
-                    name=request.form['name'],
-                    email=request.form['email'],
-                    role='admin',
-                    password_hash=hashlib.sha256(request.form['password'].encode()).hexdigest(),
-                    subjects_taught='', class_teacher_for='', gender='', phone_number=''
-                )
-                db.add(new_admin)
+                db.execute(text("""
+                    INSERT INTO users (name,email,role,password_hash,subjects_taught,class_teacher_for,gender,phone_number)
+                    VALUES (:name,:email,'admin',:pw,'','','','')
+                """), {'name':request.form['name'],'email':request.form['email'],
+                         'pw':hashlib.sha256(request.form['password'].encode()).hexdigest()})
                 db.commit()
                 flash('Admin added.', 'success')
             return redirect(url_for('admin_management'))
