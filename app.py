@@ -11,7 +11,6 @@ from functools import wraps
 from pathlib import Path
 
 import csv
-import traceback
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, flash, send_file, jsonify, abort)
 from sqlalchemy import create_engine, text
@@ -325,7 +324,7 @@ def add_student():
 @admin_required
 def edit_student(sid):
     db = SessionLocal()
-    s = db.get(Student, sid)
+    s = db.query(Student).get(sid)
     if not s:
         db.close()
         abort(404)
@@ -356,7 +355,7 @@ def edit_student(sid):
 @admin_required
 def delete_student(sid):
     db = SessionLocal()
-    s = db.get(Student, sid)
+    s = db.query(Student).get(sid)
     if s:
         db.delete(s)
         db.commit()
@@ -417,7 +416,7 @@ def add_staff():
 @admin_required
 def edit_staff(uid):
     db = SessionLocal()
-    u = db.get(User, uid)
+    u = db.query(User).get(uid)
     if not u:
         db.close()
         abort(404)
@@ -449,7 +448,7 @@ def edit_staff(uid):
 @admin_required
 def delete_staff(uid):
     db = SessionLocal()
-    u = db.get(User, uid)
+    u = db.query(User).get(uid)
     if u:
         db.delete(u)
         db.commit()
@@ -478,27 +477,27 @@ def add_term():
         try:
             is_active = 'is_active' in request.form
             if is_active:
-                db.query(AcademicTerm).update({'is_active': False})
+                db.execute(text("UPDATE academic_terms SET is_active=false"))
             t = AcademicTerm(
                 year=int(request.form['year']),
                 term_number=int(request.form['term_number']),
                 term_name=request.form['term_name'],
-                start_date=request.form.get('start_date', ''),
-                end_date=request.form.get('end_date', ''),
+                start_date=request.form['start_date'],
+                end_date=request.form['end_date'],
                 next_term_begins=request.form.get('next_term_begins', ''),
                 is_active=is_active,
             )
             db.add(t)
             db.commit()
-            flash('Term added.', 'success')
+            flash('Term added successfully.', 'success')
         except Exception as e:
             db.rollback()
-            app.logger.error('Failed to add term: %s\n%s', e, traceback.format_exc())
-            flash('Error saving term. Check the server logs for details.', 'error')
+            flash(f'Error adding term: {e}', 'error')
         finally:
             db.close()
         return redirect(url_for('terms'))
-    return render_template('term_form.html', term=None, now=datetime.now)
+    from datetime import datetime
+    return render_template('term_form.html', term=None, current_year=datetime.now().year)
 
 
 @app.route('/terms/<int:tid>/activate', methods=['POST'])
@@ -507,7 +506,7 @@ def add_term():
 def activate_term(tid):
     db = SessionLocal()
     db.query(AcademicTerm).update({'is_active': False})
-    t = db.get(AcademicTerm, tid)
+    t = db.query(AcademicTerm).get(tid)
     if t:
         t.is_active = True
         db.commit()
@@ -521,7 +520,7 @@ def activate_term(tid):
 @admin_required
 def delete_term(tid):
     db = SessionLocal()
-    t = db.get(AcademicTerm, tid)
+    t = db.query(AcademicTerm).get(tid)
     if t:
         db.delete(t)
         db.commit()
@@ -538,84 +537,142 @@ def marks():
     try:
         role = session['user_role']
         uid = session.get('user_id')
-        user = db.get(User, uid) if uid else None
-        terms = db.query(AcademicTerm).order_by(AcademicTerm.year.desc(), AcademicTerm.term_number).all()
-        active_term = db.query(AcademicTerm).filter_by(is_active=True).first()
+        user = db.execute(text("SELECT * FROM users WHERE id=:id"), {'id': uid}).fetchone()
+        terms = db.execute(text("SELECT * FROM academic_terms ORDER BY year DESC, term_number")).fetchall()
+        active_term = db.execute(text("SELECT * FROM academic_terms WHERE is_active=true LIMIT 1")).fetchone()
 
-        # Determine which classes/subjects the user can see
+        # Classes and subjects this user can access
         if role == 'admin':
             classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
-            subjects_filter = None
-        elif user:
-            classes = [c.strip() for c in (user.class_teacher_for or '').split(',') if c.strip()]
-            subjects_filter = [s.strip() for s in (user.subjects_taught or '').split(',') if s.strip()]
-            # Also include classes where user teaches subjects
-            if not classes:
-                classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
+            subjects_filter = None  # admin sees all subjects
         else:
-            classes = []
-            subjects_filter = []
+            # Teacher: subjects_taught comma list, class_teacher_for comma list
+            raw_subjects = [s.strip() for s in (user.subjects_taught or '').split(',') if s.strip()]
+            raw_classes  = [c.strip() for c in (user.class_teacher_for or '').split(',') if c.strip()]
+            subjects_filter = raw_subjects if raw_subjects else None
+            if raw_classes:
+                classes = raw_classes
+            else:
+                # Fall back to all classes (so they can at least see something)
+                classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
 
-        selected_class = request.args.get('class_name') or (classes[0] if classes else None)
+        selected_class   = request.args.get('class_name') or (classes[0] if classes else None)
         selected_term_id = request.args.get('term_id') or (str(active_term.id) if active_term else None)
+        selected_subject = request.args.get('subject') or None  # which subject tab is open
 
         students_list = []
-        marks_data = {}
+        marks_data    = {}
+        all_subjects  = []   # subjects available for this class (filtered if teacher)
+
         if selected_class and selected_term_id:
             rows = db.execute(text(
                 "SELECT id, name, registration_number, subjects FROM students "
                 "WHERE class_name=:cls ORDER BY name"), {'cls': selected_class}).fetchall()
+
             for r in rows:
                 subs = json.loads(r.subjects) if r.subjects else []
                 students_list.append({'id': r.id, 'name': r.name,
-                                       'reg': r.registration_number, 'subjects': subs})
-            # Fetch existing marks
-            mrows = db.execute(text("""
-                SELECT m.student_id, m.subject, m.coursework_out_of_20, m.midterm_out_of_20,
-                       m.endterm_out_of_60, m.total, m.grade, m.comment
-                FROM marks m WHERE m.term_id=:tid
-                AND m.student_id IN (SELECT id FROM students WHERE class_name=:cls)
-            """), {'tid': int(selected_term_id), 'cls': selected_class}).fetchall()
-            for r in mrows:
-                marks_data[(r.student_id, r.subject)] = dict(r._mapping)
+                                      'reg': r.registration_number, 'subjects': subs})
+                for s in subs:
+                    if s not in all_subjects:
+                        all_subjects.append(s)
 
+            # Apply subject filter for teachers
+            if subjects_filter:
+                all_subjects = [s for s in all_subjects if s in subjects_filter]
+
+            if not selected_subject or selected_subject not in all_subjects:
+                selected_subject = all_subjects[0] if all_subjects else None
+
+            # Fetch existing marks for this class + term
+            if students_list:
+                mrows = db.execute(text("""
+                    SELECT m.student_id, m.subject, m.coursework_out_of_20,
+                           m.midterm_out_of_20, m.endterm_out_of_60, m.total, m.grade, m.comment
+                    FROM marks m
+                    WHERE m.term_id=:tid
+                    AND m.student_id IN (SELECT id FROM students WHERE class_name=:cls)
+                """), {'tid': int(selected_term_id), 'cls': selected_class}).fetchall()
+                for r in mrows:
+                    marks_data[(r.student_id, r.subject)] = dict(r._mapping)
+
+        # ── BULK SAVE ──────────────────────────────────────────────────────────
         if request.method == 'POST':
-            try:
-                student_id = int(request.form['student_id'])
-                subject = request.form['subject']
-                term_id = int(request.form['term_id'])
-                comp_type = request.form['component_type']  # coursework/midterm/endterm
-                score = float(request.form['score'])
-                total = float(request.form['total'])
-                comp_name = request.form.get('component_name', comp_type.title())
+            term_id    = int(request.form['term_id'])
+            saved      = 0
+            errors     = []
+            form       = request.form
 
-                # Save component mark
-                existing = db.query(ComponentMark).filter_by(
-                    student_id=student_id, subject=subject, term_id=term_id,
-                    component_type=comp_type, component_name=comp_name).first()
-                if existing:
-                    existing.score = score
-                    existing.total = total
-                else:
-                    db.add(ComponentMark(student_id=student_id, subject=subject,
-                                          term_id=term_id, component_type=comp_type,
-                                          component_name=comp_name, score=score,
-                                          total=total, submitted_by=uid))
-                db.commit()
+            # Form fields are named: cw_{student_id}, mt_{student_id}, et_{student_id}
+            # for the current subject (also posted as hidden field 'subject')
+            subject = form.get('subject', '')
 
-                # Recompute compiled mark
-                _recompile_mark(db, student_id, subject, term_id, uid)
-                flash('Mark saved.', 'success')
-            except Exception as e:
-                db.rollback()
-                flash(f'Error saving mark: {e}', 'error')
-            return redirect(url_for('marks', class_name=selected_class, term_id=selected_term_id))
+            # Collect all student ids submitted
+            student_ids = [int(k.split('_')[1]) for k in form if k.startswith('cw_')]
 
-        return render_template('marks.html', classes=classes, terms=terms,
-                                selected_class=selected_class,
-                                selected_term_id=selected_term_id,
-                                students_list=students_list, marks_data=marks_data,
-                                subjects_filter=subjects_filter)
+            for sid in student_ids:
+                try:
+                    cw_score = float(form.get(f'cw_{sid}') or 0)
+                    cw_total = float(form.get(f'cwt_{sid}') or 20)
+                    mt_score = float(form.get(f'mt_{sid}') or 0)
+                    mt_total = float(form.get(f'mtt_{sid}') or 20)
+                    et_score = float(form.get(f'et_{sid}') or 0)
+                    et_total = float(form.get(f'ett_{sid}') or 60)
+
+                    # Save/update component marks (coursework)
+                    for comp_type, score, total in [
+                        ('coursework', cw_score, cw_total),
+                        ('midterm',    mt_score, mt_total),
+                        ('endterm',    et_score, et_total),
+                    ]:
+                        existing_cm = db.execute(text("""
+                            SELECT id FROM component_marks
+                            WHERE student_id=:sid AND subject=:sub AND term_id=:tid
+                            AND component_type=:ct AND component_name=:cn
+                        """), {'sid': sid, 'sub': subject, 'tid': term_id,
+                               'ct': comp_type, 'cn': comp_type.title()}).fetchone()
+
+                        if existing_cm:
+                            db.execute(text("""
+                                UPDATE component_marks SET score=:sc, total=:tot
+                                WHERE id=:id
+                            """), {'sc': score, 'tot': total, 'id': existing_cm.id})
+                        else:
+                            db.execute(text("""
+                                INSERT INTO component_marks
+                                (student_id, subject, term_id, component_type, component_name, score, total, submitted_by)
+                                VALUES (:sid,:sub,:tid,:ct,:cn,:sc,:tot,:uid)
+                            """), {'sid': sid, 'sub': subject, 'tid': term_id,
+                                   'ct': comp_type, 'cn': comp_type.title(),
+                                   'sc': score, 'tot': total, 'uid': uid})
+
+                    db.commit()
+                    _recompile_mark(db, sid, subject, term_id, uid)
+                    saved += 1
+                except Exception as e:
+                    db.rollback()
+                    errors.append(str(e))
+
+            if errors:
+                flash(f'Saved {saved} records. Errors: {"; ".join(errors[:3])}', 'warning')
+            else:
+                flash(f'✓ Marks saved for {saved} student(s) in {subject}.', 'success')
+
+            return redirect(url_for('marks',
+                class_name=form.get('selected_class', selected_class),
+                term_id=term_id,
+                subject=subject))
+
+        return render_template('marks.html',
+            classes=classes, terms=terms,
+            selected_class=selected_class,
+            selected_term_id=selected_term_id,
+            students_list=students_list,
+            marks_data=marks_data,
+            all_subjects=all_subjects,
+            selected_subject=selected_subject,
+            subjects_filter=subjects_filter,
+            role=role)
     finally:
         db.close()
 
@@ -677,7 +734,7 @@ def behavior():
         if role == 'admin':
             classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
         else:
-            u = db.get(User, uid)
+            u = db.query(User).get(uid)
             classes = [c.strip() for c in (u.class_teacher_for or '').split(',') if c.strip()] if u else []
             if not classes:
                 classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
@@ -749,13 +806,13 @@ def behavior_components():
                 flash('Component added.', 'success')
             elif action == 'toggle':
                 cid = int(request.form['component_id'])
-                c = db.get(BehaviorComponent, cid)
+                c = db.query(BehaviorComponent).get(cid)
                 if c:
                     c.active = not c.active
                     db.commit()
             elif action == 'delete':
                 cid = int(request.form['component_id'])
-                c = db.get(BehaviorComponent, cid)
+                c = db.query(BehaviorComponent).get(cid)
                 if c:
                     db.delete(c)
                     db.commit()
@@ -793,7 +850,7 @@ def discipline():
                 flash('Discipline report filed.', 'success')
             elif action == 'update_status' and role == 'admin':
                 rid = int(request.form['report_id'])
-                r = db.get(DisciplineReport, rid)
+                r = db.query(DisciplineReport).get(rid)
                 if r:
                     r.status = request.form['status']
                     r.admin_notes = request.form.get('admin_notes', '')
@@ -845,7 +902,7 @@ def communications():
                 flash('Message sent.', 'success')
             elif action == 'mark_read':
                 mid = int(request.form['message_id'])
-                m = db.get(Message, mid)
+                m = db.query(Message).get(mid)
                 if m:
                     m.read = True
                     db.commit()
@@ -879,7 +936,7 @@ def decisions():
         if role == 'admin':
             classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
         else:
-            u = db.get(User, uid)
+            u = db.query(User).get(uid)
             classes = [c.strip() for c in (u.class_teacher_for or '').split(',') if c.strip()] if u else []
             if not classes:
                 classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
@@ -1045,7 +1102,7 @@ def generate_reports():
             selected_class = request.form.get('class_name')
             student_id = request.form.get('student_id')
 
-            term = db.get(AcademicTerm, term_id)
+            term = db.query(AcademicTerm).get(term_id)
             if not term:
                 flash('Term not found.', 'error')
                 return redirect(url_for('generate_reports'))
@@ -1059,7 +1116,7 @@ def generate_reports():
 
             if student_id:
                 # Single student PDF
-                s = db.get(Student, int(student_id))
+                s = db.query(Student).get(int(student_id))
                 if not s:
                     flash('Student not found.', 'error')
                     return redirect(url_for('generate_reports'))
@@ -1303,7 +1360,7 @@ def change_login():
         if not uid:
             flash('Please log in first.', 'error')
             return redirect(url_for('login'))
-        user = db.get(User, uid)
+        user = db.query(User).get(uid)
         if not user:
             flash('User not found.', 'error')
             return redirect(url_for('dashboard'))
@@ -1445,7 +1502,7 @@ def comments():
         if role == 'admin':
             classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
         else:
-            u = db.get(User, uid)
+            u = db.query(User).get(uid)
             classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
 
         selected_class = request.args.get('class_name') or (classes[0] if classes else None)

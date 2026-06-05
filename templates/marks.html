@@ -1,70 +1,251 @@
-{% extends "base.html" %}{% block title %}Enter Results{% endblock %}
-{% block content %}
-<h2 class="fw-bold mb-3"><i class="bi bi-pencil-square me-2"></i>Enter Results</h2>
-<div class="card mb-3"><div class="card-body">
-<form class="row g-2" method="GET">
-<div class="col-md-4"><label class="form-label">Class</label>
-<select name="class_name" class="form-select" onchange="this.form.submit()">
-{% for c in classes %}<option value="{{ c }}" {{ 'selected' if c==selected_class }}>{{ c }}</option>{% endfor %}
-</select></div>
-<div class="col-md-4"><label class="form-label">Term</label>
-<select name="term_id" class="form-select" onchange="this.form.submit()">
-{% for t in terms %}<option value="{{ t.id }}" {{ 'selected' if t.id|string==selected_term_id }}>{{ t.term_name }}</option>{% endfor %}
-</select></div>
-</form></div></div>
+{% extends "base.html" %}
+{% block title %}Enter Results{% endblock %}
 
-{% if students_list %}
-<div class="card"><div class="card-header">Results Entry — {{ selected_class }}</div>
-<div class="card-body p-0">
-<div class="accordion" id="studentsAccordion">
-{% for s in students_list %}
-<div class="accordion-item">
-  <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#s{{ s.id }}">
-    {{ s.name }} <span class="badge bg-secondary ms-2">{{ s.reg }}</span>
-  </button></h2>
-  <div id="s{{ s.id }}" class="accordion-collapse collapse">
-    <div class="accordion-body">
-      {% for subject in s.subjects %}
-      {% if not subjects_filter or subject in subjects_filter %}
-      {% set mk = marks_data.get((s.id, subject), {}) %}
-      <div class="card mb-2"><div class="card-header py-2 bg-light fw-semibold">{{ subject }}</div>
-      <div class="card-body py-2">
-        <div class="row g-2">
-          {% for comp_type, label, base in [('coursework','CW',20),('midterm','MOT',20),('endterm','EOT',60)] %}
-          <div class="col-md-4">
-            <label class="form-label small fw-semibold">{{ label }} /{{ base }}</label>
-            <div class="d-flex gap-1 align-items-center">
-              <form method="POST" class="d-flex gap-1" style="flex:1">
-                <input type="hidden" name="student_id" value="{{ s.id }}">
-                <input type="hidden" name="subject" value="{{ subject }}">
-                <input type="hidden" name="term_id" value="{{ selected_term_id }}">
-                <input type="hidden" name="component_type" value="{{ comp_type }}">
-                <input type="hidden" name="component_name" value="{{ label }}">
-                <input type="number" name="score" class="form-control form-control-sm" min="0" max="{{ base }}" step="0.1"
-                  value="{{ '%.1f'|format(mk.get(comp_type+'_out_of_'+base|string, 0)) if mk else '' }}" placeholder="Score">
-                <input type="number" name="total" class="form-control form-control-sm" min="1" max="9999" step="0.1"
-                  value="{{ base }}" placeholder="Total">
-                <button type="submit" class="btn btn-sm btn-brand">✓</button>
-              </form>
-            </div>
-          </div>
-          {% endfor %}
-          <div class="col-md-12 mt-1">
-            {% if mk %}
-            <small class="text-muted">Total: <strong>{{ mk.get('total','') }}</strong> &nbsp;
-            Grade: <span class="badge bg-{{ 'success' if mk.get('grade') in ['A*','A'] else 'warning text-dark' if mk.get('grade') in ['B','C'] else 'danger' }}">{{ mk.get('grade','') }}</span></small>
-            {% endif %}
-          </div>
-        </div>
-      </div></div>
-      {% endif %}
-      {% endfor %}
+{% block extra_css %}
+<style>
+.subject-tabs .nav-link { border-radius: 8px 8px 0 0; font-weight: 600; font-size: .9rem; }
+.subject-tabs .nav-link.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+.marks-table th { font-size: .82rem; white-space: nowrap; }
+.marks-table td { vertical-align: middle; padding: 6px 8px; }
+.marks-input { width: 68px; text-align: center; font-size: .9rem; padding: 4px 6px; }
+.total-cell { font-weight: 700; font-size: 1rem; }
+.grade-cell { font-weight: 800; font-size: 1rem; }
+.grade-A\\* { color: #7c3aed; }
+.grade-A  { color: #059669; }
+.grade-B  { color: #2563eb; }
+.grade-C  { color: #d97706; }
+.grade-D  { color: #ea580c; }
+.grade-E, .grade-U { color: #dc2626; }
+.saved-row { background: #f0fdf4 !important; }
+.filter-bar { background: #fff; border-radius: 12px; padding: 16px 20px; margin-bottom: 18px; box-shadow: 0 1px 6px rgba(0,0,0,.07); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="fw-bold mb-0"><i class="bi bi-pencil-square me-2"></i>Enter Results</h2>
+</div>
+
+<!-- Filter bar -->
+<div class="filter-bar">
+  <form class="row g-2 align-items-end" method="GET" id="filterForm">
+    <div class="col-md-3">
+      <label class="form-label fw-semibold mb-1">Class</label>
+      <select name="class_name" class="form-select" onchange="this.form.submit()">
+        {% for c in classes %}
+        <option value="{{ c }}" {{ 'selected' if c == selected_class }}>{{ c }}</option>
+        {% endfor %}
+      </select>
     </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold mb-1">Term</label>
+      <select name="term_id" class="form-select" onchange="this.form.submit()">
+        {% for t in terms %}
+        <option value="{{ t.id }}" {{ 'selected' if t.id|string == selected_term_id }}>{{ t.term_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold mb-1">Subject</label>
+      <select name="subject" class="form-select" onchange="this.form.submit()">
+        {% for s in all_subjects %}
+        <option value="{{ s }}" {{ 'selected' if s == selected_subject }}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+      {% if subjects_filter %}
+      <div class="alert alert-info py-2 px-3 mb-0 w-100" style="font-size:.82rem;">
+        <i class="bi bi-info-circle me-1"></i>
+        Showing your {{ subjects_filter|length }} subject(s) only
+      </div>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+{% if not students_list %}
+  <div class="alert alert-warning"><i class="bi bi-exclamation-circle me-2"></i>No students found for this class.</div>
+{% elif not all_subjects %}
+  <div class="alert alert-warning"><i class="bi bi-exclamation-circle me-2"></i>No subjects found. Make sure students have subjects assigned.</div>
+{% else %}
+
+<!-- Subject tabs -->
+<ul class="nav nav-tabs subject-tabs mb-0" id="subjectTabs">
+  {% for s in all_subjects %}
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if s == selected_subject }}"
+       href="{{ url_for('marks', class_name=selected_class, term_id=selected_term_id, subject=s) }}">
+      {{ s }}
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+
+<!-- Marks entry form for the selected subject -->
+{% if selected_subject %}
+<div class="card" style="border-radius: 0 12px 12px 12px;">
+  <div class="card-body p-0">
+    <form method="POST" id="marksForm">
+      <input type="hidden" name="term_id"        value="{{ selected_term_id }}">
+      <input type="hidden" name="subject"         value="{{ selected_subject }}">
+      <input type="hidden" name="selected_class"  value="{{ selected_class }}">
+
+      <div class="table-responsive">
+        <table class="table marks-table mb-0">
+          <thead>
+            <tr class="table-light">
+              <th style="min-width:180px;">#&nbsp; Student</th>
+              <th class="text-center" colspan="2">
+                Coursework
+                <div style="font-size:.75rem;font-weight:400;color:#666;">Score / Out of</div>
+              </th>
+              <th class="text-center" colspan="2">
+                Mid-Term
+                <div style="font-size:.75rem;font-weight:400;color:#666;">Score / Out of</div>
+              </th>
+              <th class="text-center" colspan="2">
+                End of Term
+                <div style="font-size:.75rem;font-weight:400;color:#666;">Score / Out of</div>
+              </th>
+              <th class="text-center">CW/20</th>
+              <th class="text-center">MT/20</th>
+              <th class="text-center">ET/60</th>
+              <th class="text-center">Total</th>
+              <th class="text-center">Grade</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for student in students_list %}
+              {% if selected_subject in student.subjects %}
+                {% set m = marks_data.get((student.id, selected_subject), {}) %}
+                {% set has_marks = m.get('total') is not none and m.get('total') != '' %}
+                <tr class="{{ 'saved-row' if has_marks }}">
+                  <td>
+                    <div class="fw-semibold" style="font-size:.9rem;">{{ student.name }}</div>
+                    <small class="text-muted">{{ student.reg }}</small>
+                  </td>
+                  <!-- Coursework -->
+                  <td class="text-center">
+                    <input type="number" step="0.1" min="0"
+                           name="cw_{{ student.id }}"
+                           class="form-control marks-input"
+                           value="{{ m.get('coursework_out_of_20', '') if m else '' }}"
+                           placeholder="0"
+                           oninput="recalc({{ student.id }})">
+                  </td>
+                  <td class="text-center">
+                    <input type="number" step="0.1" min="0"
+                           name="cwt_{{ student.id }}"
+                           class="form-control marks-input"
+                           value="20"
+                           readonly style="background:#f8f9fa;color:#888;">
+                  </td>
+                  <!-- Mid-term -->
+                  <td class="text-center">
+                    <input type="number" step="0.1" min="0"
+                           name="mt_{{ student.id }}"
+                           class="form-control marks-input"
+                           value="{{ m.get('midterm_out_of_20', '') if m else '' }}"
+                           placeholder="0"
+                           oninput="recalc({{ student.id }})">
+                  </td>
+                  <td class="text-center">
+                    <input type="number" step="0.1" min="0"
+                           name="mtt_{{ student.id }}"
+                           class="form-control marks-input"
+                           value="20"
+                           readonly style="background:#f8f9fa;color:#888;">
+                  </td>
+                  <!-- End of term -->
+                  <td class="text-center">
+                    <input type="number" step="0.1" min="0"
+                           name="et_{{ student.id }}"
+                           class="form-control marks-input"
+                           value="{{ m.get('endterm_out_of_60', '') if m else '' }}"
+                           placeholder="0"
+                           oninput="recalc({{ student.id }})">
+                  </td>
+                  <td class="text-center">
+                    <input type="number" step="0.1" min="0"
+                           name="ett_{{ student.id }}"
+                           class="form-control marks-input"
+                           value="60"
+                           readonly style="background:#f8f9fa;color:#888;">
+                  </td>
+                  <!-- Live computed -->
+                  <td class="text-center total-cell" id="cw20_{{ student.id }}">
+                    {{ '%.1f'|format(m.get('coursework_out_of_20') or 0) if m else '—' }}
+                  </td>
+                  <td class="text-center total-cell" id="mt20_{{ student.id }}">
+                    {{ '%.1f'|format(m.get('midterm_out_of_20') or 0) if m else '—' }}
+                  </td>
+                  <td class="text-center total-cell" id="et60_{{ student.id }}">
+                    {{ '%.1f'|format(m.get('endterm_out_of_60') or 0) if m else '—' }}
+                  </td>
+                  <td class="text-center total-cell" id="total_{{ student.id }}">
+                    {{ '%.1f'|format(m.get('total') or 0) if m else '—' }}
+                  </td>
+                  <td class="text-center grade-cell" id="grade_{{ student.id }}">
+                    {% if m and m.get('grade') %}<span class="grade-{{ m.get('grade') }}">{{ m.get('grade') }}</span>{% else %}—{% endif %}
+                  </td>
+                </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Save All button -->
+      <div class="d-flex justify-content-between align-items-center p-3 border-top bg-light" style="border-radius:0 0 12px 12px;">
+        <div class="text-muted small">
+          <i class="bi bi-info-circle me-1"></i>
+          Green rows already have saved marks. Editing will overwrite them.
+        </div>
+        <button type="submit" class="btn btn-brand btn-lg px-5 fw-semibold">
+          <i class="bi bi-cloud-upload me-2"></i>Save All — {{ selected_subject }}
+        </button>
+      </div>
+    </form>
   </div>
 </div>
-{% endfor %}
-</div></div></div>
-{% else %}
-<div class="alert alert-info"><i class="bi bi-info-circle me-2"></i>Select a class and term to enter results.</div>
 {% endif %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getGrade(total) {
+  if (total >= 90) return 'A*';
+  if (total >= 80) return 'A';
+  if (total >= 70) return 'B';
+  if (total >= 60) return 'C';
+  if (total >= 50) return 'D';
+  if (total >= 40) return 'E';
+  return 'U';
+}
+
+function recalc(sid) {
+  const cw  = parseFloat(document.querySelector(`[name="cw_${sid}"]`)?.value)  || 0;
+  const cwt = parseFloat(document.querySelector(`[name="cwt_${sid}"]`)?.value) || 20;
+  const mt  = parseFloat(document.querySelector(`[name="mt_${sid}"]`)?.value)  || 0;
+  const mtt = parseFloat(document.querySelector(`[name="mtt_${sid}"]`)?.value) || 20;
+  const et  = parseFloat(document.querySelector(`[name="et_${sid}"]`)?.value)  || 0;
+  const ett = parseFloat(document.querySelector(`[name="ett_${sid}"]`)?.value) || 60;
+
+  const cw20 = cwt  ? (cw  / cwt)  * 20 : 0;
+  const mt20 = mtt  ? (mt  / mtt)  * 20 : 0;
+  const et60 = ett  ? (et  / ett)  * 60 : 0;
+  const total = cw20 + mt20 + et60;
+  const grade = getGrade(total);
+
+  document.getElementById(`cw20_${sid}`).textContent  = cw20.toFixed(1);
+  document.getElementById(`mt20_${sid}`).textContent  = mt20.toFixed(1);
+  document.getElementById(`et60_${sid}`).textContent  = et60.toFixed(1);
+  document.getElementById(`total_${sid}`).textContent = total.toFixed(1);
+
+  const gradeEl = document.getElementById(`grade_${sid}`);
+  gradeEl.innerHTML = `<span class="grade-${grade}">${grade}</span>`;
+}
+</script>
 {% endblock %}
