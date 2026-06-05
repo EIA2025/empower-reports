@@ -278,6 +278,25 @@ def dashboard():
         db.close()
 
 
+def _get_all_known_subjects(db):
+    """Return sorted list of all subjects known in the system:
+       collected from teachers' subjects_taught + existing marks."""
+    known = set()
+    # From teachers
+    rows = db.execute(text("SELECT subjects_taught FROM users WHERE subjects_taught IS NOT NULL AND subjects_taught != ''")).fetchall()
+    for r in rows:
+        for s in r.subjects_taught.split(','):
+            s = s.strip()
+            if s:
+                known.add(s)
+    # From existing marks (in case some were entered differently)
+    rows2 = db.execute(text("SELECT DISTINCT subject FROM marks WHERE subject IS NOT NULL")).fetchall()
+    for r in rows2:
+        if r.subject:
+            known.add(r.subject.strip())
+    return sorted(known)
+
+
 # ── Routes: Students ──────────────────────────────────────────────────────────
 @app.route('/students')
 @login_required
@@ -316,7 +335,12 @@ def add_student():
         finally:
             db.close()
         return redirect(url_for('students'))
-    return render_template('student_form.html', student=None)
+    db = SessionLocal()
+    try:
+        all_subjects = _get_all_known_subjects(db)
+    finally:
+        db.close()
+    return render_template('student_form.html', student=None, subjects=[], all_subjects=all_subjects)
 
 
 @app.route('/students/<int:sid>/edit', methods=['GET', 'POST'])
@@ -346,8 +370,9 @@ def edit_student(sid):
             db.close()
         return redirect(url_for('students'))
     subjects = json.loads(s.subjects) if s.subjects else []
+    all_subjects = _get_all_known_subjects(db)
     db.close()
-    return render_template('student_form.html', student=s, subjects=subjects)
+    return render_template('student_form.html', student=s, subjects=subjects, all_subjects=all_subjects)
 
 
 @app.route('/students/<int:sid>/delete', methods=['POST'])
@@ -577,9 +602,16 @@ def marks():
                     if s not in all_subjects:
                         all_subjects.append(s)
 
-            # Apply subject filter for teachers
-            if subjects_filter:
-                all_subjects = [s for s in all_subjects if s in subjects_filter]
+        # Apply subject filter for teachers — case-insensitive match
+        if subjects_filter:
+            sf_lower = [s.lower() for s in subjects_filter]
+            # Keep subjects that match teacher's list (case-insensitive)
+            matched = [s for s in all_subjects if s.lower() in sf_lower]
+            # Also add any teacher subjects not yet in class list (so tabs always show)
+            for sf in subjects_filter:
+                if sf.lower() not in [m.lower() for m in matched]:
+                    matched.append(sf)
+            all_subjects = matched if matched else subjects_filter
 
             if not selected_subject or selected_subject not in all_subjects:
                 selected_subject = all_subjects[0] if all_subjects else None
