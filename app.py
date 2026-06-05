@@ -65,7 +65,7 @@ def init_db():
     db = SessionLocal()
     try:
         # Seed default behavior components
-        if db.query(BehaviorComponent).count() == 0:
+        if db.execute(text('SELECT COUNT(*) FROM behavior_components')).scalar() == 0:
             defaults = [
                 ("punctuality","Punctuality"),("attendance","Attendance"),
                 ("manners","Manners"),("general_behavior","General Behavior"),
@@ -83,11 +83,11 @@ def init_db():
                                          display_order=idx, active=True))
             db.commit()
         # Seed default report design
-        if db.query(ReportDesign).count() == 0:
+        if db.execute(text('SELECT COUNT(*) FROM report_designs')).scalar() == 0:
             db.add(ReportDesign())
             db.commit()
         # Seed default admin
-        if not db.query(User).filter_by(email='admin').first():
+        if not db.execute(text("SELECT * FROM users WHERE email='admin' LIMIT 1")).fetchone():
             db.add(User(name='Administrator', email='admin', role='admin',
                         password_hash=hashlib.sha256(b'admin123').hexdigest(),
                         subjects_taught='', class_teacher_for='',
@@ -157,7 +157,7 @@ def login():
         return redirect(url_for('dashboard'))
 
     db = SessionLocal()
-    design = db.query(ReportDesign).first()
+    design = db.execute(text('SELECT * FROM report_designs LIMIT 1')).fetchone()
     logo_b64 = design.logo_data if design else None
     school_name = design.school_name if design else "Empower International Academy"
     db.close()
@@ -231,11 +231,11 @@ def logout():
 def dashboard():
     db = SessionLocal()
     try:
-        design = db.query(ReportDesign).first()
-        active_term = db.query(AcademicTerm).filter_by(is_active=True).first()
-        total_students = db.query(Student).count()
-        total_teachers = db.query(User).filter_by(role='teacher').count()
-        total_marks = db.query(Mark).count()
+        design = db.execute(text('SELECT * FROM report_designs LIMIT 1')).fetchone()
+        active_term = db.execute(text('SELECT * FROM academic_terms WHERE is_active=true LIMIT 1')).fetchone()
+        total_students = db.execute(text('SELECT COUNT(*) FROM students')).scalar()
+        total_teachers = db.execute(text("SELECT COUNT(*) FROM users WHERE role='teacher'")).scalar()
+        total_marks = db.execute(text('SELECT COUNT(*) FROM marks')).scalar()
 
         # Notifications for current user
         notifs = []
@@ -303,7 +303,7 @@ def _get_all_known_subjects(db):
 @admin_required
 def students():
     db = SessionLocal()
-    students = db.query(Student).order_by(Student.class_name, Student.name).all()
+    students = db.execute(text('SELECT * FROM students ORDER BY class_name, name')).fetchall()
     db.close()
     return render_template('students.html', students=students)
 
@@ -348,7 +348,7 @@ def add_student():
 @admin_required
 def edit_student(sid):
     db = SessionLocal()
-    s = db.query(Student).get(sid)
+    s = db.execute(text('SELECT * FROM students WHERE id=:id'),{'id':sid}).fetchone()
     if not s:
         db.close()
         abort(404)
@@ -380,7 +380,7 @@ def edit_student(sid):
 @admin_required
 def delete_student(sid):
     db = SessionLocal()
-    s = db.query(Student).get(sid)
+    s = db.execute(text('SELECT * FROM students WHERE id=:id'),{'id':sid}).fetchone()
     if s:
         db.delete(s)
         db.commit()
@@ -395,7 +395,7 @@ def delete_student(sid):
 @admin_required
 def staff():
     db = SessionLocal()
-    users = db.query(User).filter(User.role != 'master_admin').order_by(User.name).all()
+    users = db.execute(text("SELECT * FROM users WHERE role!='master_admin' ORDER BY name")).fetchall()
     db.close()
     return render_template('staff.html', users=users)
 
@@ -441,7 +441,7 @@ def add_staff():
 @admin_required
 def edit_staff(uid):
     db = SessionLocal()
-    u = db.query(User).get(uid)
+    u = db.execute(text('SELECT * FROM users WHERE id=:id'),{'id':uid}).fetchone()
     if not u:
         db.close()
         abort(404)
@@ -473,7 +473,7 @@ def edit_staff(uid):
 @admin_required
 def delete_staff(uid):
     db = SessionLocal()
-    u = db.query(User).get(uid)
+    u = db.execute(text('SELECT * FROM users WHERE id=:id'),{'id':uid}).fetchone()
     if u:
         db.delete(u)
         db.commit()
@@ -488,7 +488,7 @@ def delete_staff(uid):
 @admin_required
 def terms():
     db = SessionLocal()
-    terms = db.query(AcademicTerm).order_by(AcademicTerm.year.desc(), AcademicTerm.term_number).all()
+    terms = db.execute(text('SELECT * FROM academic_terms ORDER BY year DESC, term_number')).fetchall()
     db.close()
     return render_template('terms.html', terms=terms)
 
@@ -530,8 +530,8 @@ def add_term():
 @admin_required
 def activate_term(tid):
     db = SessionLocal()
-    db.query(AcademicTerm).update({'is_active': False})
-    t = db.query(AcademicTerm).get(tid)
+    db.execute(text("UPDATE academic_terms SET is_active=false"))
+    t = db.execute(text('SELECT * FROM academic_terms WHERE id=:id'),{'id':tid}).fetchone()
     if t:
         t.is_active = True
         db.commit()
@@ -545,7 +545,7 @@ def activate_term(tid):
 @admin_required
 def delete_term(tid):
     db = SessionLocal()
-    t = db.query(AcademicTerm).get(tid)
+    t = db.execute(text('SELECT * FROM academic_terms WHERE id=:id'),{'id':tid}).fetchone()
     if t:
         db.delete(t)
         db.commit()
@@ -711,9 +711,10 @@ def marks():
 
 def _recompile_mark(db, student_id, subject, term_id, submitted_by=None):
     def _sum(comp_type):
-        rows = db.query(ComponentMark).filter_by(
-            student_id=student_id, subject=subject,
-            term_id=term_id, component_type=comp_type).all()
+        rows = db.execute(text("""
+            SELECT score, total FROM component_marks
+            WHERE student_id=:sid AND subject=:sub AND term_id=:tid AND component_type=:ct
+        """), {'sid': student_id, 'sub': subject, 'tid': term_id, 'ct': comp_type}).fetchall()
         s = sum(r.score or 0 for r in rows)
         t = sum(r.total or 0 for r in rows)
         return s, t
@@ -722,32 +723,59 @@ def _recompile_mark(db, student_id, subject, term_id, submitted_by=None):
     mt_s, mt_t = _sum('midterm')
     et_s, et_t = _sum('endterm')
 
-    cw20 = convert_to_base(cw_s, cw_t, 20)
-    mt20 = convert_to_base(mt_s, mt_t, 20)
-    et60 = convert_to_base(et_s, et_t, 60)
+    cw20  = convert_to_base(cw_s, cw_t, 20)
+    mt20  = convert_to_base(mt_s, mt_t, 20)
+    et60  = convert_to_base(et_s, et_t, 60)
     total = compute_total(cw20, mt20, et60)
     grade = get_grade(total)
+    now   = datetime.now().isoformat()
 
-    existing = db.query(Mark).filter_by(student_id=student_id,
-                                         subject=subject, term_id=term_id).first()
+    existing = db.execute(text("""
+        SELECT id FROM marks WHERE student_id=:sid AND subject=:sub AND term_id=:tid
+    """), {'sid': student_id, 'sub': subject, 'tid': term_id}).fetchone()
+
     if existing:
-        existing.coursework_score = cw_s; existing.coursework_total = cw_t
-        existing.coursework_out_of_20 = cw20
-        existing.midterm_score = mt_s; existing.midterm_total = mt_t
-        existing.midterm_out_of_20 = mt20
-        existing.endterm_score = et_s; existing.endterm_total = et_t
-        existing.endterm_out_of_60 = et60
-        existing.total = total; existing.grade = grade
-        existing.submitted_at = datetime.now().isoformat()
+        params = {
+            'cw_s': cw_s, 'cw_t': cw_t, 'cw20': cw20,
+            'mt_s': mt_s, 'mt_t': mt_t, 'mt20': mt20,
+            'et_s': et_s, 'et_t': et_t, 'et60': et60,
+            'total': total, 'grade': grade, 'now': now,
+            'id': existing.id,
+        }
         if submitted_by:
-            existing.submitted_by = submitted_by
+            params['sb'] = submitted_by
+            sb_clause = ', submitted_by=:sb'
+        else:
+            sb_clause = ''
+        db.execute(text(
+            "UPDATE marks SET "
+            "coursework_score=:cw_s, coursework_total=:cw_t, coursework_out_of_20=:cw20, "
+            "midterm_score=:mt_s, midterm_total=:mt_t, midterm_out_of_20=:mt20, "
+            "endterm_score=:et_s, endterm_total=:et_t, endterm_out_of_60=:et60, "
+            "total=:total, grade=:grade, submitted_at=:now" + sb_clause +
+            " WHERE id=:id"
+        ), params)
     else:
-        db.add(Mark(student_id=student_id, subject=subject, term_id=term_id,
-                    coursework_score=cw_s, coursework_total=cw_t, coursework_out_of_20=cw20,
-                    midterm_score=mt_s, midterm_total=mt_t, midterm_out_of_20=mt20,
-                    endterm_score=et_s, endterm_total=et_t, endterm_out_of_60=et60,
-                    total=total, grade=grade, submitted_by=submitted_by,
-                    submitted_at=datetime.now().isoformat()))
+        db.execute(text("""
+            INSERT INTO marks
+                (student_id, subject, term_id,
+                 coursework_score, coursework_total, coursework_out_of_20,
+                 midterm_score, midterm_total, midterm_out_of_20,
+                 endterm_score, endterm_total, endterm_out_of_60,
+                 total, grade, submitted_by, submitted_at)
+            VALUES
+                (:sid, :sub, :tid,
+                 :cw_s, :cw_t, :cw20,
+                 :mt_s, :mt_t, :mt20,
+                 :et_s, :et_t, :et60,
+                 :total, :grade, :sb, :now)
+        """), {
+            'sid': student_id, 'sub': subject, 'tid': term_id,
+            'cw_s': cw_s, 'cw_t': cw_t, 'cw20': cw20,
+            'mt_s': mt_s, 'mt_t': mt_t, 'mt20': mt20,
+            'et_s': et_s, 'et_t': et_t, 'et60': et60,
+            'total': total, 'grade': grade, 'sb': submitted_by, 'now': now
+        })
     db.commit()
 
 
@@ -758,15 +786,15 @@ def behavior():
     db = SessionLocal()
     try:
         uid = session.get('user_id')
-        terms = db.query(AcademicTerm).order_by(AcademicTerm.year.desc()).all()
-        active_term = db.query(AcademicTerm).filter_by(is_active=True).first()
-        components = db.query(BehaviorComponent).filter_by(active=True).order_by(BehaviorComponent.display_order).all()
+        terms = db.execute(text('SELECT * FROM academic_terms ORDER BY year DESC, term_number')).fetchall()
+        active_term = db.execute(text('SELECT * FROM academic_terms WHERE is_active=true LIMIT 1')).fetchone()
+        components = db.execute(text('SELECT * FROM behavior_components WHERE active=true ORDER BY display_order')).fetchall()
 
         role = session['user_role']
         if role == 'admin':
             classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
         else:
-            u = db.query(User).get(uid)
+            u = db.execute(text('SELECT * FROM users WHERE id=:id'),{'id':uid}).fetchone()
             classes = [c.strip() for c in (u.class_teacher_for or '').split(',') if c.strip()] if u else []
             if not classes:
                 classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
@@ -796,14 +824,22 @@ def behavior():
                 for comp in components:
                     val = request.form.get(f'comp_{comp.id}')
                     if val:
-                        existing = db.query(ClassroomBehaviorResponse).filter_by(
-                            student_id=student_id, term_id=term_id, component_id=comp.id).first()
+                        existing = db.execute(text("""
+                            SELECT id FROM classroom_behavior_responses
+                            WHERE student_id=:sid AND term_id=:tid AND component_id=:cid
+                        """), {'sid': student_id, 'tid': term_id, 'cid': comp.id}).fetchone()
                         if existing:
-                            existing.value = val
+                            db.execute(text("""
+                                UPDATE classroom_behavior_responses SET value=:val
+                                WHERE id=:id
+                            """), {'val': val, 'id': existing.id})
                         else:
-                            db.add(ClassroomBehaviorResponse(
-                                student_id=student_id, term_id=term_id,
-                                component_id=comp.id, value=val, evaluated_by=uid))
+                            db.execute(text("""
+                                INSERT INTO classroom_behavior_responses
+                                (student_id, term_id, component_id, value, evaluated_by)
+                                VALUES (:sid, :tid, :cid, :val, :uid)
+                            """), {'sid': student_id, 'tid': term_id,
+                                   'cid': comp.id, 'val': val, 'uid': uid})
                 db.commit()
                 flash('Behavior saved.', 'success')
             except Exception as e:
@@ -838,18 +874,18 @@ def behavior_components():
                 flash('Component added.', 'success')
             elif action == 'toggle':
                 cid = int(request.form['component_id'])
-                c = db.query(BehaviorComponent).get(cid)
+                c = db.execute(text('SELECT * FROM behavior_components WHERE id=:id'),{'id':cid}).fetchone()
                 if c:
                     c.active = not c.active
                     db.commit()
             elif action == 'delete':
                 cid = int(request.form['component_id'])
-                c = db.query(BehaviorComponent).get(cid)
+                c = db.execute(text('SELECT * FROM behavior_components WHERE id=:id'),{'id':cid}).fetchone()
                 if c:
                     db.delete(c)
                     db.commit()
             return redirect(url_for('behavior_components'))
-        comps = db.query(BehaviorComponent).order_by(BehaviorComponent.display_order).all()
+        comps = db.execute(text('SELECT * FROM behavior_components ORDER BY display_order')).fetchall()
         return render_template('behavior_components.html', components=comps)
     finally:
         db.close()
@@ -863,8 +899,8 @@ def discipline():
     try:
         uid = session.get('user_id')
         role = session['user_role']
-        terms = db.query(AcademicTerm).order_by(AcademicTerm.year.desc()).all()
-        students_all = db.query(Student).order_by(Student.class_name, Student.name).all()
+        terms = db.execute(text('SELECT * FROM academic_terms ORDER BY year DESC, term_number')).fetchall()
+        students_all = db.execute(text('SELECT * FROM students ORDER BY class_name, name')).fetchall()
 
         if request.method == 'POST':
             action = request.form.get('action', 'add')
@@ -882,7 +918,7 @@ def discipline():
                 flash('Discipline report filed.', 'success')
             elif action == 'update_status' and role == 'admin':
                 rid = int(request.form['report_id'])
-                r = db.query(DisciplineReport).get(rid)
+                r = db.execute(text('SELECT * FROM discipline_reports WHERE id=:id'),{'id':rid}).fetchone()
                 if r:
                     r.status = request.form['status']
                     r.admin_notes = request.form.get('admin_notes', '')
@@ -915,7 +951,7 @@ def communications():
     db = SessionLocal()
     try:
         uid = session.get('user_id')
-        users_all = db.query(User).filter(User.role != 'master_admin').all()
+        users_all = db.execute(text("SELECT * FROM users WHERE role!='master_admin'")).fetchall()
 
         if request.method == 'POST':
             action = request.form.get('action', 'send')
@@ -934,7 +970,7 @@ def communications():
                 flash('Message sent.', 'success')
             elif action == 'mark_read':
                 mid = int(request.form['message_id'])
-                m = db.query(Message).get(mid)
+                m = db.execute(text('SELECT * FROM messages WHERE id=:id'),{'id':mid}).fetchone()
                 if m:
                     m.read = True
                     db.commit()
@@ -961,14 +997,14 @@ def decisions():
     db = SessionLocal()
     try:
         uid = session.get('user_id')
-        terms = db.query(AcademicTerm).order_by(AcademicTerm.year.desc()).all()
-        active_term = db.query(AcademicTerm).filter_by(is_active=True).first()
+        terms = db.execute(text('SELECT * FROM academic_terms ORDER BY year DESC, term_number')).fetchall()
+        active_term = db.execute(text('SELECT * FROM academic_terms WHERE is_active=true LIMIT 1')).fetchone()
 
         role = session['user_role']
         if role == 'admin':
             classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
         else:
-            u = db.query(User).get(uid)
+            u = db.execute(text('SELECT * FROM users WHERE id=:id'),{'id':uid}).fetchone()
             classes = [c.strip() for c in (u.class_teacher_for or '').split(',') if c.strip()] if u else []
             if not classes:
                 classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
@@ -982,7 +1018,7 @@ def decisions():
             rows = db.execute(text("SELECT id, name FROM students WHERE class_name=:c ORDER BY name"), {'c': selected_class}).fetchall()
             students_list = [{'id': r.id, 'name': r.name} for r in rows]
             for s in students_list:
-                d = db.query(StudentDecision).filter_by(student_id=s['id'], term_id=int(selected_term_id)).first()
+                d = db.execute(text('SELECT * FROM student_decisions WHERE student_id=:sid AND term_id=:tid'),{'sid':s['id'],'tid':int(selected_term_id)}).fetchone()
                 if d:
                     decisions_data[s['id']] = {'decision': d.decision, 'notes': d.notes}
 
@@ -992,7 +1028,7 @@ def decisions():
                 term_id = int(request.form['term_id'])
                 decision_val = request.form['decision']
                 notes = request.form.get('notes', '')
-                existing = db.query(StudentDecision).filter_by(student_id=student_id, term_id=term_id).first()
+                existing = db.execute(text('SELECT id FROM student_decisions WHERE student_id=:sid AND term_id=:tid'),{'sid':student_id,'tid':term_id}).fetchone()
                 if existing:
                     existing.decision = decision_val; existing.notes = notes
                 else:
@@ -1022,8 +1058,8 @@ def visitation():
     db = SessionLocal()
     try:
         uid = session.get('user_id')
-        terms = db.query(AcademicTerm).order_by(AcademicTerm.year.desc()).all()
-        active_term = db.query(AcademicTerm).filter_by(is_active=True).first()
+        terms = db.execute(text('SELECT * FROM academic_terms ORDER BY year DESC, term_number')).fetchall()
+        active_term = db.execute(text('SELECT * FROM academic_terms WHERE is_active=true LIMIT 1')).fetchone()
         classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
 
         selected_class = request.args.get('class_name') or (classes[0] if classes else None)
@@ -1035,7 +1071,7 @@ def visitation():
             rows = db.execute(text("SELECT id, name FROM students WHERE class_name=:c ORDER BY name"), {'c': selected_class}).fetchall()
             students_list = [{'id': r.id, 'name': r.name} for r in rows]
             for s in students_list:
-                v = db.query(VisitationDay).filter_by(student_id=s['id'], term_id=int(selected_term_id)).first()
+                v = db.execute(text('SELECT * FROM visitation_days WHERE student_id=:sid AND term_id=:tid'),{'sid':s['id'],'tid':int(selected_term_id)}).fetchone()
                 if v:
                     vd_data[s['id']] = {'date': v.visitation_date, 'parent_attended': v.parent_attended, 'report_given': v.report_given, 'notes': v.notes}
 
@@ -1043,7 +1079,7 @@ def visitation():
             try:
                 student_id = int(request.form['student_id'])
                 term_id = int(request.form['term_id'])
-                existing = db.query(VisitationDay).filter_by(student_id=student_id, term_id=term_id).first()
+                existing = db.execute(text('SELECT id FROM visitation_days WHERE student_id=:sid AND term_id=:tid'),{'sid':student_id,'tid':term_id}).fetchone()
                 if existing:
                     existing.visitation_date = request.form.get('visitation_date', '')
                     existing.parent_attended = 'parent_attended' in request.form
@@ -1077,7 +1113,7 @@ def visitation():
 def report_design():
     db = SessionLocal()
     try:
-        design = db.query(ReportDesign).first()
+        design = db.execute(text('SELECT * FROM report_designs LIMIT 1')).fetchone()
         if not design:
             design = ReportDesign()
             db.add(design)
@@ -1123,10 +1159,10 @@ def report_design():
 def generate_reports():
     db = SessionLocal()
     try:
-        terms = db.query(AcademicTerm).order_by(AcademicTerm.year.desc()).all()
-        active_term = db.query(AcademicTerm).filter_by(is_active=True).first()
+        terms = db.execute(text('SELECT * FROM academic_terms ORDER BY year DESC, term_number')).fetchall()
+        active_term = db.execute(text('SELECT * FROM academic_terms WHERE is_active=true LIMIT 1')).fetchone()
         classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
-        design = db.query(ReportDesign).first()
+        design = db.execute(text('SELECT * FROM report_designs LIMIT 1')).fetchone()
 
         if request.method == 'POST':
             term_id = int(request.form['term_id'])
@@ -1134,7 +1170,7 @@ def generate_reports():
             selected_class = request.form.get('class_name')
             student_id = request.form.get('student_id')
 
-            term = db.query(AcademicTerm).get(term_id)
+            term = db.execute(text('SELECT * FROM academic_terms WHERE id=:id'),{'id':term_id}).fetchone()
             if not term:
                 flash('Term not found.', 'error')
                 return redirect(url_for('generate_reports'))
@@ -1148,7 +1184,7 @@ def generate_reports():
 
             if student_id:
                 # Single student PDF
-                s = db.query(Student).get(int(student_id))
+                s = db.execute(text('SELECT * FROM students WHERE id=:id'),{'id':int(student_id)}).fetchone()
                 if not s:
                     flash('Student not found.', 'error')
                     return redirect(url_for('generate_reports'))
@@ -1189,7 +1225,7 @@ def generate_reports():
                 return send_file(zip_buf, download_name=fname, as_attachment=True,
                                   mimetype='application/zip')
 
-        students_all = db.query(Student).order_by(Student.class_name, Student.name).all()
+        students_all = db.execute(text('SELECT * FROM students ORDER BY class_name, name')).fetchall()
         return render_template('generate_reports.html', terms=terms, active_term=active_term,
                                 classes=classes, students=students_all, design=design)
     finally:
@@ -1241,7 +1277,7 @@ def _get_behavior_dict(db, student_id, term_id):
 
 
 def _get_decision(db, student_id, term_id):
-    d = db.query(StudentDecision).filter_by(student_id=student_id, term_id=term_id).first()
+    d = db.execute(text('SELECT * FROM student_decisions WHERE student_id=:sid AND term_id=:tid'),{'sid':student_id,'tid':term_id}).fetchone()
     if not d:
         return None
     return {'decision': d.decision, 'notes': d.notes}
@@ -1254,8 +1290,8 @@ def _get_decision(db, student_id, term_id):
 def analytics():
     db = SessionLocal()
     try:
-        terms = db.query(AcademicTerm).order_by(AcademicTerm.year.desc()).all()
-        active_term = db.query(AcademicTerm).filter_by(is_active=True).first()
+        terms = db.execute(text('SELECT * FROM academic_terms ORDER BY year DESC, term_number')).fetchall()
+        active_term = db.execute(text('SELECT * FROM academic_terms WHERE is_active=true LIMIT 1')).fetchone()
         classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
 
         selected_class = request.args.get('class_name') or (classes[0] if classes else None)
@@ -1392,7 +1428,7 @@ def change_login():
         if not uid:
             flash('Please log in first.', 'error')
             return redirect(url_for('login'))
-        user = db.query(User).get(uid)
+        user = db.execute(text('SELECT * FROM users WHERE id=:id'),{'id':uid}).fetchone()
         if not user:
             flash('User not found.', 'error')
             return redirect(url_for('dashboard'))
@@ -1414,7 +1450,7 @@ def change_login():
                 flash('Provide at least one recovery detail.', 'error')
             else:
                 # Check email uniqueness
-                conflict = db.query(User).filter(User.email == new_email, User.id != uid).first()
+                conflict = db.execute(text('SELECT id FROM users WHERE email=:em AND id!=:uid'),{'em':new_email,'uid':uid}).fetchone()
                 if conflict:
                     flash('Email already taken.', 'error')
                 else:
@@ -1464,8 +1500,8 @@ def admin_management():
                 flash('Admin added.', 'success')
             return redirect(url_for('admin_management'))
 
-        admins = db.query(User).filter_by(role='admin').all()
-        audit_logs = db.query(AuditLog).order_by(AuditLog.timestamp.desc()).limit(50).all()
+        admins = db.execute(text("SELECT * FROM users WHERE role='admin'")).fetchall()
+        audit_logs = db.execute(text('SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 50')).fetchall()
         return render_template('admin_management.html', admins=admins, audit_logs=audit_logs)
     finally:
         db.close()
@@ -1489,9 +1525,9 @@ def master_admin():
                 return redirect(url_for('master_admin'))
 
             if action == 'reset_admin_pw':
-                admin = db.query(User).filter_by(email='admin').first()
+                admin = db.execute(text("SELECT * FROM users WHERE email='admin' LIMIT 1")).fetchone()
                 if not admin:
-                    admin = db.query(User).filter_by(role='admin').first()
+                    admin = db.execute(text("SELECT * FROM users WHERE role='admin' LIMIT 1")).fetchone()
                 if admin:
                     admin.password_hash = hashlib.sha256(b'admin123').hexdigest()
                     db.commit()
@@ -1511,9 +1547,9 @@ def master_admin():
                 else:
                     flash('Confirmation text did not match.', 'error')
 
-        total_users = db.query(User).count()
-        total_students = db.query(Student).count()
-        total_terms = db.query(AcademicTerm).count()
+        total_users = db.execute(text('SELECT COUNT(*) FROM users')).scalar()
+        total_students = db.execute(text('SELECT COUNT(*) FROM students')).scalar()
+        total_terms = db.execute(text('SELECT COUNT(*) FROM academic_terms')).scalar()
         return render_template('master_admin.html', total_users=total_users,
                                 total_students=total_students, total_terms=total_terms)
     finally:
@@ -1528,13 +1564,13 @@ def comments():
     try:
         uid = session.get('user_id')
         role = session['user_role']
-        terms = db.query(AcademicTerm).order_by(AcademicTerm.year.desc()).all()
-        active_term = db.query(AcademicTerm).filter_by(is_active=True).first()
+        terms = db.execute(text('SELECT * FROM academic_terms ORDER BY year DESC, term_number')).fetchall()
+        active_term = db.execute(text('SELECT * FROM academic_terms WHERE is_active=true LIMIT 1')).fetchone()
 
         if role == 'admin':
             classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
         else:
-            u = db.query(User).get(uid)
+            u = db.execute(text('SELECT * FROM users WHERE id=:id'),{'id':uid}).fetchone()
             classes = [r[0] for r in db.execute(text("SELECT DISTINCT class_name FROM students ORDER BY class_name")).fetchall()]
 
         selected_class = request.args.get('class_name') or (classes[0] if classes else None)
@@ -1545,7 +1581,7 @@ def comments():
             term_id = int(request.form['term_id'])
             subject = request.form['subject']
             comment_text = request.form['comment']
-            mark = db.query(Mark).filter_by(student_id=student_id, term_id=term_id, subject=subject).first()
+            mark = db.execute(text('SELECT id FROM marks WHERE student_id=:sid AND term_id=:tid AND subject=:sub'),{'sid':student_id,'tid':term_id,'sub':subject}).fetchone()
             if mark:
                 mark.comment = comment_text
                 db.commit()
