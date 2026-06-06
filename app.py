@@ -424,7 +424,7 @@ def login():
                 flash('Passwords do not match.', 'error')
             else:
                 db2 = SessionLocal()
-                u = db2.query(User).filter_by(email=email).first()
+                u = db2.execute(text('SELECT * FROM users WHERE email=:e LIMIT 1'),{'e':email}).fetchone()
                 if not u:
                     flash('No account found with that email.', 'error')
                 else:
@@ -436,7 +436,8 @@ def login():
                     elif method == 'nickname' and u.recovery_nickname:
                         ok = u.recovery_nickname.strip().lower() == answer
                     if ok:
-                        u.password_hash = hashlib.sha256(new_pw.encode()).hexdigest()
+                        db2.execute(text('UPDATE users SET password_hash=:pw WHERE id=:id'),
+                                    {'pw': hashlib.sha256(new_pw.encode()).hexdigest(), 'id': u.id})
                         db2.commit()
                         flash('Password reset! Please login.', 'success')
                     else:
@@ -447,7 +448,7 @@ def login():
             username = request.form.get('username', '').strip()
             password = request.form.get('password', '')
             db2 = SessionLocal()
-            user = db2.query(User).filter_by(email=username).first()
+            user = db2.execute(text('SELECT * FROM users WHERE email=:e LIMIT 1'),{'e':username}).fetchone()
             db2.close()
             if user and user.password_hash == hashlib.sha256(password.encode()).hexdigest():
                 session['user_id'] = user.id
