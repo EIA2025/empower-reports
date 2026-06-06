@@ -596,12 +596,13 @@ def edit_student(sid):
         abort(404)
     if request.method == 'POST':
         try:
-            s.name = request.form['name']
-            s.year = int(request.form.get('year', 0) or 0)
-            s.class_name = request.form['class_name']
-            s.registration_number = request.form['registration_number']
-            s.subjects = json.dumps(request.form.getlist('subjects'))
-            s.gender = request.form.get('gender', '')
+            db.execute(text("""
+                UPDATE students SET name=:name,year=:year,class_name=:cls,
+                registration_number=:reg,subjects=:subs,gender=:gender WHERE id=:id
+            """), {'name':request.form['name'],'year':int(request.form.get('year',0) or 0),
+                    'cls':request.form['class_name'],'reg':request.form['registration_number'],
+                    'subs':json.dumps(request.form.getlist('subjects')),
+                    'gender':request.form.get('gender',''),'id':sid})
             db.commit()
             log_audit(db, session.get('user_id'), 'edit_student', s.name)
             flash('Student updated.', 'success')
@@ -624,7 +625,7 @@ def delete_student(sid):
     db = SessionLocal()
     s = db.execute(text('SELECT * FROM students WHERE id=:id'),{'id':sid}).fetchone()
     if s:
-        db.delete(s)
+        db.execute(text('DELETE FROM students WHERE id=:id'),{'id':sid})
         db.commit()
         flash('Student deleted.', 'success')
     db.close()
@@ -691,14 +692,15 @@ def edit_staff(uid):
         abort(404)
     if request.method == 'POST':
         try:
-            u.name = request.form['name']
-            u.email = request.form['email']
-            u.role = request.form['role']
-            u.subjects_taught = ','.join(request.form.getlist('subjects_taught'))
-            u.class_teacher_for = request.form.get('class_teacher_for', '')
-            u.gender = request.form.get('gender', '')
-            if request.form.get('password'):
-                u.password_hash = hashlib.sha256(request.form['password'].encode()).hexdigest()
+            _pw = hashlib.sha256(request.form['password'].encode()).hexdigest() if request.form.get('password') else None
+            _upd = {'name':request.form['name'],'email':request.form['email'],'role':request.form['role'],
+                    'subs':','.join(request.form.getlist('subjects_taught')),
+                    'cls':request.form.get('class_teacher_for',''),'gender':request.form.get('gender',''),'id':uid}
+            _sql = 'UPDATE users SET name=:name,email=:email,role=:role,subjects_taught=:subs,class_teacher_for=:cls,gender=:gender'
+            if _pw:
+                _sql += ',password_hash=:pw'; _upd['pw'] = _pw
+            _sql += ' WHERE id=:id'
+            db.execute(text(_sql), _upd)
             db.commit()
             log_audit(db, session.get('user_id'), 'edit_staff', u.name)
             flash('Staff updated.', 'success')
@@ -719,7 +721,7 @@ def delete_staff(uid):
     db = SessionLocal()
     u = db.execute(text('SELECT * FROM users WHERE id=:id'),{'id':uid}).fetchone()
     if u:
-        db.delete(u)
+        db.execute(text('DELETE FROM users WHERE id=:id'),{'id':uid})
         db.commit()
         flash('Staff deleted.', 'success')
     db.close()
@@ -779,7 +781,7 @@ def activate_term(tid):
     db.execute(text("UPDATE academic_terms SET is_active=false"))
     t = db.execute(text('SELECT * FROM academic_terms WHERE id=:id'),{'id':tid}).fetchone()
     if t:
-        t.is_active = True
+        db.execute(text('UPDATE academic_terms SET is_active=true WHERE id=:id'),{'id':tid})
         db.commit()
         flash(f'{t.term_name} set as active term.', 'success')
     db.close()
@@ -793,7 +795,7 @@ def delete_term(tid):
     db = SessionLocal()
     t = db.execute(text('SELECT * FROM academic_terms WHERE id=:id'),{'id':tid}).fetchone()
     if t:
-        db.delete(t)
+        db.execute(text('DELETE FROM academic_terms WHERE id=:id'),{'id':tid})
         db.commit()
         flash('Term deleted.', 'success')
     db.close()
@@ -1128,7 +1130,7 @@ def behavior_components():
                 cid = int(request.form['component_id'])
                 c = db.execute(text('SELECT * FROM behavior_components WHERE id=:id'),{'id':cid}).fetchone()
                 if c:
-                    db.delete(c)
+                    db.execute(text('DELETE FROM behavior_components WHERE id=:id'),{'id':cid})
                     db.commit()
             return redirect(url_for('behavior_components'))
         comps = db.execute(text('SELECT * FROM behavior_components ORDER BY display_order')).fetchall()
@@ -1166,8 +1168,8 @@ def discipline():
                 rid = int(request.form['report_id'])
                 r = db.execute(text('SELECT * FROM discipline_reports WHERE id=:id'),{'id':rid}).fetchone()
                 if r:
-                    r.status = request.form['status']
-                    r.admin_notes = request.form.get('admin_notes', '')
+                    db.execute(text('UPDATE discipline_reports SET status=:s,admin_notes=:n WHERE id=:id'),
+                               {'s':request.form['status'],'n':request.form.get('admin_notes',''),'id':rid})
                     db.commit()
                     flash('Report updated.', 'success')
             return redirect(url_for('discipline'))
@@ -1387,19 +1389,25 @@ def report_design():
                 'did':     design.id,
             }
 
+            logo_b64_new = None
             logo_file = request.files.get('logo')
             if logo_file and logo_file.filename:
-                logo_bytes = logo_file.read()
-                design.logo_data = base64.b64encode(logo_bytes).decode('utf-8')
-
-            logo_url = request.form.get('logo_url', '').strip()
-            if logo_url:
+                logo_b64_new = base64.b64encode(logo_file.read()).decode('utf-8')
+            logo_url_input = request.form.get('logo_url', '').strip()
+            if logo_url_input:
                 try:
-                    resp = requests.get(logo_url, timeout=10)
-                    design.logo_data = base64.b64encode(resp.content).decode('utf-8')
+                    resp = requests.get(logo_url_input, timeout=10)
+                    logo_b64_new = base64.b64encode(resp.content).decode('utf-8')
                 except Exception as e:
                     flash(f'Could not download logo: {e}', 'error')
-
+            if logo_b64_new:
+                _design_updates['logo'] = logo_b64_new
+                db.execute(text("""
+                    UPDATE report_designs SET school_name=:sname,school_subtitle=:ssub,
+                    school_address=:saddr,school_po_box=:spob,school_phone=:sphone,
+                    school_email=:semail,school_website=:sweb,primary_color=:scolor,
+                    report_footer=:sfooter,logo_data=:logo WHERE id=:did
+                """), _design_updates)
             db.commit()
             log_audit(db, session.get('user_id'), 'update_report_design', '')
             flash('Report design updated.', 'success')
@@ -1711,19 +1719,25 @@ def change_login():
                 if conflict:
                     flash('Email already taken.', 'error')
                 else:
-                    user.email = new_email
+                    cl_params = {'email': new_email, 'id': uid}
+                    cl_set = ['email=:email']
                     if new_pw:
-                        user.password_hash = hashlib.sha256(new_pw.encode()).hexdigest()
+                        cl_set.append('password_hash=:pw')
+                        cl_params['pw'] = hashlib.sha256(new_pw.encode()).hexdigest()
                     if r_phone:
                         ok, val = validate_phone(r_phone)
                         if ok:
-                            user.recovery_phone = val
+                            cl_set.append('recovery_phone=:rphone')
+                            cl_params['rphone'] = val
                         else:
                             flash(val, 'error')
                             db.close()
                             return render_template('change_login.html', user=user)
-                    user.recovery_city = r_city or None
-                    user.recovery_nickname = r_nick or None
+                    cl_set.append('recovery_city=:rcity')
+                    cl_params['rcity'] = r_city or None
+                    cl_set.append('recovery_nickname=:rnick')
+                    cl_params['rnick'] = r_nick or None
+                    db.execute(text('UPDATE users SET ' + ','.join(cl_set) + ' WHERE id=:id'), cl_params)
                     db.commit()
                     log_audit(db, uid, 'change_login', new_email)
                     flash('Login details updated.', 'success')
@@ -1783,7 +1797,8 @@ def master_admin():
                 if not admin:
                     admin = db.execute(text("SELECT * FROM users WHERE role='admin' LIMIT 1")).fetchone()
                 if admin:
-                    admin.password_hash = hashlib.sha256(b'admin123').hexdigest()
+                    db.execute(text('UPDATE users SET password_hash=:pw WHERE id=:id'),
+                               {'pw':hashlib.sha256(b'admin123').hexdigest(),'id':admin.id})
                     db.commit()
                     flash('Admin password reset to admin123.', 'success')
                 else:
@@ -1792,8 +1807,17 @@ def master_admin():
             elif action == 'factory_reset':
                 confirm_text = request.form.get('confirm_text', '')
                 if confirm_text == 'DELETE ALL DATA':
-                    Base.metadata.drop_all(engine)
-                    Base.metadata.create_all(engine)
+                    # Drop all tables via raw psycopg2 to avoid NullPool issues
+                    conn2 = _get_raw_conn()
+                    cur2 = conn2.cursor()
+                    cur2.execute("""
+                        DROP TABLE IF EXISTS messages,visitation_days,student_decisions,
+                        classroom_behavior_responses,behavior_components,classroom_behavior,
+                        audit_logs,report_designs,discipline_reports,marks,component_marks,
+                        academic_terms,students,users CASCADE
+                    """)
+                    conn2.commit()
+                    cur2.close(); conn2.close()
                     init_db()
                     flash('Database reset complete. Default admin: admin / admin123', 'success')
                     session.clear()
@@ -1837,7 +1861,8 @@ def comments():
             comment_text = request.form['comment']
             mark = db.execute(text('SELECT id FROM marks WHERE student_id=:sid AND term_id=:tid AND subject=:sub'),{'sid':student_id,'tid':term_id,'sub':subject}).fetchone()
             if mark:
-                mark.comment = comment_text
+                db.execute(text('UPDATE marks SET comment=:c WHERE id=:id'),
+                           {'c':comment_text,'id':mark.id})
                 db.commit()
                 flash('Comment saved.', 'success')
             else:
