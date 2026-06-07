@@ -64,6 +64,27 @@ def init_db():
 
 
 def _create_tables(cur):
+    # ── Migration: drop tables from old schema that conflict with new schema ──
+    # The old empower-reports project had a `users` table WITHOUT school_id.
+    # We detect this and drop all old tables so the new schema can be created cleanly.
+    cur.execute("""
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name='users' AND column_name='school_id'
+    """)
+    has_school_id = cur.fetchone()
+    if not has_school_id:
+        print("  Old schema detected — dropping legacy tables and rebuilding...")
+        cur.execute("""
+            DROP TABLE IF EXISTS
+                messages, visitation_days, student_decisions,
+                classroom_behavior_responses, behavior_components,
+                classroom_behavior, audit_logs, report_designs,
+                discipline_reports, marks, component_marks,
+                academic_terms, students, users
+            CASCADE
+        """)
+        print("  Legacy tables dropped.")
+
     cur.execute("""
     CREATE TABLE IF NOT EXISTS schools (
         id SERIAL PRIMARY KEY,
