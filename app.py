@@ -15,7 +15,7 @@ def create_app():
     from blueprints.people.routes    import people_bp
     from blueprints.academics.routes import academics_bp
     from blueprints.finance.routes   import finance_bp
-    from blueprints.communications.routes import comms_bp
+    from blueprints.communications.routes import communications_bp as comms_bp
     from blueprints.library.routes   import library_bp
     from blueprints.events.routes    import events_bp
     from blueprints.system.routes    import system_bp
