@@ -8,53 +8,33 @@
 }
 .login-bg {
   min-height: 100vh;
-  background: linear-gradient(-45deg,
-    #7ec859,   /* school lime green */
-    #1e3a8a,   /* deep blue */
-    #a8d85a,   /* lighter green */
-    #ffffff,   /* white */
-    #1e40af,   /* mid blue */
-    #5aad2e,   /* green */
-    #ffffff,   /* white */
-    #1e3a8a    /* deep blue */
-  );
+  background: linear-gradient(-45deg, #7ec859, #1e3a8a, #a8d85a, #ffffff, #1e40af, #5aad2e, #fff, #1e3a8a);
   background-size: 400% 400%;
   animation: gradientShift 10s ease infinite;
-  display: flex;
-  align-items: center;
-  position: relative;
-  overflow: hidden;
+  display: flex; align-items: center; overflow: hidden; position: relative;
 }
-/* faint white logo watermark behind card */
 .login-watermark {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
   width: 65vmin; height: 65vmin;
-  background-image: url('/static/logo.png');
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
-  opacity: 0.08;
-  pointer-events: none;
-  user-select: none;
+  background: url('/static/img/logo-white.png') center/contain no-repeat;
+  opacity: .08; pointer-events: none;
 }
+.login-card { border-radius: 16px; backdrop-filter: blur(8px); background: rgba(255,255,255,.93); }
 </style>
 
 <div class="login-bg">
   <div class="login-watermark"></div>
-
   <div class="container" style="position:relative;z-index:1;">
     <div class="row justify-content-center">
       <div class="col-md-5 col-lg-4">
-
-        <!-- white logo + school name -->
         <div class="text-center text-white mb-4">
-          <img src="/static/logo-white.png"
-               alt="Empower International Academy"
-               style="width:120px;height:120px;object-fit:contain;margin-bottom:10px;filter:drop-shadow(0 2px 18px rgba(0,0,0,.25));">
-          <h2 class="fw-bold mb-0" style="text-shadow:0 2px 8px rgba(0,0,0,.3);">{{ school_name }}</h2>
-          <p style="opacity:.8;margin:0;font-size:.85rem;letter-spacing:2px;text-shadow:0 1px 4px rgba(0,0,0,.2);">EXCELLENCE &nbsp;|&nbsp; INTEGRITY &nbsp;|&nbsp; ACTION</p>
+          <img src="/static/img/logo-white.png" alt="Logo" style="width:110px;height:110px;object-fit:contain;margin-bottom:10px;">
+          <h2 class="fw-bold mb-0" style="text-shadow:0 2px 8px rgba(0,0,0,.3);">
+            {{ school.name if school else 'Empower International Academy' }}
+          </h2>
+          <p style="opacity:.8;font-size:.84rem;letter-spacing:2px;text-shadow:0 1px 4px rgba(0,0,0,.2);">
+            EXCELLENCE &nbsp;|&nbsp; INTEGRITY &nbsp;|&nbsp; ACTION
+          </p>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -65,22 +45,19 @@
           {% endfor %}
         {% endwith %}
 
-        <!-- Login card — frosted glass -->
-        <div class="card shadow-lg" style="border-radius:16px;backdrop-filter:blur(8px);background:rgba(255,255,255,0.92);">
+        <div class="card shadow-lg login-card">
           <div class="card-body p-4">
-            <ul class="nav nav-tabs mb-3" id="loginTabs">
-              <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#loginTab">Login</button></li>
-              <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#forgotTab">Forgot Password</button></li>
+            <ul class="nav nav-tabs mb-3">
+              <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#staffTab">Staff / Parent / Student</button></li>
               <li class="nav-item"><button class="nav-link text-danger" data-bs-toggle="tab" data-bs-target="#masterTab">Master Admin</button></li>
             </ul>
             <div class="tab-content">
-
-              <div class="tab-pane fade show active" id="loginTab">
+              <div class="tab-pane fade show active" id="staffTab">
                 <form method="POST">
                   <input type="hidden" name="action" value="login">
                   <div class="mb-3">
-                    <label class="form-label fw-semibold">Username</label>
-                    <input type="text" name="username" class="form-control" required autofocus>
+                    <label class="form-label fw-semibold">Email / Username</label>
+                    <input type="text" name="email" class="form-control" required autofocus placeholder="your@email.com">
                   </div>
                   <div class="mb-3">
                     <label class="form-label fw-semibold">Password</label>
@@ -90,43 +67,43 @@
                     <i class="bi bi-box-arrow-in-right me-2"></i>Login
                   </button>
                 </form>
+                <hr>
+                <details class="mt-2">
+                  <summary class="text-muted small" style="cursor:pointer;">Forgot password?</summary>
+                  <form method="POST" class="mt-3">
+                    <input type="hidden" name="action" value="forgot">
+                    <div class="mb-2"><input type="text" name="recover_email" class="form-control form-control-sm" placeholder="Your email/username" required></div>
+                    <div class="mb-2">
+                      <select name="recover_method" class="form-select form-select-sm">
+                        <option value="phone">Phone Number</option>
+                        <option value="city">City of Birth</option>
+                        <option value="nickname">Nickname / Pet Name</option>
+                      </select>
+                    </div>
+                    <div class="mb-2"><input type="text" name="recover_answer" class="form-control form-control-sm" placeholder="Your answer" required></div>
+                    <div class="mb-2"><input type="password" name="new_password" class="form-control form-control-sm" placeholder="New password" required></div>
+                    <div class="mb-2"><input type="password" name="confirm_password" class="form-control form-control-sm" placeholder="Confirm password" required></div>
+                    <button type="submit" class="btn btn-warning btn-sm w-100">Reset Password</button>
+                  </form>
+                </details>
               </div>
-
-              <div class="tab-pane fade" id="forgotTab">
-                <form method="POST">
-                  <input type="hidden" name="action" value="forgot">
-                  <div class="mb-3"><label class="form-label fw-semibold">Username / Email</label>
-                  <input type="text" name="recover_email" class="form-control" required></div>
-                  <div class="mb-3"><label class="form-label fw-semibold">Recovery Method</label>
-                  <select name="recover_method" class="form-select">
-                    <option value="phone">Phone Number</option>
-                    <option value="city">City of Birth</option>
-                    <option value="nickname">Nickname / Pet Name</option>
-                  </select></div>
-                  <div class="mb-3"><label class="form-label fw-semibold">Your Answer</label>
-                  <input type="text" name="recover_answer" class="form-control" required></div>
-                  <div class="mb-3"><label class="form-label fw-semibold">New Password</label>
-                  <input type="password" name="new_password" class="form-control" required></div>
-                  <div class="mb-3"><label class="form-label fw-semibold">Confirm Password</label>
-                  <input type="password" name="confirm_password" class="form-control" required></div>
-                  <button type="submit" class="btn btn-warning w-100">Reset Password</button>
-                </form>
-              </div>
-
               <div class="tab-pane fade" id="masterTab">
-                <div class="alert alert-warning"><i class="bi bi-shield-exclamation me-1"></i>Master Admin Recovery</div>
+                <div class="alert alert-warning py-2"><i class="bi bi-shield-exclamation me-1"></i><small>Master Admin — system-wide access</small></div>
                 <form method="POST">
-                  <input type="hidden" name="action" value="master_admin">
-                  <div class="mb-3"><label class="form-label fw-semibold">Master Admin Password</label>
+                  <input type="hidden" name="action" value="master_login">
+                  <div class="mb-3"><label class="form-label fw-semibold">Master Admin Email</label>
+                  <input type="email" name="master_email" class="form-control" required></div>
+                  <div class="mb-3"><label class="form-label fw-semibold">Password</label>
                   <input type="password" name="master_password" class="form-control" required></div>
-                  <button type="submit" class="btn btn-danger w-100">Unlock Master Admin</button>
+                  <button type="submit" class="btn btn-danger w-100">Access System</button>
                 </form>
               </div>
-
             </div>
           </div>
         </div>
-        <p class="text-center text-white mt-3" style="font-size:.8rem;opacity:.6;">Empower International Academy &copy; 2025</p>
+        <p class="text-center text-white mt-3" style="font-size:.78rem;opacity:.6;">
+          Empower International Academy &copy; {{ now.year if now else 2025 }} &nbsp;·&nbsp; Powered by EIA Admin
+        </p>
       </div>
     </div>
   </div>

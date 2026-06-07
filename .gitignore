@@ -1,13 +1,6 @@
 __pycache__/
 *.pyc
-*.pyo
 .env
-*.db
 *.sqlite3
-uploads/
 .DS_Store
 venv/
-env/
-*.egg-info/
-dist/
-build/

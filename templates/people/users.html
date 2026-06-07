@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}User Accounts{% endblock %}
+{% block page_title %}User Accounts{% endblock %}
+{% block content %}
+<div class="card mb-3"><div class="card-body py-2">
+<form class="row g-2" method="GET">
+  <div class="col-md-3"><select name="role" class="form-select form-select-sm" onchange="this.form.submit()">
+    <option value="">All Roles</option>
+    {% for r in ['admin','teacher','parent','student','bursar'] %}
+    <option value="{{ r }}" {{ 'selected' if r==selected_role }}>{{ r.title() }}</option>{% endfor %}</select></div>
+  <div class="col-auto"><a href="{{ url_for('people.users') }}" class="btn btn-sm btn-outline-secondary">Clear</a></div>
+</form></div></div>
+<div class="card"><div class="card-body p-0">
+<table class="table mb-0">
+  <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for u in users %}
+    <tr>
+      <td class="fw-semibold">{{ u.name }}</td>
+      <td><small>{{ u.email or '—' }}</small></td>
+      <td><span class="role-badge role-{{ u.role }}">{{ u.role }}</span></td>
+      <td><span class="badge bg-{{ 'success' if u.is_active else 'secondary' }}">{{ 'Active' if u.is_active else 'Inactive' }}</span>
+          {% if u.must_change_pw %}<span class="badge bg-warning text-dark ms-1">Must Change PW</span>{% endif %}</td>
+      <td><small class="text-muted">{{ u.last_login.strftime('%d %b %Y') if u.last_login else 'Never' }}</small></td>
+      <td>
+        <form method="POST" action="{{ url_for('people.toggle_user', user_id=u.id) }}" class="d-inline">
+          <button class="btn btn-xs btn-{{ 'outline-warning' if u.is_active else 'outline-success' }}" style="padding:2px 8px;font-size:.78rem;">{{ 'Disable' if u.is_active else 'Enable' }}</button>
+        </form>
+        <button class="btn btn-xs btn-outline-secondary ms-1" style="padding:2px 8px;font-size:.78rem;" data-bs-toggle="modal" data-bs-target="#resetModal{{ u.id }}">Reset PW</button>
+      </td>
+    </tr>
+    <div class="modal fade" id="resetModal{{ u.id }}"><div class="modal-dialog"><div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Reset Password — {{ u.name }}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body"><form method="POST" action="{{ url_for('people.reset_user_password', user_id=u.id) }}">
+        <label class="form-label">New Password</label><input type="text" name="new_password" class="form-control" value="changeme123">
+        <button type="submit" class="btn btn-brand w-100 mt-3">Set Password</button>
+      </form></div>
+    </div></div></div>
+    {% else %}<tr><td colspan="6" class="text-center text-muted py-4">No users found.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div></div>
+{% endblock %}

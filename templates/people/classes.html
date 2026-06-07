@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Classes{% endblock %}
+{% block page_title %}Classes{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('people.index') }}" class="text-decoration-none text-muted">People</a></li><li class="breadcrumb-item active">Classes</li>{% endblock %}
+{% block topbar_actions %}<a href="{{ url_for('people.add_class') }}" class="btn btn-sm btn-brand"><i class="bi bi-plus-lg me-1"></i>Add Class</a>{% endblock %}
+{% block content %}
+<div class="card"><div class="card-body p-0">
+<table class="table table-hover mb-0">
+  <thead><tr><th>Class</th><th>Level</th><th>Class Teacher</th><th>Students</th><th>Room</th><th>Capacity</th></tr></thead>
+  <tbody>
+    {% for c in classes %}
+    <tr>
+      <td class="fw-bold" style="font-size:1.05rem;">{{ c.name }}{% if c.stream %} <small class="text-muted">{{ c.stream }}</small>{% endif %}</td>
+      <td>{{ c.level or '—' }}</td>
+      <td>{{ c.teacher_name or '—' }}</td>
+      <td><span class="badge" style="background:var(--brand);font-size:.85rem;">{{ c.student_count }}</span></td>
+      <td>{{ c.room or '—' }}</td>
+      <td>{{ c.capacity or '—' }}</td>
+    </tr>
+    {% else %}<tr><td colspan="6" class="text-center text-muted py-4">No classes defined yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div></div>
+{% endblock %}

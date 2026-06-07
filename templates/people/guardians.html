@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Guardians{% endblock %}
+{% block page_title %}Guardians{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('people.index') }}" class="text-decoration-none text-muted">People</a></li><li class="breadcrumb-item active">Guardians</li>{% endblock %}
+{% block topbar_actions %}<a href="{{ url_for('people.add_guardian') }}" class="btn btn-sm btn-brand"><i class="bi bi-person-plus me-1"></i>Add Guardian</a>{% endblock %}
+{% block content %}
+<div class="card mb-3"><div class="card-body py-2">
+  <form class="row g-2" method="GET">
+    <div class="col-md-5"><div class="input-group input-group-sm"><span class="input-group-text"><i class="bi bi-search"></i></span>
+    <input type="text" name="q" class="form-control" placeholder="Search name, phone…" value="{{ q }}"></div></div>
+    <div class="col-auto"><button class="btn btn-sm btn-brand">Search</button></div>
+  </form>
+</div></div>
+<div class="card"><div class="card-body p-0">
+<table class="table table-hover mb-0">
+  <thead><tr><th>Name</th><th>Relationship</th><th>Phone</th><th>Email</th><th>Children</th><th>Portal</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for g in guardians %}
+    <tr>
+      <td class="fw-semibold">{{ g.name }}</td>
+      <td>{{ g.relationship or '—' }}</td>
+      <td>{{ g.phone or '—' }}</td>
+      <td><small>{{ g.email or '—' }}</small></td>
+      <td><small class="text-muted">{{ g.children or '—' }}</small></td>
+      <td>{% if g.user_id %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">None</span>{% endif %}</td>
+      <td><a href="{{ url_for('people.edit_guardian', gid=g.id) }}" class="btn btn-xs btn-outline-secondary" style="padding:2px 8px;font-size:.78rem;"><i class="bi bi-pencil"></i></a></td>
+    </tr>
+    {% else %}<tr><td colspan="7" class="text-center text-muted py-4">No guardians found.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div></div>
+{% endblock %}

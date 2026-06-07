@@ -1,12 +1,12 @@
 services:
   - type: web
-    name: empower-reports
+    name: empower-school
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     envVars:
       - key: DATABASE_URL
-        sync: false          # Set this manually in Render dashboard — paste your Supabase URL here
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: PYTHON_VERSION

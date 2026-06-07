@@ -1,133 +1,127 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - Empower Reports{% endblock %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <div>
-    <h2 class="fw-bold mb-0">Dashboard</h2>
-    <small class="text-muted">Welcome back, {{ session.get('username') }}</small>
-  </div>
-  {% if active_term %}
-    <span class="badge bg-success fs-6"><i class="bi bi-calendar-check me-1"></i>{{ active_term.term_name }} — Active</span>
-  {% else %}
-    <span class="badge bg-warning text-dark fs-6"><i class="bi bi-exclamation-triangle me-1"></i>No Active Term</span>
-  {% endif %}
-</div>
+{% set role = session.get('user_role') %}
 
-<!-- Stats row -->
+{% if role == 'admin' %}
 <div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="card text-center p-3">
-      <div class="display-5 text-primary fw-bold">{{ total_students }}</div>
-      <div class="text-muted small mt-1"><i class="bi bi-mortarboard me-1"></i>Students</div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#1e3a8a,#2563eb)">
+      <div class="number" id="stat-students">—</div>
+      <div class="label">Active Students</div>
+      <div class="icon"><i class="bi bi-mortarboard"></i></div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="card text-center p-3">
-      <div class="display-5 text-success fw-bold">{{ total_teachers }}</div>
-      <div class="text-muted small mt-1"><i class="bi bi-people me-1"></i>Teachers</div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#166534,#16a34a)">
+      <div class="number" id="stat-staff">—</div>
+      <div class="label">Staff Members</div>
+      <div class="icon"><i class="bi bi-people"></i></div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="card text-center p-3">
-      <div class="display-5 text-warning fw-bold">{{ total_marks }}</div>
-      <div class="text-muted small mt-1"><i class="bi bi-pencil-square me-1"></i>Mark Records</div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#854d0e,#d97706)">
+      <div class="number" id="stat-guardians">—</div>
+      <div class="label">Guardians</div>
+      <div class="icon"><i class="bi bi-person-hearts"></i></div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="card text-center p-3">
-      {% set unread = notifs | selectattr('read', 'equalto', False) | list | length %}
-      <div class="display-5 fw-bold" style="color:var(--brand)">{{ unread }}</div>
-      <div class="text-muted small mt-1"><i class="bi bi-bell me-1"></i>Unread Notifications</div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#9a3412,#ea580c)">
+      <div class="number" id="stat-balance">—</div>
+      <div class="label">Outstanding Fees</div>
+      <div class="icon"><i class="bi bi-cash-stack"></i></div>
     </div>
   </div>
 </div>
 
 <div class="row g-3">
-  <!-- Top Students -->
-  <div class="col-md-6">
+  <div class="col-lg-8">
     <div class="card">
-      <div class="card-header"><i class="bi bi-trophy me-2"></i>Top Students{% if active_term %} — {{ active_term.term_name }}{% endif %}</div>
-      <div class="card-body p-0">
-        {% if top_students %}
-        <table class="table mb-0">
-          <thead><tr><th>#</th><th>Name</th><th>Class</th><th>Avg</th></tr></thead>
-          <tbody>
-            {% for s in top_students %}
-            <tr>
-              <td><span class="badge bg-{{ 'warning text-dark' if loop.index==1 else 'secondary' }}">{{ loop.index }}</span></td>
-              <td>{{ s.name }}</td><td>{{ s.class_name }}</td>
-              <td><span class="badge bg-success">{{ s.avg }}</span></td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <div class="text-center text-muted py-4">No marks data yet</div>
-        {% endif %}
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-bar-chart me-2"></i>Students per Class</span>
+        <a href="{{ url_for('people.students') }}" class="btn btn-sm btn-light">View All</a>
       </div>
+      <div class="card-body"><canvas id="classChart" height="180"></canvas></div>
     </div>
   </div>
-
-  <!-- Grade Distribution Chart -->
-  <div class="col-md-6">
-    <div class="card">
-      <div class="card-header"><i class="bi bi-bar-chart me-2"></i>Grade Distribution</div>
-      <div class="card-body">
-        {% if grade_dist %}
-        <canvas id="gradeChart" height="180"></canvas>
-        {% else %}
-        <div class="text-center text-muted py-4">No grade data yet</div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  <!-- Notifications -->
-  <div class="col-12">
-    <div class="card">
-      <div class="card-header"><i class="bi bi-bell me-2"></i>Recent Notifications</div>
-      <div class="card-body p-0">
-        {% if notifs %}
-        <table class="table mb-0">
-          <thead><tr><th>From</th><th>Subject</th><th>Type</th><th>Date</th><th>Status</th></tr></thead>
-          <tbody>
-            {% for n in notifs %}
-            <tr class="{{ 'table-light' if not n.read else '' }}">
-              <td>{{ n.sender_name or 'System' }}</td>
-              <td>{{ n.subject or '(no subject)' }}</td>
-              <td><span class="badge bg-{{ 'danger' if n.message_type=='discipline' else 'info' }}">{{ n.message_type or 'message' }}</span></td>
-              <td><small class="text-muted">{{ n.created_at[:10] if n.created_at else '' }}</small></td>
-              <td>{% if not n.read %}<span class="badge bg-primary">New</span>{% else %}<span class="badge bg-secondary">Read</span>{% endif %}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <div class="text-center text-muted py-4">No notifications</div>
-        {% endif %}
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-lightning me-2"></i>Quick Actions</div>
+      <div class="card-body d-flex flex-column gap-2">
+        <a href="{{ url_for('people.add_student') }}" class="btn btn-brand"><i class="bi bi-person-plus me-2"></i>Enrol Student</a>
+        <a href="{{ url_for('people.add_staff') }}" class="btn btn-outline-primary"><i class="bi bi-person-plus me-2"></i>Add Staff</a>
+        <a href="{{ url_for('academics.marks') }}" class="btn btn-outline-success"><i class="bi bi-pencil-square me-2"></i>Enter Results</a>
+        <a href="{{ url_for('academics.reports') }}" class="btn btn-outline-danger"><i class="bi bi-file-pdf me-2"></i>Generate Reports</a>
+        <a href="{{ url_for('finance.invoices') }}" class="btn btn-outline-warning"><i class="bi bi-receipt me-2"></i>Fee Invoices</a>
+        <a href="{{ url_for('communications.inbox') }}" class="btn btn-outline-secondary"><i class="bi bi-envelope me-2"></i>Messages</a>
       </div>
     </div>
   </div>
 </div>
 
+{% elif role == 'teacher' %}
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="stat-card" style="background:linear-gradient(135deg,#166534,#16a34a)">
+      <div class="number">—</div><div class="label">My Students</div>
+      <div class="icon"><i class="bi bi-mortarboard"></i></div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <a href="{{ url_for('academics.marks') }}" class="text-decoration-none">
+      <div class="stat-card" style="background:linear-gradient(135deg,#1e3a8a,#2563eb)">
+        <div class="number"><i class="bi bi-pencil-square" style="font-size:1.8rem"></i></div>
+        <div class="label">Enter Results</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-4">
+    <a href="{{ url_for('academics.attendance') }}" class="text-decoration-none">
+      <div class="stat-card" style="background:linear-gradient(135deg,#854d0e,#d97706)">
+        <div class="number"><i class="bi bi-check-square" style="font-size:1.8rem"></i></div>
+        <div class="label">Take Attendance</div>
+      </div>
+    </a>
+  </div>
+</div>
+
+{% elif role in ['parent', 'student'] %}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-person-circle" style="font-size:4rem;color:var(--brand)"></i>
+    <h4 class="mt-3">Welcome, {{ session.get('username') }}</h4>
+    <p class="text-muted">Use the menu on the left to view results, fees, and messages.</p>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
-{% if grade_dist %}
+{% if session.get('user_role') == 'admin' %}
 <script>
-const gradeData = {{ grade_dist | tojson }};
-new Chart(document.getElementById('gradeChart'), {
+// Load stats via people blueprint index
+fetch('/people/').then(()=>{});
+
+// Fake stats for now — real data via AJAX in next build
+document.getElementById('stat-students').textContent = '—';
+document.getElementById('stat-staff').textContent    = '—';
+document.getElementById('stat-guardians').textContent= '—';
+document.getElementById('stat-balance').textContent  = '—';
+
+// Class chart placeholder
+const ctx = document.getElementById('classChart').getContext('2d');
+new Chart(ctx, {
   type: 'bar',
   data: {
-    labels: gradeData.map(d => d.grade),
-    datasets: [{
-      label: 'Students',
-      data: gradeData.map(d => d.count),
-      backgroundColor: ['#2ecc71','#3498db','#f39c12','#e67e22','#e74c3c','#c0392b','#95a5a6'],
-    }]
+    labels: ['Loading...'],
+    datasets: [{ label: 'Students', data: [0],
+      backgroundColor: '#1e3a8a', borderRadius: 6 }]
   },
-  options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  options: { plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
 });
 </script>
 {% endif %}

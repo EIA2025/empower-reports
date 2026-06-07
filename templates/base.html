@@ -3,50 +3,120 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% block title %}Empower Reports{% endblock %}</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+<title>{% block title %}Empower School{% endblock %} — EIA Admin</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <style>
-  :root { --brand: #1e3a8a; --brand-dark: #162d6e; --brand-light: #eeeef8; }
-  body { background: #f4f6fb; font-family: 'Segoe UI', sans-serif; }
-
-  /* Sidebar */
-  .sidebar {
-    min-height: 100vh;
-    background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 60%, #2d6a27 100%);
-    color: #fff;
-    position: relative;
-    z-index: 10;
+  :root {
+    --brand:      #1e3a8a;
+    --brand-dark: #162d6e;
+    --brand-mid:  #1e40af;
+    --green:      #7ec859;
+    --sidebar-w:  240px;
   }
-  .sidebar .nav-link { color: rgba(255,255,255,.82); border-radius: 8px; margin: 2px 8px; transition: all .18s; font-size:.9rem; }
-  .sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background: rgba(255,255,255,.18); }
-  .sidebar .nav-link i { margin-right: 8px; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f1f5f9; font-family: 'Segoe UI', system-ui, sans-serif; font-size: .9rem; }
 
-  /* Cards */
-  .card { border: none; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.07); }
+  /* ── Sidebar ── */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: var(--sidebar-w);
+    background: linear-gradient(180deg, var(--brand) 0%, var(--brand-mid) 60%, #1a5c1a 100%);
+    color: #fff; overflow-y: auto; z-index: 100;
+    display: flex; flex-direction: column;
+  }
+  .sidebar-logo { padding: 18px 16px 12px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.12); }
+  .sidebar-logo img { width: 56px; height: 56px; object-fit: contain; }
+  .sidebar-logo .school-name { font-size: .8rem; font-weight: 700; margin-top: 6px; opacity: .9; line-height: 1.3; }
+  .sidebar-logo .user-badge { font-size: .7rem; opacity: .65; margin-top: 2px; }
+
+  .sidebar-section { padding: 10px 8px 4px; font-size: .67rem; font-weight: 700;
+    letter-spacing: 1.5px; text-transform: uppercase; opacity: .5; }
+
+  .sidebar nav a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 14px; color: rgba(255,255,255,.82);
+    text-decoration: none; border-radius: 8px; margin: 1px 6px;
+    transition: all .15s; font-size: .85rem;
+  }
+  .sidebar nav a:hover, .sidebar nav a.active {
+    background: rgba(255,255,255,.16); color: #fff;
+  }
+  .sidebar nav a i { font-size: 1rem; width: 20px; flex-shrink: 0; }
+  .sidebar-footer { margin-top: auto; padding: 12px 10px; border-top: 1px solid rgba(255,255,255,.12); }
+  .sidebar-footer a { color: rgba(255,255,255,.7); text-decoration: none; font-size: .8rem; }
+  .sidebar-footer a:hover { color: #fff; }
+
+  /* ── Main content ── */
+  .main-wrap { margin-left: var(--sidebar-w); min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ── Topbar ── */
+  .topbar {
+    position: sticky; top: 0; z-index: 90;
+    background: #fff; border-bottom: 1px solid #e2e8f0;
+    padding: 10px 24px; display: flex; align-items: center;
+    justify-content: space-between; gap: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  }
+  .topbar .page-title { font-weight: 700; font-size: 1.1rem; color: #1e293b; }
+  .topbar .breadcrumb { font-size: .8rem; color: #64748b; margin: 0; }
+  .topbar .breadcrumb-item + .breadcrumb-item::before { color: #94a3b8; }
+
+  /* ── Content area ── */
+  .content-area { padding: 24px; flex: 1; position: relative; }
+
+  /* Watermark */
+  .content-area::before {
+    content: '';
+    position: fixed;
+    top: 50%; left: calc(50% + var(--sidebar-w)/2);
+    transform: translate(-50%, -50%);
+    width: 520px; height: 520px;
+    background: url('/static/img/logo.png') center/contain no-repeat;
+    opacity: .045;
+    pointer-events: none; z-index: 0;
+  }
+  .content-area > * { position: relative; z-index: 1; }
+
+  /* ── Cards & tables ── */
+  .card { border: none; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.07); }
   .card-header { background: var(--brand); color: #fff; border-radius: 12px 12px 0 0 !important; font-weight: 600; }
+  .table th { background: #f8fafc; font-size: .8rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .5px; color: #64748b; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+  .table td { vertical-align: middle; }
+
+  /* ── Buttons ── */
   .btn-brand { background: var(--brand); color: #fff; border: none; }
   .btn-brand:hover { background: var(--brand-dark); color: #fff; }
-  .table th { background: var(--brand-light); color: var(--brand-dark); font-weight: 600; }
-  .flash-messages { position: fixed; top: 14px; right: 20px; z-index: 9999; min-width: 300px; }
-  @media(max-width:768px){ .sidebar{ min-height:auto; } }
+  .btn-green { background: var(--green); color: #1a3a0a; border: none; font-weight: 600; }
+  .btn-green:hover { background: #6ab348; color: #1a3a0a; }
 
-  /* Watermark — only rendered inside authenticated block */
-  .page-watermark {
-    position: fixed;
-    top: 50%;
-    left: calc(50% + 8.333%); /* centred in the 10-col content area */
-    transform: translate(-50%, -50%);
-    width: 72vmin;
-    height: 72vmin;
-    background-image: url('/static/logo.png');
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    opacity: 0.06;
-    pointer-events: none;
-    user-select: none;
-    z-index: 0;
+  /* ── Badges ── */
+  .role-badge { padding: 3px 10px; border-radius: 20px; font-size: .72rem; font-weight: 600; }
+  .role-admin    { background: #dbeafe; color: #1e40af; }
+  .role-teacher  { background: #dcfce7; color: #166534; }
+  .role-parent   { background: #fef9c3; color: #854d0e; }
+  .role-student  { background: #f3e8ff; color: #6b21a8; }
+  .role-bursar   { background: #ffedd5; color: #9a3412; }
+
+  /* ── Stats cards ── */
+  .stat-card { border-radius: 14px; padding: 20px 22px; color: #fff; position: relative; overflow: hidden; }
+  .stat-card .number { font-size: 2.2rem; font-weight: 800; line-height: 1; }
+  .stat-card .label  { font-size: .82rem; opacity: .85; margin-top: 4px; }
+  .stat-card .icon   { position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+    font-size: 3rem; opacity: .18; }
+
+  /* ── Flash messages ── */
+  .flash-wrap { position: fixed; top: 16px; right: 16px; z-index: 9999; min-width: 320px; max-width: 420px; }
+
+  /* ── Module tab pills ── */
+  .module-tabs .nav-link { border-radius: 8px; color: rgba(255,255,255,.7); padding: 6px 14px; font-size: .82rem; }
+  .module-tabs .nav-link.active { background: rgba(255,255,255,.2); color: #fff; }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); }
+    .main-wrap { margin-left: 0; }
   }
 </style>
 {% block extra_css %}{% endblock %}
@@ -54,108 +124,183 @@
 <body>
 
 {% if session.get('user_id') %}
-{# ── Authenticated layout — watermark + sidebar ── #}
+<!-- ── Sidebar ─────────────────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <img src="/static/img/logo-white.png" alt="Logo">
+    <div class="school-name">{{ session.get('school_name', 'Empower School') }}</div>
+    <div class="user-badge">
+      <span class="role-badge role-{{ session.get('user_role','') }}">{{ session.get('user_role','').replace('_',' ').title() }}</span>
+    </div>
+  </div>
 
-<div class="page-watermark"></div>
+  <nav class="pt-1">
+    <!-- Dashboard -->
+    <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}">
+      <i class="bi bi-speedometer2"></i> Dashboard
+    </a>
 
-<div class="container-fluid" style="position:relative;z-index:1;">
-  <div class="row g-0">
+    {% set role = session.get('user_role') %}
 
-    <!-- Sidebar -->
-    <nav class="col-md-2 sidebar py-3 d-none d-md-block">
-      <div class="text-center mb-2 px-2">
-        <img src="/static/logo-white.png"
-             alt="EIA Logo"
-             style="width:74px;height:74px;object-fit:contain;margin-bottom:6px;">
-        <div class="fw-bold" style="font-size:.95rem;line-height:1.2;">Empower Reports</div>
-        <small class="opacity-75" style="font-size:.75rem;">{{ session.get('user_role','').replace('_',' ').title() }}</small>
-      </div>
-      <hr class="border-white opacity-25 mx-2">
+    {% if role == 'master_admin' %}
+      <div class="sidebar-section">System</div>
+      <a href="{{ url_for('system.overview') }}" class="{{ 'active' if 'system.' in (request.endpoint or '') }}">
+        <i class="bi bi-globe"></i> All Schools
+      </a>
 
-      <ul class="nav flex-column">
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint=='dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
-            <i class="bi bi-speedometer2"></i>Dashboard
-          </a>
-        </li>
+    {% else %}
+      <!-- People Module -->
+      {% if role in ['admin'] %}
+      <div class="sidebar-section">People</div>
+      <a href="{{ url_for('people.students') }}" class="{{ 'active' if 'people.student' in (request.endpoint or '') }}">
+        <i class="bi bi-mortarboard"></i> Students
+      </a>
+      <a href="{{ url_for('people.staff') }}" class="{{ 'active' if 'people.staff' in (request.endpoint or '') }}">
+        <i class="bi bi-people"></i> Staff
+      </a>
+      <a href="{{ url_for('people.guardians') }}" class="{{ 'active' if 'people.guardian' in (request.endpoint or '') }}">
+        <i class="bi bi-person-hearts"></i> Guardians
+      </a>
+      <a href="{{ url_for('people.classes') }}" class="{{ 'active' if 'people.class' in (request.endpoint or '') }}">
+        <i class="bi bi-grid"></i> Classes
+      </a>
+      <a href="{{ url_for('people.users') }}" class="{{ 'active' if request.endpoint=='people.users' }}">
+        <i class="bi bi-person-badge"></i> User Accounts
+      </a>
+      {% endif %}
 
-        {% if session.get('user_role') == 'master_admin' %}
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint=='master_admin' %}active{% endif %}" href="{{ url_for('master_admin') }}">
-            <i class="bi bi-shield-lock"></i>Master Admin
-          </a>
-        </li>
+      <!-- Academics Module -->
+      <div class="sidebar-section">Academics</div>
+      <a href="{{ url_for('academics.terms') }}" class="{{ 'active' if 'academics.term' in (request.endpoint or '') }}">
+        <i class="bi bi-calendar3"></i> Terms
+      </a>
+      {% if role in ['admin', 'teacher'] %}
+      <a href="{{ url_for('academics.marks') }}" class="{{ 'active' if request.endpoint=='academics.marks' }}">
+        <i class="bi bi-pencil-square"></i> Results
+      </a>
+      <a href="{{ url_for('academics.attendance') }}" class="{{ 'active' if request.endpoint=='academics.attendance' }}">
+        <i class="bi bi-check-square"></i> Attendance
+      </a>
+      <a href="{{ url_for('academics.behaviour') }}" class="{{ 'active' if request.endpoint=='academics.behaviour' }}">
+        <i class="bi bi-clipboard-check"></i> Behaviour
+      </a>
+      <a href="{{ url_for('academics.reports') }}" class="{{ 'active' if request.endpoint=='academics.reports' }}">
+        <i class="bi bi-file-pdf"></i> Reports
+      </a>
+      {% endif %}
+      {% if role == 'admin' %}
+      <a href="{{ url_for('academics.timetable') }}" class="{{ 'active' if request.endpoint=='academics.timetable' }}">
+        <i class="bi bi-table"></i> Timetable
+      </a>
+      {% endif %}
 
-        {% elif session.get('user_role') == 'admin' %}
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='students' %}active{% endif %}" href="{{ url_for('students') }}"><i class="bi bi-mortarboard"></i>Students</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='staff' %}active{% endif %}" href="{{ url_for('staff') }}"><i class="bi bi-people"></i>Staff</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='terms' %}active{% endif %}" href="{{ url_for('terms') }}"><i class="bi bi-calendar3"></i>Academic Calendar</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='marks' %}active{% endif %}" href="{{ url_for('marks') }}"><i class="bi bi-pencil-square"></i>Enter Results</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='comments' %}active{% endif %}" href="{{ url_for('comments') }}"><i class="bi bi-chat-text"></i>Comments</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='behavior' %}active{% endif %}" href="{{ url_for('behavior') }}"><i class="bi bi-clipboard-check"></i>Behavior</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='decisions' %}active{% endif %}" href="{{ url_for('decisions') }}"><i class="bi bi-check2-circle"></i>Decisions</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='discipline' %}active{% endif %}" href="{{ url_for('discipline') }}"><i class="bi bi-exclamation-triangle"></i>Discipline</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='visitation' %}active{% endif %}" href="{{ url_for('visitation') }}"><i class="bi bi-person-badge"></i>Visitation Day</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='generate_reports' %}active{% endif %}" href="{{ url_for('generate_reports') }}"><i class="bi bi-file-pdf"></i>Generate Reports</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='analytics' %}active{% endif %}" href="{{ url_for('analytics') }}"><i class="bi bi-graph-up"></i>Analytics</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='communications' %}active{% endif %}" href="{{ url_for('communications') }}"><i class="bi bi-envelope"></i>Communications</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='report_design' %}active{% endif %}" href="{{ url_for('report_design') }}"><i class="bi bi-palette"></i>Report Design</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='behavior_components' %}active{% endif %}" href="{{ url_for('behavior_components') }}"><i class="bi bi-sliders"></i>Behavior Setup</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='admin_management' %}active{% endif %}" href="{{ url_for('admin_management') }}"><i class="bi bi-gear"></i>Admin Mgmt</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('data_export', type='students') }}"><i class="bi bi-download"></i>Data Export</a></li>
+      <!-- Finance Module -->
+      {% if role in ['admin', 'bursar'] %}
+      <div class="sidebar-section">Finance</div>
+      <a href="{{ url_for('finance.invoices') }}" class="{{ 'active' if 'finance.invoice' in (request.endpoint or '') }}">
+        <i class="bi bi-receipt"></i> Invoices
+      </a>
+      <a href="{{ url_for('finance.payments') }}" class="{{ 'active' if 'finance.payment' in (request.endpoint or '') }}">
+        <i class="bi bi-cash-stack"></i> Payments
+      </a>
+      <a href="{{ url_for('finance.fee_structure') }}" class="{{ 'active' if request.endpoint=='finance.fee_structure' }}">
+        <i class="bi bi-list-check"></i> Fee Structure
+      </a>
+      {% endif %}
 
-        {% else %}{# teacher #}
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='marks' %}active{% endif %}" href="{{ url_for('marks') }}"><i class="bi bi-pencil-square"></i>Enter Results</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='comments' %}active{% endif %}" href="{{ url_for('comments') }}"><i class="bi bi-chat-text"></i>Comments</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='behavior' %}active{% endif %}" href="{{ url_for('behavior') }}"><i class="bi bi-clipboard-check"></i>Behavior</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='decisions' %}active{% endif %}" href="{{ url_for('decisions') }}"><i class="bi bi-check2-circle"></i>Decisions</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='discipline' %}active{% endif %}" href="{{ url_for('discipline') }}"><i class="bi bi-exclamation-triangle"></i>Discipline</a></li>
-        <li class="nav-item"><a class="nav-link {% if request.endpoint=='communications' %}active{% endif %}" href="{{ url_for('communications') }}"><i class="bi bi-envelope"></i>Communications</a></li>
-        {% endif %}
+      <!-- Parent portal -->
+      {% if role == 'parent' %}
+      <div class="sidebar-section">My Children</div>
+      <a href="{{ url_for('people.parent_portal') }}"><i class="bi bi-person-heart"></i> My Children</a>
+      <a href="{{ url_for('academics.parent_results') }}"><i class="bi bi-bar-chart"></i> Results</a>
+      <a href="{{ url_for('finance.my_fees') }}"><i class="bi bi-cash"></i> Fees & Payments</a>
+      {% endif %}
 
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint=='change_login' %}active{% endif %}" href="{{ url_for('change_login') }}">
-            <i class="bi bi-key"></i>Change Login
-          </a>
-        </li>
-      </ul>
+      <!-- Student portal -->
+      {% if role == 'student' %}
+      <div class="sidebar-section">My Academics</div>
+      <a href="{{ url_for('academics.student_results') }}"><i class="bi bi-bar-chart"></i> My Results</a>
+      <a href="{{ url_for('academics.student_timetable') }}"><i class="bi bi-table"></i> Timetable</a>
+      {% endif %}
 
-      <hr class="border-white opacity-25 mx-2">
-      <div class="px-3 pb-2">
-        <div class="d-flex align-items-center gap-2 mb-2">
-          <i class="bi bi-person-circle opacity-75"></i>
-          <small class="opacity-75 text-truncate">{{ session.get('username') }}</small>
+      <!-- Comms — all roles -->
+      <div class="sidebar-section">Communications</div>
+      <a href="{{ url_for('communications.inbox') }}" class="{{ 'active' if 'communications.' in (request.endpoint or '') }}">
+        <i class="bi bi-envelope"></i> Messages
+      </a>
+      <a href="{{ url_for('events.calendar') }}" class="{{ 'active' if 'events.' in (request.endpoint or '') }}">
+        <i class="bi bi-calendar-event"></i> Events
+      </a>
+
+      <!-- Library -->
+      <div class="sidebar-section">Library</div>
+      <a href="{{ url_for('library.catalogue') }}" class="{{ 'active' if 'library.' in (request.endpoint or '') }}">
+        <i class="bi bi-book"></i> Library
+      </a>
+
+      <!-- Admin settings -->
+      {% if role == 'admin' %}
+      <div class="sidebar-section">Settings</div>
+      <a href="{{ url_for('people.index') }}"><i class="bi bi-gear"></i> People Admin</a>
+      {% endif %}
+
+    {% endif %}
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="d-flex justify-content-between align-items-center">
+      <span class="text-white-50" style="font-size:.78rem;">{{ session.get('username','') }}</span>
+      <a href="{{ url_for('auth.logout') }}" title="Logout">
+        <i class="bi bi-box-arrow-right"></i>
+      </a>
+    </div>
+  </div>
+</aside>
+
+<!-- ── Main Wrapper ─────────────────────────────────────────────────────────── -->
+<div class="main-wrap">
+  <!-- Topbar -->
+  <div class="topbar">
+    <div>
+      <div class="page-title">{% block page_title %}{% endblock %}</div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+          <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}" class="text-decoration-none text-muted">Home</a></li>
+          {% block breadcrumb %}{% endblock %}
+        </ol>
+      </nav>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+      {% block topbar_actions %}{% endblock %}
+      <a href="{{ url_for('auth.change_password') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-key"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- Flash messages -->
+  <div class="flash-wrap">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ 'danger' if cat=='error' else cat }} alert-dismissible fade show shadow-sm mb-2">
+          {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
-        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light w-100">
-          <i class="bi bi-box-arrow-right me-1"></i>Logout
-        </a>
-      </div>
-    </nav>
+      {% endfor %}
+    {% endwith %}
+  </div>
 
-    <!-- Main content -->
-    <main class="col-md-10 px-4 py-3" style="position:relative;z-index:1;min-height:100vh;">
-      <div class="flash-messages">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% for cat, msg in messages %}
-            <div class="alert alert-{{ 'danger' if cat=='error' else cat }} alert-dismissible fade show shadow-sm" role="alert">
-              {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-          {% endfor %}
-        {% endwith %}
-      </div>
-      {% block content %}{% endblock %}
-    </main>
-
+  <!-- Content -->
+  <div class="content-area">
+    {% block content %}{% endblock %}
   </div>
 </div>
 
 {% else %}
-{# ── Login / unauthenticated — no watermark ── #}
 {% block auth_content %}{% endblock %}
 {% endif %}
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>

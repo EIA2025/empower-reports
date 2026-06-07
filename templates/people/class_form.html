@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Add Class{% endblock %}
+{% block page_title %}Add Class{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-lg-6">
+<div class="card"><div class="card-header">Class Details</div><div class="card-body">
+<form method="POST"><div class="row g-3">
+  <div class="col-md-6"><label class="form-label fw-semibold">Class Name *</label><input type="text" name="name" class="form-control" required placeholder="e.g. S1, P3, Form 4"></div>
+  <div class="col-md-6"><label class="form-label fw-semibold">Stream</label><input type="text" name="stream" class="form-control" placeholder="e.g. A, West, Blue"></div>
+  <div class="col-md-6"><label class="form-label fw-semibold">Level</label>
+  <select name="level" class="form-select"><option value="">— Select —</option>{% for l in ['Nursery','Primary','O-Level','A-Level'] %}<option value="{{ l }}">{{ l }}</option>{% endfor %}</select></div>
+  <div class="col-md-6"><label class="form-label fw-semibold">Class Teacher</label>
+  <select name="class_teacher" class="form-select"><option value="">— None —</option>{% for s in staff %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select></div>
+  <div class="col-md-6"><label class="form-label fw-semibold">Capacity</label><input type="number" name="capacity" class="form-control"></div>
+  <div class="col-md-6"><label class="form-label fw-semibold">Room</label><input type="text" name="room" class="form-control"></div>
+  <div class="col-12"><button type="submit" class="btn btn-brand w-100">Add Class</button></div>
+</div></form>
+</div></div>
+</div></div>
+{% endblock %}
