@@ -60,13 +60,17 @@ def login():
         action = request.form.get('action', 'login')
 
         if action == 'master_login':
-            _handle_master_login()
+            resp = _handle_master_login()
+            if resp:
+                return resp
         elif action == 'login':
-            _handle_user_login()
+            resp = _handle_user_login()
+            if resp:
+                return resp
         elif action == 'forgot':
             _handle_forgot_password()
 
-        return redirect(request.url)
+        return redirect(url_for('auth.login'))
 
     # Get school name for display
     db = SessionLocal()
@@ -97,8 +101,10 @@ def _handle_master_login():
                 "UPDATE system_users SET last_login=CURRENT_TIMESTAMP WHERE id=:id"
             ), {'id': u.id})
             db.commit()
+            return redirect(url_for('dashboard'))
         else:
             flash('Invalid master admin credentials.', 'error')
+            return None
     finally:
         db.close()
 
@@ -113,7 +119,6 @@ def _handle_user_login():
         ), {'e': email}).fetchone()
 
         if u and u.password_hash == hashlib.sha256(pw.encode()).hexdigest():
-            # Get school info
             school = db.execute(text(
                 "SELECT * FROM schools WHERE id=:id LIMIT 1"
             ), {'id': u.school_id}).fetchone()
@@ -133,8 +138,10 @@ def _handle_user_login():
             if u.must_change_pw:
                 flash('Please change your password before continuing.', 'warning')
                 return redirect(url_for('auth.change_password'))
+            return redirect(url_for('dashboard'))
         else:
             flash('Invalid email or password.', 'error')
+            return None
     finally:
         db.close()
 
