@@ -13,6 +13,7 @@
   </button>
 </form>
 {% endblock %}
+
 {% block content %}
 <div class="row g-3">
   <!-- Left: Info -->
@@ -27,7 +28,9 @@
           <div>
             <div class="fw-bold">{{ school.name }}</div>
             <div class="text-muted small">{{ school.subtitle or '' }}</div>
-            <span class="badge bg-{{ 'success' if school.is_active else 'danger' }}">{{ 'Active' if school.is_active else 'Inactive' }}</span>
+            <span class="badge bg-{{ 'success' if school.is_active else 'danger' }}">
+              {{ 'Active' if school.is_active else 'Inactive' }}
+            </span>
           </div>
         </div>
         <dl class="row mb-0" style="font-size:.85rem;">
@@ -35,11 +38,13 @@
           <dt class="col-5 text-muted">Phone</dt><dd class="col-7">{{ school.phone or '—' }}</dd>
           <dt class="col-5 text-muted">Email</dt><dd class="col-7">{{ school.email or '—' }}</dd>
           <dt class="col-5 text-muted">Currency</dt><dd class="col-7">{{ school.currency or 'UGX' }}</dd>
-          <dt class="col-5 text-muted">Plan</dt><dd class="col-7"><span class="badge bg-{{ 'success' if school.plan=='premium' else 'info text-dark' if school.plan=='basic' else 'secondary' }}">{{ (school.plan or 'trial').title() }}</span></dd>
+          <dt class="col-5 text-muted">Plan</dt>
+          <dd class="col-7"><span class="badge bg-{{ 'success' if school.plan=='premium' else 'info text-dark' if school.plan=='basic' else 'secondary' }}">{{ (school.plan or 'trial').title() }}</span></dd>
           <dt class="col-5 text-muted">Expires</dt><dd class="col-7">{{ school.plan_expires or 'Never' }}</dd>
           <dt class="col-5 text-muted">Max Students</dt><dd class="col-7">{{ school.max_students or 500 }}</dd>
           <dt class="col-5 text-muted">Max Staff</dt><dd class="col-7">{{ school.max_staff or 50 }}</dd>
-          <dt class="col-5 text-muted">Created</dt><dd class="col-7">{{ school.created_at.strftime('%d %b %Y') if school.created_at else '—' }}</dd>
+          <dt class="col-5 text-muted">Created</dt>
+          <dd class="col-7">{{ school.created_at.strftime('%d %b %Y') if school.created_at else '—' }}</dd>
         </dl>
         {% if school.notes %}
         <div class="mt-3 p-2 rounded bg-light small text-muted">{{ school.notes }}</div>
@@ -64,7 +69,7 @@
     <div class="card border-danger">
       <div class="card-header bg-danger text-white"><i class="bi bi-exclamation-triangle me-2"></i>Danger Zone</div>
       <div class="card-body">
-        <p class="small text-muted">Permanently delete this school and ALL its data. This cannot be undone.</p>
+        <p class="small text-muted mb-2">Permanently delete this school and ALL its data.</p>
         <button class="btn btn-outline-danger btn-sm w-100" data-bs-toggle="modal" data-bs-target="#deleteModal">
           Delete School
         </button>
@@ -84,37 +89,38 @@
       </div>
       <div class="card-body p-0">
         <table class="table mb-0">
-          <thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Last Login</th><th>Actions</th></tr></thead>
+          <thead>
+            <tr><th>Name</th><th>Email</th><th>Status</th><th>Last Login</th><th>Actions</th></tr>
+          </thead>
           <tbody>
             {% for a in admins %}
             <tr>
               <td class="fw-semibold">{{ a.name }}</td>
               <td><small>{{ a.email }}</small></td>
-              <td><span class="badge bg-{{ 'success' if a.is_active else 'secondary' }}">{{ 'Active' if a.is_active else 'Inactive' }}</span></td>
+              <td>
+                <span class="badge bg-{{ 'success' if a.is_active else 'secondary' }}">
+                  {{ 'Active' if a.is_active else 'Inactive' }}
+                </span>
+              </td>
               <td><small class="text-muted">{{ a.last_login.strftime('%d %b %Y') if a.last_login else 'Never' }}</small></td>
               <td>
                 <form method="POST" action="{{ url_for('system.toggle_user', user_id=a.id) }}" class="d-inline">
-                  <button class="btn btn-xs btn-{{ 'outline-warning' if a.is_active else 'outline-success' }}" style="padding:2px 8px;font-size:.75rem;">
+                  <button type="submit" class="btn btn-xs btn-{{ 'outline-warning' if a.is_active else 'outline-success' }}"
+                          style="padding:2px 8px;font-size:.75rem;">
                     {{ 'Disable' if a.is_active else 'Enable' }}
                   </button>
                 </form>
-                <button class="btn btn-xs btn-outline-secondary ms-1" style="padding:2px 8px;font-size:.75rem;"
-                        data-bs-toggle="modal" data-bs-target="#resetPwModal{{ a.id }}">
+                <button type="button"
+                        class="btn btn-xs btn-outline-secondary ms-1"
+                        style="padding:2px 8px;font-size:.75rem;"
+                        data-bs-toggle="modal"
+                        data-bs-target="#resetPwModal"
+                        data-uid="{{ a.id }}"
+                        data-name="{{ a.name }}">
                   Reset PW
                 </button>
               </td>
             </tr>
-            <!-- Reset PW Modal -->
-            <div class="modal fade" id="resetPwModal{{ a.id }}"><div class="modal-dialog"><div class="modal-content">
-              <div class="modal-header"><h5 class="modal-title">Reset Password — {{ a.name }}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-              <div class="modal-body">
-                <form method="POST" action="{{ url_for('system.reset_password', user_id=a.id) }}">
-                  <label class="form-label fw-semibold">New Password</label>
-                  <input type="text" name="new_password" class="form-control mb-3" value="admin123">
-                  <button type="submit" class="btn btn-brand w-100">Set Password</button>
-                </form>
-              </div>
-            </div></div></div>
             {% else %}
             <tr><td colspan="5" class="text-center text-muted py-3">No admin accounts yet.</td></tr>
             {% endfor %}
@@ -150,30 +156,97 @@
   </div>
 </div>
 
+{# ── ALL MODALS OUTSIDE THE TABLE — no nesting in <tr> ── #}
+
 <!-- Add Admin Modal -->
-<div class="modal fade" id="addAdminModal"><div class="modal-dialog"><div class="modal-content">
-  <div class="modal-header"><h5 class="modal-title">Add Admin Account</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-  <div class="modal-body">
-    <form method="POST" action="{{ url_for('system.add_school_admin', school_id=school.id) }}">
-      <div class="mb-3"><label class="form-label fw-semibold">Full Name *</label><input type="text" name="name" class="form-control" required></div>
-      <div class="mb-3"><label class="form-label fw-semibold">Email / Username *</label><input type="text" name="email" class="form-control" required></div>
-      <div class="mb-3"><label class="form-label fw-semibold">Phone</label><input type="text" name="phone" class="form-control"></div>
-      <div class="mb-3"><label class="form-label fw-semibold">Password</label><input type="text" name="password" class="form-control" value="admin123"></div>
-      <button type="submit" class="btn btn-brand w-100">Create Admin Account</button>
-    </form>
+<div class="modal fade" id="addAdminModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add Admin Account</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form method="POST" action="{{ url_for('system.add_school_admin', school_id=school.id) }}">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Full Name *</label>
+            <input type="text" name="name" class="form-control" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Email / Username *</label>
+            <input type="text" name="email" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Phone</label>
+            <input type="text" name="phone" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Password</label>
+            <input type="text" name="password" class="form-control" value="admin123">
+            <small class="text-muted">Admin will log in with this password. Change it afterwards.</small>
+          </div>
+          <button type="submit" class="btn btn-brand w-100">
+            <i class="bi bi-person-plus me-2"></i>Create Admin Account
+          </button>
+        </form>
+      </div>
+    </div>
   </div>
-</div></div></div>
+</div>
+
+<!-- Single shared Reset PW Modal — populated by JS -->
+<div class="modal fade" id="resetPwModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Reset Password — <span id="resetAdminName"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form method="POST" id="resetPwForm">
+          <label class="form-label fw-semibold">New Password</label>
+          <input type="text" name="new_password" class="form-control mb-3" value="admin123">
+          <small class="text-muted d-block mb-3">User will be required to change this on next login.</small>
+          <button type="submit" class="btn btn-brand w-100">Set Password</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Delete School Modal -->
-<div class="modal fade" id="deleteModal"><div class="modal-dialog"><div class="modal-content border-danger">
-  <div class="modal-header bg-danger text-white"><h5 class="modal-title">⚠ Delete School</h5><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-  <div class="modal-body">
-    <p class="text-danger fw-semibold">This will permanently delete <strong>{{ school.name }}</strong> and ALL associated data including students, staff, marks, and financial records.</p>
-    <form method="POST" action="{{ url_for('system.delete_school', school_id=school.id) }}">
-      <label class="form-label">Type the school name to confirm:</label>
-      <input type="text" name="confirm_name" class="form-control mb-3" placeholder="{{ school.name }}" required>
-      <button type="submit" class="btn btn-danger w-100">Permanently Delete</button>
-    </form>
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content border-danger">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">⚠ Delete School</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-danger fw-semibold">
+          This will permanently delete <strong>{{ school.name }}</strong> and ALL associated data including
+          students, staff, marks, and financial records.
+        </p>
+        <form method="POST" action="{{ url_for('system.delete_school', school_id=school.id) }}">
+          <label class="form-label">Type the school name to confirm:</label>
+          <input type="text" name="confirm_name" class="form-control mb-3" placeholder="{{ school.name }}" required>
+          <button type="submit" class="btn btn-danger w-100">Permanently Delete Everything</button>
+        </form>
+      </div>
+    </div>
   </div>
-</div></div></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Populate the shared Reset PW modal with the right user id and name
+document.getElementById('resetPwModal').addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  const uid  = btn.getAttribute('data-uid');
+  const name = btn.getAttribute('data-name');
+  document.getElementById('resetAdminName').textContent = name;
+  document.getElementById('resetPwForm').action = '/system/users/' + uid + '/reset-password';
+});
+</script>
 {% endblock %}
