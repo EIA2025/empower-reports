@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}System Admins{% endblock %}
+{% block page_title %}System Admin Accounts{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('system.overview') }}" class="text-decoration-none text-muted">System</a></li><li class="breadcrumb-item active">Admins</li>{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card"><div class="card-header"><i class="bi bi-person-plus me-2"></i>Add System Admin</div>
+    <div class="card-body">
+      <form method="POST"><input type="hidden" name="action" value="add">
+        <div class="mb-3"><label class="form-label fw-semibold">Full Name *</label><input type="text" name="name" class="form-control" required></div>
+        <div class="mb-3"><label class="form-label fw-semibold">Email *</label><input type="email" name="email" class="form-control" required></div>
+        <div class="mb-3"><label class="form-label fw-semibold">Password</label><input type="text" name="password" class="form-control" value="masteradmin123"></div>
+        <button type="submit" class="btn btn-brand w-100">Create Admin</button>
+      </form>
+    </div></div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card"><div class="card-body p-0">
+    <table class="table mb-0">
+      <thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Last Login</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for a in admins %}
+        <tr>
+          <td class="fw-semibold">{{ a.name }}</td>
+          <td><small>{{ a.email }}</small></td>
+          <td><span class="badge bg-{{ 'success' if a.is_active else 'secondary' }}">{{ 'Active' if a.is_active else 'Inactive' }}</span></td>
+          <td><small class="text-muted">{{ a.last_login.strftime('%d %b %Y') if a.last_login else 'Never' }}</small></td>
+          <td>
+            <form method="POST" class="d-inline"><input type="hidden" name="action" value="toggle"><input type="hidden" name="uid" value="{{ a.id }}">
+              <button class="btn btn-xs btn-{{ 'outline-warning' if a.is_active else 'outline-success' }}" style="padding:2px 8px;font-size:.78rem;">{{ 'Disable' if a.is_active else 'Enable' }}</button>
+            </form>
+            <button class="btn btn-xs btn-outline-secondary ms-1" style="padding:2px 8px;font-size:.78rem;" data-bs-toggle="modal" data-bs-target="#resetModal{{ a.id }}">Reset PW</button>
+          </td>
+        </tr>
+        <div class="modal fade" id="resetModal{{ a.id }}"><div class="modal-dialog"><div class="modal-content">
+          <div class="modal-header"><h5 class="modal-title">Reset — {{ a.name }}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body"><form method="POST"><input type="hidden" name="action" value="reset_pw"><input type="hidden" name="uid" value="{{ a.id }}">
+            <label class="form-label fw-semibold">New Password</label><input type="text" name="new_password" class="form-control mb-3" value="masteradmin123">
+            <button type="submit" class="btn btn-brand w-100">Set Password</button>
+          </form></div>
+        </div></div></div>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No system admins.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div></div>
+  </div>
+</div>
+{% endblock %}

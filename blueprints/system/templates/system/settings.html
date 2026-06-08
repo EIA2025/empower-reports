@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}System Settings{% endblock %}
+{% block page_title %}System Settings{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('system.overview') }}" class="text-decoration-none text-muted">System</a></li><li class="breadcrumb-item active">Settings</li>{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-lg-7">
+<div class="card"><div class="card-header"><i class="bi bi-gear me-2"></i>Global Configuration</div>
+<div class="card-body">
+<form method="POST">
+  <h6 class="fw-bold text-muted mb-3">Branding</h6>
+  <div class="mb-3"><label class="form-label fw-semibold">System Name</label>
+    <input type="text" name="setting_system_name" class="form-control" value="{{ cfg.get('system_name','EIA School Admin') }}" placeholder="EIA School Admin"></div>
+  <div class="mb-3"><label class="form-label fw-semibold">Support Email</label>
+    <input type="email" name="setting_support_email" class="form-control" value="{{ cfg.get('support_email','') }}" placeholder="support@eia.ac.ug"></div>
+  <div class="mb-3"><label class="form-label fw-semibold">Support Phone</label>
+    <input type="text" name="setting_support_phone" class="form-control" value="{{ cfg.get('support_phone','') }}"></div>
+  <hr>
+  <h6 class="fw-bold text-muted mb-3">Default Limits</h6>
+  <div class="row g-3">
+    <div class="col-md-6"><label class="form-label fw-semibold">Default Max Students</label>
+      <input type="number" name="setting_default_max_students" class="form-control" value="{{ cfg.get('default_max_students','500') }}"></div>
+    <div class="col-md-6"><label class="form-label fw-semibold">Default Max Staff</label>
+      <input type="number" name="setting_default_max_staff" class="form-control" value="{{ cfg.get('default_max_staff','50') }}"></div>
+  </div>
+  <hr>
+  <h6 class="fw-bold text-muted mb-3">Registration</h6>
+  <div class="mb-3 form-check">
+    <input type="checkbox" class="form-check-input" name="setting_allow_self_register" id="selfReg" value="1" {{ 'checked' if cfg.get('allow_self_register')=='1' }}>
+    <label class="form-check-label" for="selfReg">Allow schools to self-register (future feature)</label>
+  </div>
+  <hr>
+  <button type="submit" class="btn btn-brand w-100">Save Settings</button>
+</form>
+</div></div>
+</div></div>
+{% endblock %}

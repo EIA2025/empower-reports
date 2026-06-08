@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Schools{% endblock %}
+{% block page_title %}All Schools{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('system.overview') }}" class="text-decoration-none text-muted">System</a></li><li class="breadcrumb-item active">Schools</li>{% endblock %}
+{% block topbar_actions %}<a href="{{ url_for('system.add_school') }}" class="btn btn-sm btn-brand"><i class="bi bi-plus-lg me-1"></i>New School</a>{% endblock %}
+{% block content %}
+<div class="card mb-3"><div class="card-body py-2">
+  <form class="row g-2 align-items-center" method="GET">
+    <div class="col-md-5"><div class="input-group input-group-sm"><span class="input-group-text"><i class="bi bi-search"></i></span>
+    <input type="text" name="q" class="form-control" placeholder="Search name, email, country…" value="{{ q }}"></div></div>
+    <div class="col-md-3"><select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">All Status</option>
+      <option value="active" {{ 'selected' if selected_status=='active' }}>Active</option>
+      <option value="inactive" {{ 'selected' if selected_status=='inactive' }}>Inactive</option>
+    </select></div>
+    <div class="col-auto"><button class="btn btn-sm btn-brand">Filter</button>
+    <a href="{{ url_for('system.schools') }}" class="btn btn-sm btn-outline-secondary ms-1">Clear</a></div>
+    <div class="col-auto ms-auto"><span class="text-muted small">{{ schools|length }} school{{ 's' if schools|length != 1 }}</span></div>
+  </form>
+</div></div>
+
+<div class="card"><div class="card-body p-0">
+<table class="table table-hover mb-0">
+  <thead><tr><th>School</th><th>Country</th><th>Students</th><th>Staff</th><th>Admins</th><th>Plan</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for s in schools %}
+    <tr>
+      <td>
+        <div class="fw-semibold">{{ s.name }}</div>
+        <small class="text-muted">{{ s.email or '' }}</small>
+      </td>
+      <td>{{ s.country or '—' }}</td>
+      <td><span class="badge" style="background:var(--brand)">{{ s.student_count }}</span></td>
+      <td>{{ s.staff_count }}</td>
+      <td>{{ s.admin_count }}</td>
+      <td><span class="badge bg-{{ 'success' if s.plan=='premium' else 'info text-dark' if s.plan=='basic' else 'secondary' }}">{{ (s.plan or 'trial').title() }}</span>
+        {% if s.plan_expires %}<br><small class="text-muted">exp {{ s.plan_expires }}</small>{% endif %}
+      </td>
+      <td><span class="badge bg-{{ 'success' if s.is_active else 'danger' }}">{{ 'Active' if s.is_active else 'Inactive' }}</span></td>
+      <td><small class="text-muted">{{ s.created_at.strftime('%d %b %Y') if s.created_at else '—' }}</small></td>
+      <td>
+        <a href="{{ url_for('system.school_detail', school_id=s.id) }}" class="btn btn-xs btn-outline-primary" style="padding:2px 8px;font-size:.78rem;"><i class="bi bi-eye"></i></a>
+        <a href="{{ url_for('system.edit_school', school_id=s.id) }}" class="btn btn-xs btn-outline-secondary ms-1" style="padding:2px 8px;font-size:.78rem;"><i class="bi bi-pencil"></i></a>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9" class="text-center text-muted py-4">No schools yet. <a href="{{ url_for('system.add_school') }}">Create the first one</a>.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div></div>
+{% endblock %}

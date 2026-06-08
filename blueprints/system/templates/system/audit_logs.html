@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Audit Logs{% endblock %}
+{% block page_title %}Audit Logs{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('system.overview') }}" class="text-decoration-none text-muted">System</a></li><li class="breadcrumb-item active">Audit Logs</li>{% endblock %}
+{% block content %}
+<div class="card mb-3"><div class="card-body py-2">
+  <form class="row g-2" method="GET">
+    <div class="col-md-3"><select name="school_id" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">All Schools</option>
+      {% for s in schools %}<option value="{{ s.id }}" {{ 'selected' if s.id|string==school_filter }}>{{ s.name }}</option>{% endfor %}
+    </select></div>
+    <div class="col-md-3"><input type="text" name="action" class="form-control form-control-sm" placeholder="Filter by action…" value="{{ action_filter }}"></div>
+    <div class="col-auto"><button class="btn btn-sm btn-brand">Filter</button>
+    <a href="{{ url_for('system.audit_logs') }}" class="btn btn-sm btn-outline-secondary ms-1">Clear</a></div>
+    <div class="col-auto ms-auto"><small class="text-muted">{{ total }} records</small></div>
+  </form>
+</div></div>
+<div class="card"><div class="card-body p-0">
+<table class="table table-hover mb-0" style="font-size:.84rem;">
+  <thead><tr><th>Time</th><th>School</th><th>User</th><th>Role</th><th>Action</th><th>Details</th></tr></thead>
+  <tbody>
+    {% for log in logs %}
+    <tr>
+      <td><small class="text-muted">{{ log.timestamp.strftime('%d %b %Y %H:%M') if log.timestamp else '—' }}</small></td>
+      <td>{{ log.school_name or '—' }}</td>
+      <td>{{ log.user_name or '—' }}</td>
+      <td><span class="badge bg-secondary" style="font-size:.7rem;">{{ log.user_role or '—' }}</span></td>
+      <td><code style="font-size:.75rem;">{{ log.action }}</code></td>
+      <td class="text-muted">{{ (log.details or '')[:80] }}{{ '…' if log.details and log.details|length>80 }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="text-center text-muted py-4">No logs found.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if pages > 1 %}
+<div class="card-footer d-flex justify-content-between align-items-center">
+  <small class="text-muted">Page {{ page }} of {{ pages }}</small>
+  <div class="d-flex gap-1">
+    {% if page > 1 %}<a href="?page={{ page-1 }}&school_id={{ school_filter }}&action={{ action_filter }}" class="btn btn-sm btn-outline-secondary">← Prev</a>{% endif %}
+    {% if page < pages %}<a href="?page={{ page+1 }}&school_id={{ school_filter }}&action={{ action_filter }}" class="btn btn-sm btn-outline-secondary">Next →</a>{% endif %}
+  </div>
+</div>
+{% endif %}
+</div>
+{% endblock %}

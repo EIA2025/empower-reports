@@ -101,6 +101,11 @@ def _create_tables(cur):
         country VARCHAR(100),
         currency VARCHAR(10) DEFAULT 'UGX',
         is_active BOOLEAN DEFAULT true,
+        plan VARCHAR(30) DEFAULT 'trial',
+        plan_expires VARCHAR(20),
+        max_students INTEGER DEFAULT 500,
+        max_staff INTEGER DEFAULT 50,
+        notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""")
 
@@ -113,6 +118,27 @@ def _create_tables(cur):
         is_active BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_login TIMESTAMP
+    )""")
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS system_settings (
+        id SERIAL PRIMARY KEY,
+        key VARCHAR(100) UNIQUE NOT NULL,
+        value TEXT,
+        description TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS system_announcements (
+        id SERIAL PRIMARY KEY,
+        created_by INTEGER REFERENCES system_users(id) ON DELETE SET NULL,
+        title VARCHAR(300) NOT NULL,
+        body TEXT,
+        target VARCHAR(50) DEFAULT 'all',
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at VARCHAR(20)
     )""")
 
     cur.execute("""

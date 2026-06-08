@@ -10,7 +10,6 @@ auth_bp = Blueprint('auth', __name__)
 
 
 # ── Decorators ────────────────────────────────────────────────────────────────
-
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -22,7 +21,6 @@ def login_required(f):
 
 
 def roles_required(*roles):
-    """Allow access only to specified roles."""
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
@@ -37,7 +35,6 @@ def roles_required(*roles):
 
 
 def school_required(f):
-    """Ensure user is logged in AND has a school_id in session."""
     @wraps(f)
     def decorated(*args, **kwargs):
         if not session.get('user_id'):
@@ -49,10 +46,10 @@ def school_required(f):
     return decorated
 
 
-# ── Login ─────────────────────────────────────────────────────────────────────
-
+# ── LOGIN ─────────────────────────────────────────────────────────────────────
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    # Already logged in → go to dashboard
     if session.get('user_id'):
         return redirect(url_for('dashboard'))
 
@@ -60,19 +57,16 @@ def login():
         action = request.form.get('action', 'login')
 
         if action == 'master_login':
-            resp = _handle_master_login()
-            if resp:
-                return resp
+            return _master_login()
+
         elif action == 'login':
-            resp = _handle_user_login()
-            if resp:
-                return resp
+            return _user_login()
+
         elif action == 'forgot':
-            _handle_forgot_password()
+            _forgot_password()
+            return redirect(url_for('auth.login'))
 
-        return redirect(url_for('auth.login'))
-
-    # Get school name for display
+    # GET — show login page with school info
     db = SessionLocal()
     try:
         school = db.execute(text(
@@ -84,77 +78,102 @@ def login():
     return render_template('login.html', school=school)
 
 
-def _handle_master_login():
+def _master_login():
+    """Handle master admin login — returns a redirect response."""
     email = request.form.get('master_email', '').strip()
-    pw    = request.form.get('master_password', '')
-    db    = SessionLocal()
+    pw    = request.form.get('master_password', '').strip()
+
+    if not email or not pw:
+        flash('Please enter email and password.', 'error')
+        return redirect(url_for('auth.login'))
+
+    db = SessionLocal()
     try:
         u = db.execute(text(
             "SELECT * FROM system_users WHERE email=:e AND is_active=true LIMIT 1"
         ), {'e': email}).fetchone()
+
         if u and u.password_hash == hashlib.sha256(pw.encode()).hexdigest():
             session.clear()
             session['user_id']   = f'sys_{u.id}'
             session['user_role'] = 'master_admin'
             session['username']  = u.name
+            session['school_name'] = 'System Administration'
             db.execute(text(
                 "UPDATE system_users SET last_login=CURRENT_TIMESTAMP WHERE id=:id"
             ), {'id': u.id})
             db.commit()
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('system.overview'))
         else:
             flash('Invalid master admin credentials.', 'error')
-            return None
+            return redirect(url_for('auth.login'))
     finally:
         db.close()
 
 
-def _handle_user_login():
-    email    = request.form.get('email', '').strip()
-    pw       = request.form.get('password', '')
-    db       = SessionLocal()
+def _user_login():
+    """Handle school user login — returns a redirect response."""
+    email = request.form.get('email', '').strip()
+    pw    = request.form.get('password', '').strip()
+
+    if not email or not pw:
+        flash('Please enter your email and password.', 'error')
+        return redirect(url_for('auth.login'))
+
+    db = SessionLocal()
     try:
         u = db.execute(text(
             "SELECT * FROM users WHERE email=:e AND is_active=true LIMIT 1"
         ), {'e': email}).fetchone()
 
-        if u and u.password_hash == hashlib.sha256(pw.encode()).hexdigest():
-            school = db.execute(text(
-                "SELECT * FROM schools WHERE id=:id LIMIT 1"
-            ), {'id': u.school_id}).fetchone()
-
-            session.clear()
-            session['user_id']    = u.id
-            session['user_role']  = u.role
-            session['username']   = u.name
-            session['school_id']  = u.school_id
-            session['school_name'] = school.name if school else ''
-
-            db.execute(text(
-                "UPDATE users SET last_login=CURRENT_TIMESTAMP WHERE id=:id"
-            ), {'id': u.id})
-            db.commit()
-
-            if u.must_change_pw:
-                flash('Please change your password before continuing.', 'warning')
-                return redirect(url_for('auth.change_password'))
-            return redirect(url_for('dashboard'))
-        else:
+        if not u:
             flash('Invalid email or password.', 'error')
-            return None
+            return redirect(url_for('auth.login'))
+
+        if u.password_hash != hashlib.sha256(pw.encode()).hexdigest():
+            flash('Invalid email or password.', 'error')
+            return redirect(url_for('auth.login'))
+
+        # Credentials correct — get school info
+        school = db.execute(text(
+            "SELECT * FROM schools WHERE id=:id LIMIT 1"
+        ), {'id': u.school_id}).fetchone()
+
+        session.clear()
+        session['user_id']    = u.id
+        session['user_role']  = u.role
+        session['username']   = u.name
+        session['school_id']  = u.school_id
+        session['school_name'] = school.name if school else 'Unknown School'
+
+        db.execute(text(
+            "UPDATE users SET last_login=CURRENT_TIMESTAMP WHERE id=:id"
+        ), {'id': u.id})
+        db.commit()
+
+        if u.must_change_pw:
+            flash('Please change your password before continuing.', 'warning')
+            return redirect(url_for('auth.change_password'))
+
+        return redirect(url_for('dashboard'))
+
     finally:
         db.close()
 
 
-def _handle_forgot_password():
+def _forgot_password():
+    """Handle password reset via recovery questions."""
     email  = request.form.get('recover_email', '').strip()
     method = request.form.get('recover_method', 'phone')
     answer = request.form.get('recover_answer', '').strip().lower()
-    new_pw = request.form.get('new_password', '')
-    conf   = request.form.get('confirm_password', '')
+    new_pw = request.form.get('new_password', '').strip()
+    conf   = request.form.get('confirm_password', '').strip()
 
     if new_pw != conf:
         flash('Passwords do not match.', 'error')
+        return
+    if len(new_pw) < 6:
+        flash('Password must be at least 6 characters.', 'error')
         return
 
     db = SessionLocal()
@@ -187,8 +206,7 @@ def _handle_forgot_password():
         db.close()
 
 
-# ── Change Password ───────────────────────────────────────────────────────────
-
+# ── CHANGE PASSWORD ───────────────────────────────────────────────────────────
 @auth_bp.route('/change-password', methods=['GET', 'POST'])
 @login_required
 def change_password():
@@ -200,7 +218,6 @@ def change_password():
         if new_pw != confirm:
             flash('New passwords do not match.', 'error')
             return render_template('change_password.html')
-
         if len(new_pw) < 6:
             flash('Password must be at least 6 characters.', 'error')
             return render_template('change_password.html')
@@ -211,6 +228,10 @@ def change_password():
                 "SELECT * FROM users WHERE id=:id LIMIT 1"
             ), {'id': session['user_id']}).fetchone()
 
+            if not u:
+                flash('User not found.', 'error')
+                return redirect(url_for('auth.login'))
+
             if u.password_hash != hashlib.sha256(current.encode()).hexdigest():
                 flash('Current password is incorrect.', 'error')
                 return render_template('change_password.html')
@@ -219,7 +240,7 @@ def change_password():
                 "UPDATE users SET password_hash=:pw, must_change_pw=false WHERE id=:id"
             ), {'pw': hashlib.sha256(new_pw.encode()).hexdigest(), 'id': u.id})
             db.commit()
-            flash('Password changed successfully.', 'success')
+            flash('Password changed successfully!', 'success')
             return redirect(url_for('dashboard'))
         finally:
             db.close()
@@ -227,8 +248,7 @@ def change_password():
     return render_template('change_password.html')
 
 
-# ── Logout ────────────────────────────────────────────────────────────────────
-
+# ── LOGOUT ────────────────────────────────────────────────────────────────────
 @auth_bp.route('/logout')
 def logout():
     session.clear()

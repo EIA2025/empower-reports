@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if school else 'New' }} School{% endblock %}
+{% block page_title %}{{ 'Edit' if school else 'Create New' }} School{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('system.schools') }}" class="text-decoration-none text-muted">Schools</a></li>
+<li class="breadcrumb-item active">{{ 'Edit' if school else 'New' }}</li>
+{% endblock %}
+{% block content %}
+<form method="POST">
+<div class="row g-3">
+  <!-- School Info -->
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-building me-2"></i>School Information</div>
+      <div class="card-body"><div class="row g-3">
+        <div class="col-12"><label class="form-label fw-semibold">School Name *</label>
+          <input type="text" name="name" class="form-control" value="{{ school.name if school else '' }}" required placeholder="e.g. Empower International Academy"></div>
+        <div class="col-12"><label class="form-label fw-semibold">Subtitle / Motto</label>
+          <input type="text" name="subtitle" class="form-control" value="{{ school.subtitle if school else '' }}" placeholder="e.g. Excellence · Integrity · Action"></div>
+        <div class="col-md-6"><label class="form-label fw-semibold">Address</label>
+          <input type="text" name="address" class="form-control" value="{{ school.address if school else '' }}"></div>
+        <div class="col-md-3"><label class="form-label fw-semibold">P.O. Box</label>
+          <input type="text" name="po_box" class="form-control" value="{{ school.po_box if school else '' }}"></div>
+        <div class="col-md-3"><label class="form-label fw-semibold">Country</label>
+          <input type="text" name="country" class="form-control" value="{{ school.country if school else 'Uganda' }}"></div>
+        <div class="col-md-4"><label class="form-label fw-semibold">Phone</label>
+          <input type="text" name="phone" class="form-control" value="{{ school.phone if school else '' }}"></div>
+        <div class="col-md-4"><label class="form-label fw-semibold">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ school.email if school else '' }}"></div>
+        <div class="col-md-4"><label class="form-label fw-semibold">Website</label>
+          <input type="text" name="website" class="form-control" value="{{ school.website if school else '' }}"></div>
+        <div class="col-md-4"><label class="form-label fw-semibold">Currency</label>
+          <select name="currency" class="form-select">
+            {% for c in ['UGX','KES','TZS','USD','GBP','EUR','ZAR'] %}
+            <option value="{{ c }}" {{ 'selected' if school and school.currency==c or (not school and c=='UGX') }}>{{ c }}</option>
+            {% endfor %}
+          </select></div>
+        <div class="col-md-4"><label class="form-label fw-semibold">Primary Colour</label>
+          <input type="color" name="primary_color" class="form-control form-control-color" value="{{ school.primary_color if school else '#1e3a8a' }}"></div>
+        <div class="col-md-4"><label class="form-label fw-semibold">Max Students</label>
+          <input type="number" name="max_students" class="form-control" value="{{ school.max_students if school else 500 }}"></div>
+        <div class="col-12"><label class="form-label fw-semibold">Notes (internal)</label>
+          <textarea name="notes" class="form-control" rows="2">{{ school.notes if school else '' }}</textarea></div>
+      </div></div>
+    </div>
+
+    {% if not school %}
+    <!-- Admin account - only shown when creating -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-person-badge me-2"></i>School Admin Account <span class="badge bg-secondary ms-1" style="font-size:.7rem;">Optional — can add later</span></div>
+      <div class="card-body"><div class="row g-3">
+        <div class="col-md-6"><label class="form-label fw-semibold">Admin Full Name</label>
+          <input type="text" name="admin_name" class="form-control" placeholder="e.g. John Doe"></div>
+        <div class="col-md-6"><label class="form-label fw-semibold">Admin Email / Username</label>
+          <input type="text" name="admin_email" class="form-control" placeholder="e.g. admin@school.ac.ug"></div>
+        <div class="col-md-6"><label class="form-label fw-semibold">Admin Phone</label>
+          <input type="text" name="admin_phone" class="form-control" placeholder="+256 ..."></div>
+        <div class="col-md-6"><label class="form-label fw-semibold">Admin Password</label>
+          <input type="text" name="admin_password" class="form-control" placeholder="e.g. school@2025">
+          <small class="text-muted">Admin will be forced to change on first login</small></div>
+      </div></div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Sidebar -->
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-tag me-2"></i>Plan</div>
+      <div class="card-body">
+        <div class="mb-3"><label class="form-label fw-semibold">Plan</label>
+          <select name="plan" class="form-select">
+            {% for p in ['trial','basic','premium'] %}
+            <option value="{{ p }}" {{ 'selected' if school and school.plan==p or (not school and p=='trial') }}>{{ p.title() }}</option>
+            {% endfor %}
+          </select></div>
+        <div class="mb-3"><label class="form-label fw-semibold">Plan Expires</label>
+          <input type="date" name="plan_expires" class="form-control" value="{{ school.plan_expires if school else '' }}">
+          <small class="text-muted">Leave blank for no expiry</small></div>
+        <div class="mb-3"><label class="form-label fw-semibold">Max Staff</label>
+          <input type="number" name="max_staff" class="form-control" value="{{ school.max_staff if school else 50 }}"></div>
+      </div>
+    </div>
+
+    <div class="d-grid gap-2">
+      <button type="submit" class="btn btn-brand btn-lg">
+        <i class="bi bi-{{ 'save' if school else 'plus-lg' }} me-2"></i>
+        {{ 'Update School' if school else 'Create School' }}
+      </button>
+      <a href="{{ url_for('system.schools') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+  </div>
+</div>
+</form>
+{% endblock %}

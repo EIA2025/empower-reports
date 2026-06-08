@@ -1,9 +1,119 @@
-{% extends "base.html" %}{% block title %}System Overview{% endblock %}{% block page_title %}System Overview{% endblock %}
+{% extends "base.html" %}
+{% block title %}System Overview{% endblock %}
+{% block page_title %}System Overview{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">System</li>{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('system.add_school') }}" class="btn btn-sm btn-brand"><i class="bi bi-plus-lg me-1"></i>New School</a>
+{% endblock %}
 {% block content %}
-<div class="alert alert-info"><i class="bi bi-info-circle me-2"></i>Master Admin Dashboard — All schools visible here.</div>
-<div class="card"><div class="card-body text-center py-5">
-<i class="bi bi-globe" style="font-size:4rem;color:var(--brand)"></i>
-<h4 class="mt-3">System Management</h4>
-<p class="text-muted">Multi-school management module coming in next build.</p>
-</div></div>
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#1e3a8a,#2563eb)">
+      <div class="number">{{ schools|length }}</div><div class="label">Total Schools</div>
+      <div class="icon"><i class="bi bi-building"></i></div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#166534,#16a34a)">
+      <div class="number">{{ active_schools }}</div><div class="label">Active Schools</div>
+      <div class="icon"><i class="bi bi-check-circle"></i></div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#854d0e,#d97706)">
+      <div class="number">{{ total_students }}</div><div class="label">Total Students</div>
+      <div class="icon"><i class="bi bi-mortarboard"></i></div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card" style="background:linear-gradient(135deg,#6b21a8,#9333ea)">
+      <div class="number">{{ total_staff }}</div><div class="label">Total Staff</div>
+      <div class="icon"><i class="bi bi-people"></i></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Schools table -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-building me-2"></i>Schools</span>
+        <a href="{{ url_for('system.schools') }}" class="btn btn-sm btn-light">View All</a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table mb-0">
+          <thead><tr><th>School</th><th>Students</th><th>Staff</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {% for s in schools[:8] %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ s.name }}</div>
+                <small class="text-muted">{{ s.country or '' }}</small>
+              </td>
+              <td>{{ s.student_count if s.student_count is defined else '—' }}</td>
+              <td>{{ s.staff_count if s.staff_count is defined else '—' }}</td>
+              <td><span class="badge bg-{{ 'success' if s.is_active else 'secondary' }}">{{ 'Active' if s.is_active else 'Inactive' }}</span></td>
+              <td><a href="{{ url_for('system.school_detail', school_id=s.id) }}" class="btn btn-xs btn-outline-primary" style="padding:2px 8px;font-size:.78rem;">Open</a></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-3">No schools yet. <a href="{{ url_for('system.add_school') }}">Create one</a>.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right column -->
+  <div class="col-lg-5">
+    <!-- Announcements -->
+    {% if announcements %}
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between">
+        <span><i class="bi bi-megaphone me-2"></i>Active Announcements</span>
+        <a href="{{ url_for('system.announcements') }}" class="btn btn-sm btn-light">Manage</a>
+      </div>
+      <div class="card-body p-0">
+        {% for a in announcements %}
+        <div class="p-3 {{ 'border-bottom' if not loop.last }}">
+          <div class="fw-semibold small">{{ a.title }}</div>
+          <div class="text-muted" style="font-size:.78rem;">{{ a.target }} · {{ a.created_at.strftime('%d %b %Y') if a.created_at else '' }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Quick actions -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-lightning me-2"></i>Quick Actions</div>
+      <div class="card-body d-flex flex-column gap-2">
+        <a href="{{ url_for('system.add_school') }}" class="btn btn-brand"><i class="bi bi-plus-lg me-2"></i>Create New School</a>
+        <a href="{{ url_for('system.audit_logs') }}" class="btn btn-outline-secondary"><i class="bi bi-journal me-2"></i>View Audit Logs</a>
+        <a href="{{ url_for('system.announcements') }}" class="btn btn-outline-secondary"><i class="bi bi-megaphone me-2"></i>Post Announcement</a>
+        <a href="{{ url_for('system.system_admins') }}" class="btn btn-outline-secondary"><i class="bi bi-shield-lock me-2"></i>Manage Sys Admins</a>
+        <a href="{{ url_for('system.settings') }}" class="btn btn-outline-secondary"><i class="bi bi-gear me-2"></i>System Settings</a>
+      </div>
+    </div>
+
+    <!-- Recent audit logs -->
+    <div class="card">
+      <div class="card-header"><i class="bi bi-clock-history me-2"></i>Recent Activity</div>
+      <div class="card-body p-0">
+        {% for log in recent_logs[:8] %}
+        <div class="px-3 py-2 border-bottom">
+          <div class="d-flex justify-content-between">
+            <small class="fw-semibold">{{ log.action }}</small>
+            <small class="text-muted">{{ log.timestamp.strftime('%d %b %H:%M') if log.timestamp else '' }}</small>
+          </div>
+          <small class="text-muted">{{ log.school_name or 'System' }} · {{ log.user_name or 'Unknown' }}</small>
+        </div>
+        {% else %}
+        <div class="p-3 text-muted text-center small">No activity yet</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

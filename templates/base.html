@@ -144,8 +144,26 @@
 
     {% if role == 'master_admin' %}
       <div class="sidebar-section">System</div>
-      <a href="{{ url_for('system.overview') }}" class="{{ 'active' if 'system.' in (request.endpoint or '') }}">
-        <i class="bi bi-globe"></i> All Schools
+      <a href="{{ url_for('system.overview') }}" class="{{ 'active' if request.endpoint=='system.overview' }}">
+        <i class="bi bi-speedometer2"></i> Overview
+      </a>
+      <a href="{{ url_for('system.schools') }}" class="{{ 'active' if 'system.school' in (request.endpoint or '') }}">
+        <i class="bi bi-building"></i> Schools
+      </a>
+      <a href="{{ url_for('system.add_school') }}" class="{{ 'active' if request.endpoint=='system.add_school' }}">
+        <i class="bi bi-plus-circle"></i> New School
+      </a>
+      <a href="{{ url_for('system.announcements') }}" class="{{ 'active' if request.endpoint=='system.announcements' }}">
+        <i class="bi bi-megaphone"></i> Announcements
+      </a>
+      <a href="{{ url_for('system.audit_logs') }}" class="{{ 'active' if request.endpoint=='system.audit_logs' }}">
+        <i class="bi bi-journal-text"></i> Audit Logs
+      </a>
+      <a href="{{ url_for('system.system_admins') }}" class="{{ 'active' if request.endpoint=='system.system_admins' }}">
+        <i class="bi bi-shield-lock"></i> System Admins
+      </a>
+      <a href="{{ url_for('system.settings') }}" class="{{ 'active' if request.endpoint=='system.settings' }}">
+        <i class="bi bi-gear"></i> Settings
       </a>
 
     {% else %}
