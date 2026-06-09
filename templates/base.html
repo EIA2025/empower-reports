@@ -17,42 +17,39 @@
   * { box-sizing: border-box; }
   body { margin: 0; background: #f1f5f9; font-family: 'Segoe UI', system-ui, sans-serif; font-size: .9rem; }
 
-  /* ── Sidebar ── */
+  /* ── Sidebar ── z-index BELOW bootstrap modal (1050) */
   .sidebar {
     position: fixed; top: 0; left: 0; bottom: 0;
     width: var(--sidebar-w);
     background: linear-gradient(180deg, var(--brand) 0%, var(--brand-mid) 60%, #1a5c1a 100%);
-    color: #fff; overflow-y: auto; z-index: 100;
+    color: #fff; overflow-y: auto;
+    z-index: 99;          /* bootstrap modal=1050, backdrop=1040, topbar=98 */
     display: flex; flex-direction: column;
   }
   .sidebar-logo { padding: 18px 16px 12px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.12); }
   .sidebar-logo img { width: 56px; height: 56px; object-fit: contain; }
   .sidebar-logo .school-name { font-size: .8rem; font-weight: 700; margin-top: 6px; opacity: .9; line-height: 1.3; }
   .sidebar-logo .user-badge { font-size: .7rem; opacity: .65; margin-top: 2px; }
-
   .sidebar-section { padding: 10px 8px 4px; font-size: .67rem; font-weight: 700;
     letter-spacing: 1.5px; text-transform: uppercase; opacity: .5; }
-
   .sidebar nav a {
     display: flex; align-items: center; gap: 10px;
     padding: 8px 14px; color: rgba(255,255,255,.82);
     text-decoration: none; border-radius: 8px; margin: 1px 6px;
     transition: all .15s; font-size: .85rem;
   }
-  .sidebar nav a:hover, .sidebar nav a.active {
-    background: rgba(255,255,255,.16); color: #fff;
-  }
+  .sidebar nav a:hover, .sidebar nav a.active { background: rgba(255,255,255,.16); color: #fff; }
   .sidebar nav a i { font-size: 1rem; width: 20px; flex-shrink: 0; }
   .sidebar-footer { margin-top: auto; padding: 12px 10px; border-top: 1px solid rgba(255,255,255,.12); }
   .sidebar-footer a { color: rgba(255,255,255,.7); text-decoration: none; font-size: .8rem; }
   .sidebar-footer a:hover { color: #fff; }
 
-  /* ── Main content ── */
+  /* ── Main wrap ── */
   .main-wrap { margin-left: var(--sidebar-w); min-height: 100vh; display: flex; flex-direction: column; }
 
-  /* ── Topbar ── */
+  /* ── Topbar ── z-index below sidebar and modal */
   .topbar {
-    position: sticky; top: 0; z-index: 90;
+    position: sticky; top: 0; z-index: 98;
     background: #fff; border-bottom: 1px solid #e2e8f0;
     padding: 10px 24px; display: flex; align-items: center;
     justify-content: space-between; gap: 16px;
@@ -62,21 +59,29 @@
   .topbar .breadcrumb { font-size: .8rem; color: #64748b; margin: 0; }
   .topbar .breadcrumb-item + .breadcrumb-item::before { color: #94a3b8; }
 
-  /* ── Content area ── */
-  .content-area { padding: 24px; flex: 1; position: relative; }
+  /* ── Content ── */
+  .content-area { padding: 24px; flex: 1; }
 
-  /* Watermark */
-  .content-area::before {
-    content: '';
+  /* ── Watermark — z-index 0, pointer-events none, never blocks anything ── */
+  .page-watermark {
     position: fixed;
-    top: 50%; left: calc(50% + var(--sidebar-w)/2);
+    top: 50%;
+    left: calc(50% + var(--sidebar-w) / 2);
     transform: translate(-50%, -50%);
     width: 520px; height: 520px;
     background: url('/static/img/logo.png') center/contain no-repeat;
     opacity: .045;
-    pointer-events: none; z-index: 0;
+    pointer-events: none !important;
+    z-index: 0;
   }
-  .content-area > * { position: relative; z-index: 1; }
+
+  /* ── Flash messages — above modal close button (1055) ── */
+  .flash-wrap {
+    position: fixed; top: 16px; right: 16px;
+    z-index: 1055;
+    min-width: 320px; max-width: 420px;
+    pointer-events: auto;
+  }
 
   /* ── Cards & tables ── */
   .card { border: none; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.07); }
@@ -88,35 +93,26 @@
   /* ── Buttons ── */
   .btn-brand { background: var(--brand); color: #fff; border: none; }
   .btn-brand:hover { background: var(--brand-dark); color: #fff; }
-  .btn-green { background: var(--green); color: #1a3a0a; border: none; font-weight: 600; }
-  .btn-green:hover { background: #6ab348; color: #1a3a0a; }
 
-  /* ── Badges ── */
+  /* ── Role badges ── */
   .role-badge { padding: 3px 10px; border-radius: 20px; font-size: .72rem; font-weight: 600; }
-  .role-admin    { background: #dbeafe; color: #1e40af; }
-  .role-teacher  { background: #dcfce7; color: #166534; }
-  .role-parent   { background: #fef9c3; color: #854d0e; }
-  .role-student  { background: #f3e8ff; color: #6b21a8; }
-  .role-bursar   { background: #ffedd5; color: #9a3412; }
+  .role-admin   { background: #dbeafe; color: #1e40af; }
+  .role-teacher { background: #dcfce7; color: #166534; }
+  .role-parent  { background: #fef9c3; color: #854d0e; }
+  .role-student { background: #f3e8ff; color: #6b21a8; }
+  .role-bursar  { background: #ffedd5; color: #9a3412; }
 
-  /* ── Stats cards ── */
+  /* ── Stat cards ── */
   .stat-card { border-radius: 14px; padding: 20px 22px; color: #fff; position: relative; overflow: hidden; }
   .stat-card .number { font-size: 2.2rem; font-weight: 800; line-height: 1; }
   .stat-card .label  { font-size: .82rem; opacity: .85; margin-top: 4px; }
   .stat-card .icon   { position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
     font-size: 3rem; opacity: .18; }
 
-  /* ── Flash messages ── */
-  .flash-wrap { position: fixed; top: 16px; right: 16px; z-index: 9999; min-width: 320px; max-width: 420px; }
-
-  /* ── Module tab pills ── */
-  .module-tabs .nav-link { border-radius: 8px; color: rgba(255,255,255,.7); padding: 6px 14px; font-size: .82rem; }
-  .module-tabs .nav-link.active { background: rgba(255,255,255,.2); color: #fff; }
-
-  /* ── Responsive ── */
   @media (max-width: 768px) {
-    .sidebar { transform: translateX(-100%); }
+    .sidebar { width: 100%; position: relative; height: auto; }
     .main-wrap { margin-left: 0; }
+    .page-watermark { display: none; }
   }
 </style>
 {% block extra_css %}{% endblock %}
@@ -124,18 +120,34 @@
 <body>
 
 {% if session.get('user_id') %}
-<!-- ── Sidebar ─────────────────────────────────────────────────────────────── -->
+
+<!-- Watermark: sits at z-index 0, never blocks any interaction -->
+<div class="page-watermark"></div>
+
+<!-- Flash messages: z-index 1055 so they appear above modals too -->
+<div class="flash-wrap">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="alert alert-{{ 'danger' if cat=='error' else cat }} alert-dismissible fade show shadow-sm mb-2">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+</div>
+
+<!-- Sidebar -->
 <aside class="sidebar">
   <div class="sidebar-logo">
     <img src="/static/img/logo-white.png" alt="Logo">
     <div class="school-name">{{ session.get('school_name', 'Empower School') }}</div>
     <div class="user-badge">
-      <span class="role-badge role-{{ session.get('user_role','') }}">{{ session.get('user_role','').replace('_',' ').title() }}</span>
+      <span class="role-badge role-{{ session.get('user_role','') }}">
+        {{ session.get('user_role','').replace('_',' ').title() }}
+      </span>
     </div>
   </div>
 
   <nav class="pt-1">
-    <!-- Dashboard -->
     <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' }}">
       <i class="bi bi-speedometer2"></i> Dashboard
     </a>
@@ -144,10 +156,10 @@
 
     {% if role == 'master_admin' %}
       <div class="sidebar-section">System</div>
-      <a href="{{ url_for('system.overview') }}" class="{{ 'active' if request.endpoint=='system.overview' }}">
+      <a href="{{ url_for('system.overview') }}" class="{{ 'active' if request.endpoint in ['system.overview','system.index'] }}">
         <i class="bi bi-speedometer2"></i> Overview
       </a>
-      <a href="{{ url_for('system.schools') }}" class="{{ 'active' if 'system.school' in (request.endpoint or '') }}">
+      <a href="{{ url_for('system.schools') }}" class="{{ 'active' if 'system.school' in (request.endpoint or '') and request.endpoint != 'system.add_school' }}">
         <i class="bi bi-building"></i> Schools
       </a>
       <a href="{{ url_for('system.add_school') }}" class="{{ 'active' if request.endpoint=='system.add_school' }}">
@@ -167,115 +179,65 @@
       </a>
 
     {% else %}
-      <!-- People Module -->
-      {% if role in ['admin'] %}
-      <div class="sidebar-section">People</div>
-      <a href="{{ url_for('people.students') }}" class="{{ 'active' if 'people.student' in (request.endpoint or '') }}">
-        <i class="bi bi-mortarboard"></i> Students
-      </a>
-      <a href="{{ url_for('people.staff') }}" class="{{ 'active' if 'people.staff' in (request.endpoint or '') }}">
-        <i class="bi bi-people"></i> Staff
-      </a>
-      <a href="{{ url_for('people.guardians') }}" class="{{ 'active' if 'people.guardian' in (request.endpoint or '') }}">
-        <i class="bi bi-person-hearts"></i> Guardians
-      </a>
-      <a href="{{ url_for('people.classes') }}" class="{{ 'active' if 'people.class' in (request.endpoint or '') }}">
-        <i class="bi bi-grid"></i> Classes
-      </a>
-      <a href="{{ url_for('people.users') }}" class="{{ 'active' if request.endpoint=='people.users' }}">
-        <i class="bi bi-person-badge"></i> User Accounts
-      </a>
+      {% if role == 'admin' %}
+        <div class="sidebar-section">People</div>
+        <a href="{{ url_for('people.students') }}" class="{{ 'active' if 'people.student' in (request.endpoint or '') }}"><i class="bi bi-mortarboard"></i> Students</a>
+        <a href="{{ url_for('people.staff') }}" class="{{ 'active' if 'people.staff' in (request.endpoint or '') }}"><i class="bi bi-people"></i> Staff</a>
+        <a href="{{ url_for('people.guardians') }}" class="{{ 'active' if 'people.guardian' in (request.endpoint or '') }}"><i class="bi bi-person-hearts"></i> Guardians</a>
+        <a href="{{ url_for('people.classes') }}" class="{{ 'active' if 'people.class' in (request.endpoint or '') }}"><i class="bi bi-grid"></i> Classes</a>
+        <a href="{{ url_for('people.users') }}" class="{{ 'active' if request.endpoint=='people.users' }}"><i class="bi bi-person-badge"></i> User Accounts</a>
       {% endif %}
 
-      <!-- Academics Module -->
       <div class="sidebar-section">Academics</div>
-      <a href="{{ url_for('academics.terms') }}" class="{{ 'active' if 'academics.term' in (request.endpoint or '') }}">
-        <i class="bi bi-calendar3"></i> Terms
-      </a>
-      {% if role in ['admin', 'teacher'] %}
-      <a href="{{ url_for('academics.marks') }}" class="{{ 'active' if request.endpoint=='academics.marks' }}">
-        <i class="bi bi-pencil-square"></i> Results
-      </a>
-      <a href="{{ url_for('academics.attendance') }}" class="{{ 'active' if request.endpoint=='academics.attendance' }}">
-        <i class="bi bi-check-square"></i> Attendance
-      </a>
-      <a href="{{ url_for('academics.behaviour') }}" class="{{ 'active' if request.endpoint=='academics.behaviour' }}">
-        <i class="bi bi-clipboard-check"></i> Behaviour
-      </a>
-      <a href="{{ url_for('academics.reports') }}" class="{{ 'active' if request.endpoint=='academics.reports' }}">
-        <i class="bi bi-file-pdf"></i> Reports
-      </a>
+      <a href="{{ url_for('academics.terms') }}" class="{{ 'active' if 'academics.term' in (request.endpoint or '') }}"><i class="bi bi-calendar3"></i> Terms</a>
+      {% if role in ['admin','teacher'] %}
+        <a href="{{ url_for('academics.marks') }}" class="{{ 'active' if request.endpoint=='academics.marks' }}"><i class="bi bi-pencil-square"></i> Results</a>
+        <a href="{{ url_for('academics.attendance') }}" class="{{ 'active' if request.endpoint=='academics.attendance' }}"><i class="bi bi-check-square"></i> Attendance</a>
+        <a href="{{ url_for('academics.behaviour') }}" class="{{ 'active' if request.endpoint=='academics.behaviour' }}"><i class="bi bi-clipboard-check"></i> Behaviour</a>
+        <a href="{{ url_for('academics.reports') }}" class="{{ 'active' if request.endpoint=='academics.reports' }}"><i class="bi bi-file-pdf"></i> Reports</a>
       {% endif %}
       {% if role == 'admin' %}
-      <a href="{{ url_for('academics.timetable') }}" class="{{ 'active' if request.endpoint=='academics.timetable' }}">
-        <i class="bi bi-table"></i> Timetable
-      </a>
+        <a href="{{ url_for('academics.timetable') }}" class="{{ 'active' if request.endpoint=='academics.timetable' }}"><i class="bi bi-table"></i> Timetable</a>
       {% endif %}
 
-      <!-- Finance Module -->
-      {% if role in ['admin', 'bursar'] %}
-      <div class="sidebar-section">Finance</div>
-      <a href="{{ url_for('finance.invoices') }}" class="{{ 'active' if 'finance.invoice' in (request.endpoint or '') }}">
-        <i class="bi bi-receipt"></i> Invoices
-      </a>
-      <a href="{{ url_for('finance.payments') }}" class="{{ 'active' if 'finance.payment' in (request.endpoint or '') }}">
-        <i class="bi bi-cash-stack"></i> Payments
-      </a>
-      <a href="{{ url_for('finance.fee_structure') }}" class="{{ 'active' if request.endpoint=='finance.fee_structure' }}">
-        <i class="bi bi-list-check"></i> Fee Structure
-      </a>
+      {% if role in ['admin','bursar'] %}
+        <div class="sidebar-section">Finance</div>
+        <a href="{{ url_for('finance.invoices') }}" class="{{ 'active' if 'finance.invoice' in (request.endpoint or '') }}"><i class="bi bi-receipt"></i> Invoices</a>
+        <a href="{{ url_for('finance.payments') }}" class="{{ 'active' if 'finance.payment' in (request.endpoint or '') }}"><i class="bi bi-cash-stack"></i> Payments</a>
+        <a href="{{ url_for('finance.fee_structure') }}" class="{{ 'active' if request.endpoint=='finance.fee_structure' }}"><i class="bi bi-list-check"></i> Fee Structure</a>
       {% endif %}
 
-      <!-- Parent portal -->
       {% if role == 'parent' %}
-      <div class="sidebar-section">My Children</div>
-      <a href="{{ url_for('people.parent_portal') }}"><i class="bi bi-person-heart"></i> My Children</a>
-      <a href="{{ url_for('academics.parent_results') }}"><i class="bi bi-bar-chart"></i> Results</a>
-      <a href="{{ url_for('finance.my_fees') }}"><i class="bi bi-cash"></i> Fees & Payments</a>
+        <div class="sidebar-section">My Children</div>
+        <a href="{{ url_for('people.parent_portal') }}"><i class="bi bi-person-heart"></i> My Children</a>
+        <a href="{{ url_for('academics.parent_results') }}"><i class="bi bi-bar-chart"></i> Results</a>
+        <a href="{{ url_for('finance.my_fees') }}"><i class="bi bi-cash"></i> Fees</a>
       {% endif %}
 
-      <!-- Student portal -->
       {% if role == 'student' %}
-      <div class="sidebar-section">My Academics</div>
-      <a href="{{ url_for('academics.student_results') }}"><i class="bi bi-bar-chart"></i> My Results</a>
-      <a href="{{ url_for('academics.student_timetable') }}"><i class="bi bi-table"></i> Timetable</a>
+        <div class="sidebar-section">My Academics</div>
+        <a href="{{ url_for('academics.student_results') }}"><i class="bi bi-bar-chart"></i> My Results</a>
+        <a href="{{ url_for('academics.student_timetable') }}"><i class="bi bi-table"></i> Timetable</a>
       {% endif %}
 
-      <!-- Comms — all roles -->
       <div class="sidebar-section">Communications</div>
-      <a href="{{ url_for('communications.inbox') }}" class="{{ 'active' if 'communications.' in (request.endpoint or '') }}">
-        <i class="bi bi-envelope"></i> Messages
-      </a>
-      <a href="{{ url_for('events.calendar') }}" class="{{ 'active' if 'events.' in (request.endpoint or '') }}">
-        <i class="bi bi-calendar-event"></i> Events
-      </a>
+      <a href="{{ url_for('communications.inbox') }}" class="{{ 'active' if 'communications.' in (request.endpoint or '') }}"><i class="bi bi-envelope"></i> Messages</a>
+      <a href="{{ url_for('events.calendar') }}" class="{{ 'active' if 'events.' in (request.endpoint or '') }}"><i class="bi bi-calendar-event"></i> Events</a>
 
-      <!-- Library -->
       <div class="sidebar-section">Library</div>
-      <a href="{{ url_for('library.catalogue') }}" class="{{ 'active' if 'library.' in (request.endpoint or '') }}">
-        <i class="bi bi-book"></i> Library
-      </a>
-
-      <!-- Admin settings -->
-      {% if role == 'admin' %}
-      <div class="sidebar-section">Settings</div>
-      <a href="{{ url_for('people.index') }}"><i class="bi bi-gear"></i> People Admin</a>
-      {% endif %}
-
+      <a href="{{ url_for('library.catalogue') }}" class="{{ 'active' if 'library.' in (request.endpoint or '') }}"><i class="bi bi-book"></i> Library</a>
     {% endif %}
   </nav>
 
   <div class="sidebar-footer">
     <div class="d-flex justify-content-between align-items-center">
       <span class="text-white-50" style="font-size:.78rem;">{{ session.get('username','') }}</span>
-      <a href="{{ url_for('auth.logout') }}" title="Logout">
-        <i class="bi bi-box-arrow-right"></i>
-      </a>
+      <a href="{{ url_for('auth.logout') }}" title="Logout"><i class="bi bi-box-arrow-right fs-5"></i></a>
     </div>
   </div>
 </aside>
 
-<!-- ── Main Wrapper ─────────────────────────────────────────────────────────── -->
+<!-- Main content -->
 <div class="main-wrap">
   <!-- Topbar -->
   <div class="topbar">
@@ -283,37 +245,29 @@
       <div class="page-title">{% block page_title %}{% endblock %}</div>
       <nav aria-label="breadcrumb">
         <ol class="breadcrumb mb-0">
-          <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}" class="text-decoration-none text-muted">Home</a></li>
+          <li class="breadcrumb-item">
+            <a href="{{ url_for('dashboard') }}" class="text-decoration-none text-muted">Home</a>
+          </li>
           {% block breadcrumb %}{% endblock %}
         </ol>
       </nav>
     </div>
-    <div class="d-flex align-items-center gap-3">
+    <div class="d-flex align-items-center gap-2">
       {% block topbar_actions %}{% endblock %}
-      <a href="{{ url_for('auth.change_password') }}" class="btn btn-sm btn-outline-secondary">
+      <a href="{{ url_for('auth.change_password') }}" class="btn btn-sm btn-outline-secondary" title="Change Password">
         <i class="bi bi-key"></i>
       </a>
     </div>
   </div>
 
-  <!-- Flash messages -->
-  <div class="flash-wrap">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for cat, msg in messages %}
-        <div class="alert alert-{{ 'danger' if cat=='error' else cat }} alert-dismissible fade show shadow-sm mb-2">
-          {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-      {% endfor %}
-    {% endwith %}
-  </div>
-
-  <!-- Content -->
+  <!-- Page content -->
   <div class="content-area">
     {% block content %}{% endblock %}
   </div>
 </div>
 
 {% else %}
+{# Unauthenticated — login page etc #}
 {% block auth_content %}{% endblock %}
 {% endif %}
 

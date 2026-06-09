@@ -159,18 +159,18 @@
 {# ── ALL MODALS OUTSIDE THE TABLE — no nesting in <tr> ── #}
 
 <!-- Add Admin Modal -->
-<div class="modal fade" id="addAdminModal" tabindex="-1">
-  <div class="modal-dialog">
+<div class="modal fade" id="addAdminModal" tabindex="-1" data-bs-backdrop="true" data-bs-keyboard="true">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add Admin Account</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <form method="POST" action="{{ url_for('system.add_school_admin', school_id=school.id) }}">
           <div class="mb-3">
             <label class="form-label fw-semibold">Full Name *</label>
-            <input type="text" name="name" class="form-control" required autofocus>
+            <input type="text" name="name" class="form-control" required>
           </div>
           <div class="mb-3">
             <label class="form-label fw-semibold">Email / Username *</label>
@@ -183,7 +183,7 @@
           <div class="mb-3">
             <label class="form-label fw-semibold">Password</label>
             <input type="text" name="password" class="form-control" value="admin123">
-            <small class="text-muted">Admin will log in with this password. Change it afterwards.</small>
+            <small class="text-muted">Admin logs in with this password.</small>
           </div>
           <button type="submit" class="btn btn-brand w-100">
             <i class="bi bi-person-plus me-2"></i>Create Admin Account
