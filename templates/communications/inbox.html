@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Inbox{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold"><i class="bi bi-inbox me-2 text-primary"></i>Inbox
+    {% if unread_count > 0 %}<span class="badge bg-danger ms-2">{{ unread_count }}</span>{% endif %}
+  </h2>
+  <a href="{{ url_for('communications.compose') }}" class="btn btn-primary">
+    <i class="bi bi-pencil-square me-1"></i>Compose
+  </a>
+</div>
+
+{% if broadcasts %}
+<div class="card shadow-sm mb-4 border-info">
+  <div class="card-header bg-info text-white d-flex align-items-center">
+    <i class="bi bi-megaphone me-2"></i><strong>Announcements & Broadcasts</strong>
+    <span class="badge bg-white text-info ms-2">{{ broadcasts|length }}</span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <tbody>
+      {% for m in broadcasts %}
+      <tr>
+        <td style="width:40px"><i class="bi bi-megaphone text-info"></i></td>
+        <td><strong>{{ m.sender_name or 'System' }}</strong></td>
+        <td>
+          <a href="{{ url_for('communications.view_message', msg_id=m.id) }}" class="text-decoration-none">
+            {{ m.subject or '(no subject)' }}
+          </a>
+        </td>
+        <td class="text-muted small text-end">{{ m.created_at.strftime('%d %b %Y') if m.created_at else '' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="card shadow-sm">
+  <div class="card-header"><strong>Messages</strong></div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <tbody>
+      {% for m in messages %}
+      <tr class="{{ 'fw-bold' if not m.read else '' }}">
+        <td style="width:40px">
+          {% if not m.read %}<span class="badge bg-primary rounded-pill">New</span>
+          {% else %}<i class="bi bi-envelope-open text-muted"></i>{% endif %}
+        </td>
+        <td>{{ m.sender_name or 'Unknown' }}</td>
+        <td>
+          <a href="{{ url_for('communications.view_message', msg_id=m.id) }}" class="text-decoration-none text-dark">
+            {{ m.subject or '(no subject)' }}
+          </a>
+        </td>
+        <td class="text-muted small text-end">{{ m.created_at.strftime('%d %b %Y') if m.created_at else '' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-center text-muted py-5">
+        <i class="bi bi-inbox fs-1 d-block mb-2"></i>Your inbox is empty.
+      </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

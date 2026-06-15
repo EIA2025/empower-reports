@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}My Child's Results{% endblock %}
+{% block content %}
+<h2 class="fw-bold mb-4"><i class="bi bi-mortarboard me-2 text-primary"></i>My Child's Results</h2>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Child</label>
+        <select name="student_id" class="form-select">
+          {% for ch in children %}
+          <option value="{{ ch.id }}" {% if ch.id == student_id %}selected{% endif %}>{{ ch.first_name }} {{ ch.last_name }} ({{ ch.class_name }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Term</label>
+        <select name="term_id" class="form-select">
+          {% for t in all_terms %}
+          <option value="{{ t.id }}" {% if t.id == term_id %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <button type="submit" class="btn btn-primary w-100">View Results</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if marks %}
+<div class="card shadow-sm">
+  <div class="card-header"><h5 class="mb-0">Academic Results</h5></div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead class="table-light"><tr><th>Subject</th><th>CW /20</th><th>MT /20</th><th>ET /60</th><th>Total /100</th><th>Grade</th></tr></thead>
+      <tbody>
+      {% for m in marks %}
+      <tr>
+        <td><strong>{{ m.subject }}</strong></td>
+        <td>{{ '%.1f'|format(m.coursework_out_of_20) if m.coursework_out_of_20 else '—' }}</td>
+        <td>{{ '%.1f'|format(m.midterm_out_of_20) if m.midterm_out_of_20 else '—' }}</td>
+        <td>{{ '%.1f'|format(m.endterm_out_of_60) if m.endterm_out_of_60 else '—' }}</td>
+        <td><strong>{{ '%.1f'|format(m.total_mark) if m.total_mark else '—' }}</strong></td>
+        <td>
+          <span class="badge bg-{{ 'success' if m.grade=='A' else 'info' if m.grade=='B' else 'warning text-dark' if m.grade=='C' else 'danger' if m.grade in ['E','F'] else 'secondary' }}">
+            {{ m.grade or '—' }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% elif student_id and term_id %}
+<div class="alert alert-info">No marks recorded for this term yet.</div>
+{% endif %}
+{% endblock %}

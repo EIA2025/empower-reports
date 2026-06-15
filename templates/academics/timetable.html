@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% block title %}Timetable{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold"><i class="bi bi-grid-3x3 me-2 text-primary"></i>Timetable</h2>
+  {% if session.role in ['admin','master'] %}
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEntryModal">
+    <i class="bi bi-plus-lg me-1"></i>Add Entry
+  </button>
+  {% endif %}
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Term</label>
+        <select name="term_id" class="form-select">
+          {% for t in all_terms %}
+          <option value="{{ t.id }}" {% if t.id == selected_term_id %}selected{% endif %}>{{ t.name }}{% if t.is_active %} ★{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Class</label>
+        <select name="class_id" class="form-select">
+          {% for c in classes %}
+          <option value="{{ c.id }}" {% if c.id == class_id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <button type="submit" class="btn btn-primary w-100">Load Timetable</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if selected_term_id and class_id %}
+<div class="row">
+{% for day in days %}
+<div class="col-lg-{% if days|length <= 3 %}4{% else %}{% if loop.index <= 2 %}6{% else %}4{% endif %}{% endif %} mb-3">
+  <div class="card shadow-sm h-100">
+    <div class="card-header bg-primary text-white"><strong>{{ day }}</strong></div>
+    <div class="card-body p-2">
+      {% for e in timetable_grid[day] %}
+      <div class="d-flex justify-content-between align-items-start border rounded p-2 mb-2 bg-light">
+        <div>
+          <div class="fw-semibold small">{{ e.subject_name or 'Lesson' }}</div>
+          <div class="text-muted small">{{ e.start_time }} – {{ e.end_time }}</div>
+          {% if e.teacher_name %}<div class="text-info small">{{ e.teacher_name }}</div>{% endif %}
+          {% if e.room %}<div class="text-muted small"><i class="bi bi-door-open"></i> {{ e.room }}</div>{% endif %}
+        </div>
+        {% if session.role in ['admin','master'] %}
+        <form method="post" action="{{ url_for('academics.delete_timetable_entry', entry_id=e.id) }}" class="d-inline">
+          <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Remove" onclick="return confirm('Remove entry?')">×</button>
+        </form>
+        {% endif %}
+      </div>
+      {% else %}
+      <p class="text-muted text-center small py-3">No lessons</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div class="alert alert-secondary">Select a term and class to view the timetable.</div>
+{% endif %}
+
+<!-- Add Entry Modal -->
+<div class="modal fade" id="addEntryModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">Add Timetable Entry</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{{ url_for('academics.add_timetable_entry') }}">
+        <input type="hidden" name="term_id" value="{{ selected_term_id }}">
+        <input type="hidden" name="class_id" value="{{ class_id }}">
+        <div class="modal-body row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Day</label>
+            <select name="day_of_week" class="form-select" required>
+              {% for d in days %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Start</label>
+            <input type="time" name="start_time" class="form-control" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">End</label>
+            <input type="time" name="end_time" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Subject</label>
+            <select name="subject_id" class="form-select">
+              <option value="">— Subject —</option>
+              {% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Teacher</label>
+            <select name="staff_id" class="form-select">
+              <option value="">— Teacher —</option>
+              {% for st in staff_list %}<option value="{{ st.id }}">{{ st.first_name }} {{ st.last_name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Room</label>
+            <input type="text" name="room" class="form-control" placeholder="e.g. Room 5">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Entry</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

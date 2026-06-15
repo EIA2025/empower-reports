@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% block title %}Attendance{% endblock %}
+{% block content %}
+<h2 class="fw-bold mb-4"><i class="bi bi-person-check me-2 text-primary"></i>Attendance</h2>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Term</label>
+        <select name="term_id" class="form-select">
+          <option value="">— Term —</option>
+          {% for t in all_terms %}
+          <option value="{{ t.id }}" {% if t.id == selected_term_id %}selected{% endif %}>{{ t.name }}{% if t.is_active %} ★{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Class</label>
+        <select name="class_name" class="form-select">
+          <option value="">— Class —</option>
+          {% for c in classes %}
+          <option value="{{ c.class_name }}" {% if c.class_name == class_name %}selected{% endif %}>{{ c.class_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Date</label>
+        <input type="date" name="date" class="form-control" value="{{ att_date }}">
+      </div>
+      <div class="col-md-3">
+        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i>Load</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if students %}
+<div class="card shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">{{ class_name }} — {{ att_date }}</h5>
+    <span class="badge bg-primary">{{ students|length }} students</span>
+  </div>
+  <form method="post" action="{{ url_for('academics.save_attendance') }}">
+    <input type="hidden" name="term_id" value="{{ selected_term_id }}">
+    <input type="hidden" name="class_name" value="{{ class_name }}">
+    <input type="hidden" name="date" value="{{ att_date }}">
+    {% for s in students %}<input type="hidden" name="student_ids" value="{{ s.id }}">{% endfor %}
+
+    <!-- Quick mark all -->
+    <div class="px-4 pt-3 pb-1 border-bottom bg-light d-flex gap-3 align-items-center">
+      <span class="fw-semibold small">Mark all:</span>
+      <button type="button" class="btn btn-sm btn-outline-success" onclick="markAll('present')">All Present</button>
+      <button type="button" class="btn btn-sm btn-outline-danger" onclick="markAll('absent')">All Absent</button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light"><tr><th>#</th><th>Student</th><th>Status</th><th>Notes</th><th>Term Attendance</th></tr></thead>
+        <tbody>
+        {% for s in students %}
+        {% set a = attendance_map.get(s.id) %}
+        {% set sm = summary.get(s.id) %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ s.last_name }}, {{ s.first_name }}<br><small class="text-muted">{{ s.student_number }}</small></td>
+          <td>
+            <div class="d-flex gap-2">
+              <div class="form-check">
+                <input class="form-check-input att-radio" type="radio" name="status_{{ s.id }}" value="present" id="p{{ s.id }}"
+                  {% if a and a.status=='present' %}checked{% elif not a %}checked{% endif %}>
+                <label class="form-check-label text-success fw-semibold" for="p{{ s.id }}">Present</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input att-radio" type="radio" name="status_{{ s.id }}" value="absent" id="a{{ s.id }}"
+                  {% if a and a.status=='absent' %}checked{% endif %}>
+                <label class="form-check-label text-danger fw-semibold" for="a{{ s.id }}">Absent</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input att-radio" type="radio" name="status_{{ s.id }}" value="late" id="l{{ s.id }}"
+                  {% if a and a.status=='late' %}checked{% endif %}>
+                <label class="form-check-label text-warning fw-semibold" for="l{{ s.id }}">Late</label>
+              </div>
+            </div>
+          </td>
+          <td><input type="text" name="notes_{{ s.id }}" class="form-control form-control-sm" value="{{ a.notes if a else '' }}" placeholder="Optional" style="width:160px"></td>
+          <td>
+            {% if sm %}
+            <small>
+              <span class="text-success">{{ sm.present_days }}P</span> /
+              <span class="text-danger">{{ sm.absent_days }}A</span> /
+              <span class="text-muted">{{ sm.total_days }} days</span>
+              {% if sm.total_days > 0 %}
+              <span class="ms-1 badge bg-{{ 'success' if (sm.present_days/sm.total_days*100) >= 75 else 'danger' }}">
+                {{ '%d'|format(sm.present_days/sm.total_days*100) }}%
+              </span>
+              {% endif %}
+            </small>
+            {% else %}<span class="text-muted small">No data</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer text-end">
+      <button type="submit" class="btn btn-success px-4"><i class="bi bi-save me-1"></i>Save Attendance</button>
+    </div>
+  </form>
+</div>
+{% elif class_name and selected_term_id %}
+<div class="alert alert-info">No students in {{ class_name }}.</div>
+{% endif %}
+
+<script>
+function markAll(status){
+  document.querySelectorAll('.att-radio').forEach(r=>{
+    if(r.value===status) r.checked=true;
+  });
+}
+</script>
+{% endblock %}

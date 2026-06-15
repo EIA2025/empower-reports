@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Edit' if editing else 'Add' }} Term{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-calendar-plus me-2"></i>{{ 'Edit' if editing else 'Create' }} Academic Term</h5>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Academic Year</label>
+            <input type="text" name="year_label" class="form-control"
+              value="{{ term.year_label if term else current_year|string + '/' + (current_year+1)|string }}"
+              placeholder="e.g. 2025/2026" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Term Name</label>
+            <input type="text" name="name" class="form-control"
+              value="{{ term.name if term else '' }}" placeholder="e.g. Term 1" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Term Number</label>
+            <select name="term_number" class="form-select">
+              {% for n in [1,2,3] %}
+              <option value="{{ n }}" {% if term and term.term_number==n %}selected{% endif %}>Term {{ n }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-semibold">Start Date</label>
+              <input type="date" name="start_date" class="form-control"
+                value="{{ term.start_date.strftime('%Y-%m-%d') if term and term.start_date else '' }}">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-semibold">End Date</label>
+              <input type="date" name="end_date" class="form-control"
+                value="{{ term.end_date.strftime('%Y-%m-%d') if term and term.end_date else '' }}">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Next Term Begins</label>
+            <input type="date" name="next_term_begins" class="form-control"
+              value="{{ term.next_term_begins.strftime('%Y-%m-%d') if term and term.next_term_begins else '' }}">
+          </div>
+          <div class="mb-4 form-check">
+            <input type="checkbox" name="is_active" class="form-check-input" id="isActive"
+              {% if term and term.is_active %}checked{% endif %}>
+            <label class="form-check-label" for="isActive">Set as active term</label>
+            <div class="form-text text-warning">This will deactivate all other terms.</div>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">{{ 'Update Term' if editing else 'Create Term' }}</button>
+            <a href="{{ url_for('academics.terms') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

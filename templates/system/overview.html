@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% block title %}System Overview{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold"><i class="bi bi-grid me-2 text-primary"></i>System Overview</h2>
+  <a href="{{ url_for('system.add_school') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>New School
+  </a>
+</div>
+
+<!-- Stats row -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm text-center p-3 border-primary">
+      <div class="fs-2 fw-bold text-primary">{{ stats.total_schools or 0 }}</div>
+      <div class="small text-muted">Total Schools</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm text-center p-3 border-success">
+      <div class="fs-2 fw-bold text-success">{{ stats.active_schools or 0 }}</div>
+      <div class="small text-muted">Active</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm text-center p-3 border-info">
+      <div class="fs-2 fw-bold text-info">{{ stats.total_students or 0 }}</div>
+      <div class="small text-muted">Total Students</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm text-center p-3 border-warning">
+      <div class="fs-2 fw-bold text-warning">{{ stats.total_users or 0 }}</div>
+      <div class="small text-muted">Total Users</div>
+    </div>
+  </div>
+</div>
+
+<!-- Schools table -->
+<div class="card shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <strong>Schools</strong>
+    <a href="{{ url_for('system.schools') }}" class="btn btn-sm btn-outline-primary">View All</a>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr><th>School</th><th>Students</th><th>Staff</th><th>Status</th><th class="text-end">Actions</th></tr>
+      </thead>
+      <tbody>
+      {% for s in schools %}
+      <tr>
+        <td>
+          <strong>{{ s.name }}</strong>
+          {% if s.email %}<br><small class="text-muted">{{ s.email }}</small>{% endif %}
+        </td>
+        <td>{{ s.student_count or 0 }}</td>
+        <td>{{ s.staff_count or 0 }}</td>
+        <td>
+          {% if s.is_active %}
+          <span class="badge bg-success">Active</span>
+          {% else %}
+          <span class="badge bg-secondary">Inactive</span>
+          {% endif %}
+        </td>
+        <td class="text-end">
+          <a href="{{ url_for('system.school_detail', school_id=s.id) }}" class="btn btn-sm btn-outline-primary">Manage</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" class="text-center text-muted py-5">
+          <i class="bi bi-building fs-1 d-block mb-2"></i>
+          No schools yet. <a href="{{ url_for('system.add_school') }}">Create the first one</a>.
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if recent_activity %}
+<div class="card shadow-sm mt-4">
+  <div class="card-header"><strong>Recent Activity</strong></div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <tbody>
+      {% for a in recent_activity %}
+      <tr>
+        <td class="text-muted small" style="width:160px">{{ a.created_at.strftime('%d %b %Y %H:%M') if a.created_at else '' }}</td>
+        <td>{{ a.action }}</td>
+        <td class="text-muted small">{{ a.performed_by_name or '—' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

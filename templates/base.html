@@ -225,7 +225,7 @@
       <a href="{{ url_for('events.calendar') }}" class="{{ 'active' if 'events.' in (request.endpoint or '') }}"><i class="bi bi-calendar-event"></i> Events</a>
 
       <div class="sidebar-section">Library</div>
-      <a href="{{ url_for('library.catalogue') }}" class="{{ 'active' if 'library.' in (request.endpoint or '') }}"><i class="bi bi-book"></i> Library</a>
+      <a href="{{ url_for('library.books') }}" class="{{ 'active' if 'library.' in (request.endpoint or '') }}"><i class="bi bi-book"></i> Library</a>
     {% endif %}
   </nav>
 

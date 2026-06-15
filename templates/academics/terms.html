@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %}Academic Terms{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold"><i class="bi bi-calendar3 me-2 text-primary"></i>Academic Terms</h2>
+  {% if session.role in ['admin','master'] %}
+  <a href="{{ url_for('academics.add_term') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Term</a>
+  {% endif %}
+</div>
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr><th>Academic Year</th><th>Term</th><th>Dates</th><th>Next Term Begins</th><th>Status</th>
+        {% if session.role in ['admin','master'] %}<th class="text-end">Actions</th>{% endif %}</tr>
+      </thead>
+      <tbody>
+      {% for t in terms %}
+      <tr>
+        <td><strong>{{ t.year_label }}</strong></td>
+        <td>{{ t.name }}</td>
+        <td>
+          {% if t.start_date %}{{ t.start_date.strftime('%d %b %Y') }}{% endif %}
+          {% if t.start_date and t.end_date %} – {% endif %}
+          {% if t.end_date %}{{ t.end_date.strftime('%d %b %Y') }}{% endif %}
+        </td>
+        <td>{% if t.next_term_begins %}{{ t.next_term_begins.strftime('%d %b %Y') }}{% endif %}</td>
+        <td>{% if t.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</td>
+        {% if session.role in ['admin','master'] %}
+        <td class="text-end">
+          {% if not t.is_active %}
+          <form method="post" action="{{ url_for('academics.activate_term', term_id=t.id) }}" class="d-inline">
+            <button class="btn btn-sm btn-outline-success">Set Active</button>
+          </form>
+          {% endif %}
+          <a href="{{ url_for('academics.edit_term', term_id=t.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+          <form method="post" action="{{ url_for('academics.delete_term', term_id=t.id) }}" class="d-inline" onsubmit="return confirm('Delete this term?')">
+            <button class="btn btn-sm btn-outline-danger">Delete</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center text-muted py-5"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No terms yet. Create one to get started.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

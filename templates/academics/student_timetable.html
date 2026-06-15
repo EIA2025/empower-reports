@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}My Timetable{% endblock %}
+{% block content %}
+<h2 class="fw-bold mb-4"><i class="bi bi-grid-3x3 me-2 text-primary"></i>My Timetable</h2>
+
+{% if student %}
+<div class="alert alert-light border mb-4">
+  <strong>{{ student.first_name }} {{ student.last_name }}</strong> &nbsp;|&nbsp; {{ student.class_name }}
+  {% if active_term %}&nbsp;|&nbsp; {{ active_term.name }}{% endif %}
+</div>
+{% endif %}
+
+{% if not active_term %}
+<div class="alert alert-warning">No active term set. Ask your admin to set the active term.</div>
+{% else %}
+<div class="row">
+{% for day in days %}
+<div class="col-lg-{% if loop.index <= 2 %}6{% else %}4{% endif %} mb-3">
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white"><strong>{{ day }}</strong></div>
+    <div class="card-body p-2">
+      {% for e in timetable_grid[day] %}
+      <div class="border rounded p-2 mb-2 bg-light">
+        <div class="fw-semibold">{{ e.subject_name or 'Lesson' }}</div>
+        <div class="text-muted small">{{ e.start_time }} – {{ e.end_time }}</div>
+        {% if e.teacher_name %}<div class="text-info small"><i class="bi bi-person me-1"></i>{{ e.teacher_name }}</div>{% endif %}
+        {% if e.room %}<div class="text-muted small"><i class="bi bi-door-open me-1"></i>{{ e.room }}</div>{% endif %}
+      </div>
+      {% else %}
+      <p class="text-muted text-center small py-3">No classes</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

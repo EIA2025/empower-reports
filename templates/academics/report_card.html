@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block title %}Report Card — {{ student.first_name }} {{ student.last_name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
+  <h2 class="fw-bold"><i class="bi bi-file-earmark-person me-2 text-primary"></i>Report Card</h2>
+  <div class="d-flex gap-2">
+    <button onclick="window.print()" class="btn btn-primary"><i class="bi bi-printer me-1"></i>Print</button>
+    <a href="{{ url_for('academics.reports') }}" class="btn btn-outline-secondary">← Back</a>
+  </div>
+</div>
+
+<div class="card shadow-sm" id="reportCard" style="max-width:800px;margin:auto;">
+  <!-- Header -->
+  <div class="card-header text-center py-3" style="background:linear-gradient(135deg,#1e3a5f,#2d6a4f);">
+    <div class="d-flex align-items-center justify-content-center gap-3">
+      {% if school %}
+      <div class="text-white">
+        <h4 class="mb-0 fw-bold">{{ school.name }}</h4>
+        <div class="small opacity-75">{{ school.address or '' }}</div>
+      </div>
+      {% endif %}
+    </div>
+    <hr style="border-color:rgba(255,255,255,0.3);" class="my-2">
+    <h5 class="text-white mb-0">ACADEMIC PROGRESS REPORT</h5>
+    {% if term %}<div class="text-white opacity-75 small">{{ term.name }} — {{ term.year_label }}</div>{% endif %}
+  </div>
+
+  <div class="card-body p-4">
+    <!-- Student info -->
+    <div class="row mb-4 border rounded p-3 bg-light">
+      <div class="col-md-6">
+        <div class="mb-1"><span class="text-muted">Name:</span> <strong>{{ student.first_name }} {{ student.last_name }}</strong></div>
+        <div class="mb-1"><span class="text-muted">Student No:</span> <strong>{{ student.student_number }}</strong></div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-1"><span class="text-muted">Class:</span> <strong>{{ student.class_name }}</strong></div>
+        {% if term %}<div class="mb-1"><span class="text-muted">Term:</span> <strong>{{ term.name }}</strong></div>{% endif %}
+      </div>
+    </div>
+
+    <!-- Marks table -->
+    <h6 class="fw-bold mb-3">Academic Performance</h6>
+    <table class="table table-bordered table-sm mb-4">
+      <thead class="table-dark text-center">
+        <tr><th class="text-start">Subject</th><th>CW /20</th><th>MT /20</th><th>ET /60</th><th>Total /100</th><th>Grade</th></tr>
+      </thead>
+      <tbody>
+      {% set ns = namespace(total=0, count=0) %}
+      {% for m in marks %}
+      {% set ns.total = ns.total + (m.total_mark or 0) %}
+      {% set ns.count = ns.count + 1 %}
+      <tr>
+        <td>{{ m.subject }}</td>
+        <td class="text-center">{{ '%.1f'|format(m.coursework_out_of_20 or 0) }}</td>
+        <td class="text-center">{{ '%.1f'|format(m.midterm_out_of_20 or 0) }}</td>
+        <td class="text-center">{{ '%.1f'|format(m.endterm_out_of_60 or 0) }}</td>
+        <td class="text-center fw-bold">{{ '%.1f'|format(m.total_mark or 0) }}</td>
+        <td class="text-center">
+          <span class="badge bg-{{ 'success' if m.grade=='A' else 'info' if m.grade=='B' else 'warning text-dark' if m.grade=='C' else 'danger' if m.grade in ['E','F'] else 'secondary' }}">
+            {{ m.grade or '—' }}
+          </span>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center text-muted py-3">No marks recorded for this term.</td></tr>
+      {% endfor %}
+      </tbody>
+      {% if ns.count > 0 %}
+      <tfoot class="table-light">
+        <tr>
+          <th>Average</th><th colspan="3"></th>
+          <th class="text-center fw-bold">{{ '%.1f'|format(ns.total / ns.count) }}</th>
+          <th class="text-center">
+            {% set avg = ns.total / ns.count %}
+            <span class="badge bg-{{ 'success' if avg>=80 else 'info' if avg>=70 else 'warning text-dark' if avg>=60 else 'danger' }}">
+              {{ 'A' if avg>=80 else 'B' if avg>=70 else 'C' if avg>=60 else 'D' if avg>=50 else 'E' if avg>=40 else 'F' }}
+            </span>
+          </th>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+
+    <!-- Behaviour -->
+    {% if behaviour %}
+    <h6 class="fw-bold mb-3">Behaviour Assessment</h6>
+    <div class="row mb-4">
+      {% for b in behaviour %}
+      <div class="col-md-4 mb-2">
+        <div class="d-flex justify-content-between align-items-center border rounded p-2">
+          <span class="small">{{ b.name }}</span>
+          <span class="badge bg-primary">{{ b.value }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Grade key -->
+    <div class="border-top pt-3">
+      <small class="text-muted">
+        <strong>Grade Key:</strong>
+        A = 80–100 (Excellent) &nbsp;|&nbsp; B = 70–79 (Very Good) &nbsp;|&nbsp;
+        C = 60–69 (Good) &nbsp;|&nbsp; D = 50–59 (Satisfactory) &nbsp;|&nbsp;
+        E = 40–49 (Pass) &nbsp;|&nbsp; F = 0–39 (Fail)
+      </small>
+    </div>
+
+    <!-- Signatures -->
+    <div class="row mt-4 pt-3">
+      <div class="col-4 text-center"><div style="border-top:1px solid #000;padding-top:4px;" class="small">Class Teacher</div></div>
+      <div class="col-4 text-center"><div style="border-top:1px solid #000;padding-top:4px;" class="small">Head Teacher</div></div>
+      <div class="col-4 text-center"><div style="border-top:1px solid #000;padding-top:4px;" class="small">Parent / Guardian</div></div>
+    </div>
+  </div>
+</div>
+
+<style>
+@media print {
+  .no-print { display: none !important; }
+  .sidebar, .topbar { display: none !important; }
+  .main-wrap { margin-left: 0 !important; }
+  #reportCard { box-shadow: none !important; max-width: 100% !important; }
+  .page-watermark { display: none !important; }
+}
+</style>
+{% endblock %}

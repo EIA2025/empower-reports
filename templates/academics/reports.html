@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}Report Cards{% endblock %}
+{% block content %}
+<h2 class="fw-bold mb-4"><i class="bi bi-file-earmark-text me-2 text-primary"></i>Report Cards</h2>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Term</label>
+        <select name="term_id" class="form-select">
+          <option value="">— Select Term —</option>
+          {% for t in all_terms %}
+          <option value="{{ t.id }}" {% if t.id == selected_term_id %}selected{% endif %}>{{ t.name }}{% if t.is_active %} (Active){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Class</label>
+        <select name="class_name" class="form-select">
+          <option value="">— Select Class —</option>
+          {% for c in classes %}
+          <option value="{{ c.class_name }}" {% if c.class_name == class_name %}selected{% endif %}>{{ c.class_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <button type="submit" class="btn btn-primary w-100">Load Students</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if students %}
+<div class="card shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">{{ class_name }} — {{ students|length }} Students</h5>
+    {% if session.role in ['admin','master'] %}
+    <form method="post" action="{{ url_for('academics.generate_all_reports') }}" class="d-inline" onsubmit="return confirm('Generate PDFs for all students?')">
+      <input type="hidden" name="term_id" value="{{ selected_term_id }}">
+      <input type="hidden" name="class_name" value="{{ class_name }}">
+      <button type="submit" class="btn btn-success"><i class="bi bi-file-pdf me-1"></i>Generate All</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead class="table-light"><tr><th>#</th><th>Student</th><th>Class</th><th>Subjects</th><th class="text-end">Report</th></tr></thead>
+      <tbody>
+      {% for s in students %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ s.last_name }}, {{ s.first_name }}<br><small class="text-muted">{{ s.student_number }}</small></td>
+        <td>{{ s.class_name }}</td>
+        <td>
+          {% if s.subject_count > 0 %}
+          <span class="badge bg-success">{{ s.subject_count }} subjects</span>
+          {% else %}
+          <span class="badge bg-warning text-dark">No marks</span>
+          {% endif %}
+        </td>
+        <td class="text-end">
+          <a href="{{ url_for('academics.generate_report_pdf', student_id=s.id, term_id=selected_term_id) }}"
+             class="btn btn-sm btn-outline-primary" target="_blank">
+            <i class="bi bi-file-pdf me-1"></i>View Report
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% elif class_name and selected_term_id %}
+<div class="alert alert-info">No students in {{ class_name }}.</div>
+{% else %}
+<div class="alert alert-secondary">Select a term and class to view report cards.</div>
+{% endif %}
+{% endblock %}

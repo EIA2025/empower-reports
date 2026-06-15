@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block title %}Behaviour{% endblock %}
+{% block content %}
+<h2 class="fw-bold mb-4"><i class="bi bi-emoji-smile me-2 text-primary"></i>Behaviour Assessment</h2>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Term</label>
+        <select name="term_id" class="form-select">
+          <option value="">— Term —</option>
+          {% for t in all_terms %}
+          <option value="{{ t.id }}" {% if t.id == selected_term_id %}selected{% endif %}>{{ t.name }}{% if t.is_active %} ★{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Class</label>
+        <select name="class_name" class="form-select">
+          <option value="">— Class —</option>
+          {% for c in classes %}
+          <option value="{{ c.class_name }}" {% if c.class_name == class_name %}selected{% endif %}>{{ c.class_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <button type="submit" class="btn btn-primary w-100">Load</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if not components %}
+<div class="alert alert-warning">No behaviour components configured. Ask admin to set them up.</div>
+{% endif %}
+
+{% if students and components %}
+<div class="card shadow-sm">
+  <div class="card-header d-flex justify-content-between">
+    <h5 class="mb-0">{{ class_name }}</h5>
+    <span class="badge bg-primary">{{ students|length }} students</span>
+  </div>
+  <form method="post" action="{{ url_for('academics.save_behaviour') }}">
+    <input type="hidden" name="term_id" value="{{ selected_term_id }}">
+    <input type="hidden" name="class_name" value="{{ class_name }}">
+    {% for s in students %}<input type="hidden" name="student_ids" value="{{ s.id }}">{% endfor %}
+    {% for c in components %}<input type="hidden" name="component_ids" value="{{ c.id }}">{% endfor %}
+
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Student</th>
+            {% for c in components %}<th>{{ c.name }}<br><small class="text-muted">{{ c.scale }}</small></th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+        {% for s in students %}
+        <tr>
+          <td>{{ s.last_name }}, {{ s.first_name }}</td>
+          {% for c in components %}
+          {% set val = behaviour_map.get((s.id, c.id), '') %}
+          <td>
+            <select name="beh_{{ s.id }}_{{ c.id }}" class="form-select form-select-sm" style="width:90px">
+              <option value="">—</option>
+              {% if c.scale == 'A-E' %}
+                {% for opt in ['A','B','C','D','E'] %}
+                <option value="{{ opt }}" {% if val==opt %}selected{% endif %}>{{ opt }}</option>
+                {% endfor %}
+              {% elif c.scale == '1-5' %}
+                {% for opt in ['1','2','3','4','5'] %}
+                <option value="{{ opt }}" {% if val==opt %}selected{% endif %}>{{ opt }}</option>
+                {% endfor %}
+              {% else %}
+                {% for opt in ['Excellent','Good','Fair','Poor'] %}
+                <option value="{{ opt }}" {% if val==opt %}selected{% endif %}>{{ opt }}</option>
+                {% endfor %}
+              {% endif %}
+            </select>
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer text-end">
+      <button type="submit" class="btn btn-success px-4"><i class="bi bi-save me-1"></i>Save Behaviour</button>
+    </div>
+  </form>
+</div>
+{% elif class_name and selected_term_id %}
+<div class="alert alert-info">No students in {{ class_name }}.</div>
+{% endif %}
+{% endblock %}

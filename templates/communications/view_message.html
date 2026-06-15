@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}{{ msg.subject or 'Message' }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold"><i class="bi bi-envelope-open me-2 text-primary"></i>Message</h2>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('communications.compose', reply_to=msg.id) }}" class="btn btn-outline-primary">
+      <i class="bi bi-reply me-1"></i>Reply
+    </a>
+    <a href="{{ url_for('communications.inbox') }}" class="btn btn-outline-secondary">← Inbox</a>
+  </div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-header bg-light">
+        <div class="row mb-1">
+          <div class="col-2 text-muted fw-semibold">From</div>
+          <div class="col-10">{{ msg.sender_name or 'System' }}</div>
+        </div>
+        {% if msg.recipient_name and not msg.is_broadcast %}
+        <div class="row mb-1">
+          <div class="col-2 text-muted fw-semibold">To</div>
+          <div class="col-10">{{ msg.recipient_name }}</div>
+        </div>
+        {% elif msg.is_broadcast %}
+        <div class="row mb-1">
+          <div class="col-2 text-muted fw-semibold">To</div>
+          <div class="col-10"><span class="badge bg-info">Broadcast — {{ msg.target_role|title if msg.target_role else 'All' }}</span></div>
+        </div>
+        {% endif %}
+        <div class="row mb-1">
+          <div class="col-2 text-muted fw-semibold">Subject</div>
+          <div class="col-10"><strong>{{ msg.subject or '(no subject)' }}</strong></div>
+        </div>
+        <div class="row">
+          <div class="col-2 text-muted fw-semibold">Date</div>
+          <div class="col-10 text-muted small">{{ msg.created_at.strftime('%d %b %Y at %H:%M') if msg.created_at else '—' }}</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="message-body" style="white-space: pre-wrap; line-height: 1.7;">{{ msg.body }}</div>
+      </div>
+      {% if session.role in ['admin','master'] %}
+      <div class="card-footer text-end">
+        <form method="post" action="{{ url_for('communications.delete_message', msg_id=msg.id) }}" class="d-inline"
+          onsubmit="return confirm('Delete this message?')">
+          <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

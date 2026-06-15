@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}System Settings{% endblock %}
+{% block content %}
+<h2 class="fw-bold mb-4"><i class="bi bi-sliders me-2 text-primary"></i>System Settings</h2>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-light"><strong>General Settings</strong></div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('system.save_settings') }}">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">System Name</label>
+            <input type="text" name="system_name" class="form-control"
+              value="{{ settings.get('system_name', 'Empower School Management') }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Support Email</label>
+            <input type="email" name="support_email" class="form-control"
+              value="{{ settings.get('support_email', '') }}" placeholder="support@yourcompany.com">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Support Phone</label>
+            <input type="text" name="support_phone" class="form-control"
+              value="{{ settings.get('support_phone', '') }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Default Currency</label>
+            <input type="text" name="default_currency" class="form-control"
+              value="{{ settings.get('default_currency', 'UGX') }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Max Students per School</label>
+            <input type="number" name="max_students" class="form-control"
+              value="{{ settings.get('max_students', 2000) }}" min="1">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">System Notice (shown on login page)</label>
+            <textarea name="login_notice" class="form-control" rows="3">{{ settings.get('login_notice', '') }}</textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Save Settings</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card shadow-sm mb-4 border-info">
+      <div class="card-header bg-info text-white"><strong>System Information</strong></div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tr><td class="text-muted">Version</td><td>2.0.0</td></tr>
+          <tr><td class="text-muted">Database</td><td>PostgreSQL (Supabase)</td></tr>
+          <tr><td class="text-muted">Framework</td><td>Flask / Python</td></tr>
+          <tr><td class="text-muted">Total Schools</td><td>{{ school_count or 0 }}</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card shadow-sm border-warning">
+      <div class="card-header bg-warning text-dark"><strong>Maintenance</strong></div>
+      <div class="card-body">
+        <p class="small text-muted">These actions affect all schools. Use with caution.</p>
+        <form method="post" action="{{ url_for('system.clear_audit_logs') }}" class="d-inline" onsubmit="return confirm('Clear all logs older than 90 days?')">
+          <button class="btn btn-outline-warning btn-sm">Clear Old Audit Logs (90d+)</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

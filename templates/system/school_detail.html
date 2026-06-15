@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block title %}{{ school.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-bold mb-1">{{ school.name }}</h2>
+    <div class="text-muted small">
+      {% if school.email %}{{ school.email }}{% endif %}
+      {% if school.phone %} · {{ school.phone }}{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('system.edit_school', school_id=school.id) }}" class="btn btn-outline-primary">Edit</a>
+    <form method="post" action="{{ url_for('system.toggle_school', school_id=school.id) }}" class="d-inline">
+      <button class="btn btn-{{ 'warning' if school.is_active else 'success' }}">
+        {{ 'Deactivate' if school.is_active else 'Activate' }}
+      </button>
+    </form>
+    <a href="{{ url_for('system.schools') }}" class="btn btn-outline-secondary">← Schools</a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Info card -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm mb-4">
+      <div class="card-header"><strong>School Details</strong></div>
+      <div class="card-body">
+        <div class="mb-2"><span class="text-muted small">Status</span><br>
+          {% if school.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+        </div>
+        {% if school.address %}<div class="mb-2"><span class="text-muted small">Address</span><br>{{ school.address }}</div>{% endif %}
+        {% if school.motto %}<div class="mb-2"><span class="text-muted small">Motto</span><br><em>{{ school.motto }}</em></div>{% endif %}
+        {% if school.country %}<div class="mb-2"><span class="text-muted small">Country</span><br>{{ school.country }}</div>{% endif %}
+        {% if school.currency %}<div class="mb-2"><span class="text-muted small">Currency</span><br>{{ school.currency }}</div>{% endif %}
+      </div>
+    </div>
+
+    <!-- Quick stats -->
+    <div class="card shadow-sm">
+      <div class="card-header"><strong>Quick Stats</strong></div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tr><td>Students</td><td class="text-end fw-bold">{{ stats.students or 0 }}</td></tr>
+          <tr><td>Staff</td><td class="text-end fw-bold">{{ stats.staff or 0 }}</td></tr>
+          <tr><td>Admins</td><td class="text-end fw-bold">{{ admins|length }}</td></tr>
+          <tr><td>Active Term</td><td class="text-end fw-bold">{{ stats.active_term or '—' }}</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admins -->
+  <div class="col-lg-8">
+    <div class="card shadow-sm mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Admin Accounts</strong>
+        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addAdminModal">
+          <i class="bi bi-plus-lg me-1"></i>Add Admin
+        </button>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light"><tr><th>Name</th><th>Email</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+          <tbody>
+          {% for a in admins %}
+          <tr>
+            <td>{{ a.first_name }} {{ a.last_name }}</td>
+            <td>{{ a.email }}</td>
+            <td>{% if a.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</td>
+            <td class="text-end">
+              <form method="post" action="{{ url_for('system.reset_admin_pw', school_id=school.id, user_id=a.id) }}" class="d-inline">
+                <button class="btn btn-sm btn-outline-warning" onclick="return confirm('Reset password to admin123?')">Reset PW</button>
+              </form>
+              <form method="post" action="{{ url_for('system.toggle_admin', school_id=school.id, user_id=a.id) }}" class="d-inline">
+                <button class="btn btn-sm btn-outline-{{ 'danger' if a.is_active else 'success' }}">
+                  {{ 'Disable' if a.is_active else 'Enable' }}
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-muted py-3">No admin accounts yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Delete zone -->
+    <div class="card shadow-sm border-danger">
+      <div class="card-header bg-danger text-white"><strong>Danger Zone</strong></div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">Deleting a school permanently removes all its data — students, staff, marks, invoices, and everything else. This cannot be undone.</p>
+        <form method="post" action="{{ url_for('system.delete_school', school_id=school.id) }}"
+          onsubmit="return confirm('Type DELETE to confirm') && prompt('Type DELETE to confirm') === 'DELETE'">
+          <button class="btn btn-danger">Delete This School</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Admin Modal -->
+<div class="modal fade" id="addAdminModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">Add Admin to {{ school.name }}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{{ url_for('system.add_school_admin', school_id=school.id) }}">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">First Name *</label>
+              <input type="text" name="first_name" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Last Name *</label>
+              <input type="text" name="last_name" class="form-control" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Email / Username *</label>
+              <input type="text" name="email" class="form-control" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Password</label>
+              <input type="password" name="password" class="form-control" placeholder="Default: admin123">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Admin</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

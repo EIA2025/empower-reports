@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Schools{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold"><i class="bi bi-building me-2 text-primary"></i>All Schools</h2>
+  <a href="{{ url_for('system.add_school') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New School</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-center">
+      <div class="col-md-6">
+        <input type="text" name="q" class="form-control" placeholder="Search school name…" value="{{ search or '' }}">
+      </div>
+      <div class="col-md-3">
+        <select name="status" class="form-select" onchange="this.form.submit()">
+          <option value="">All Status</option>
+          <option value="active" {% if status=='active' %}selected{% endif %}>Active</option>
+          <option value="inactive" {% if status=='inactive' %}selected{% endif %}>Inactive</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <button type="submit" class="btn btn-outline-primary w-100">Search</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr><th>School</th><th>Contact</th><th>Students</th><th>Staff</th><th>Status</th><th class="text-end">Actions</th></tr>
+      </thead>
+      <tbody>
+      {% for s in schools %}
+      <tr>
+        <td>
+          <strong>{{ s.name }}</strong>
+          {% if s.motto %}<br><small class="text-muted fst-italic">{{ s.motto }}</small>{% endif %}
+        </td>
+        <td>
+          {% if s.email %}<div class="small">{{ s.email }}</div>{% endif %}
+          {% if s.phone %}<div class="small text-muted">{{ s.phone }}</div>{% endif %}
+        </td>
+        <td>{{ s.student_count or 0 }}</td>
+        <td>{{ s.staff_count or 0 }}</td>
+        <td>
+          {% if s.is_active %}<span class="badge bg-success">Active</span>
+          {% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+        </td>
+        <td class="text-end">
+          <a href="{{ url_for('system.school_detail', school_id=s.id) }}" class="btn btn-sm btn-outline-primary">Manage</a>
+          <a href="{{ url_for('system.edit_school', school_id=s.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center text-muted py-5">No schools found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

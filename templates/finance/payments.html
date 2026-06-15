@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}Payments{% endblock %}
+{% block content %}
+<h2 class="fw-bold mb-4"><i class="bi bi-cash-coin me-2 text-primary"></i>Payment Records</h2>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <select name="term_id" class="form-select" onchange="this.form.submit()">
+          <option value="">— All Terms —</option>
+          {% for t in all_terms %}<option value="{{ t.id }}" {% if t.id == selected_term_id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <input type="text" name="q" class="form-control" placeholder="Search student / receipt #…" value="{{ search }}">
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary w-100">Search</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr><th>Date</th><th>Receipt #</th><th>Student</th><th>Class</th><th>Method</th><th class="text-end">Amount</th></tr>
+      </thead>
+      <tbody>
+      {% for p in payments %}
+      <tr>
+        <td>{{ p.paid_at.strftime('%d %b %Y') if p.paid_at else '—' }}</td>
+        <td><code>{{ p.receipt_number }}</code></td>
+        <td>{{ p.student_name }}</td>
+        <td>{{ p.class_name }}</td>
+        <td><span class="badge bg-light text-dark">{{ p.payment_method|title if p.payment_method else '—' }}</span></td>
+        <td class="text-end fw-bold text-success">{{ '{:,.0f}'.format(p.amount or 0) }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center text-muted py-5"><i class="bi bi-cash-stack fs-1 d-block mb-2"></i>No payment records found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

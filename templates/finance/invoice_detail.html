@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}Invoice {{ invoice.invoice_number }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold"><i class="bi bi-receipt me-2 text-primary"></i>Invoice {{ invoice.invoice_number }}</h2>
+  <a href="{{ url_for('finance.invoices') }}" class="btn btn-outline-secondary">← Back</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-light"><strong>Invoice Details</strong></div>
+      <div class="card-body">
+        <div class="row mb-2"><div class="col-4 text-muted">Student</div><div class="col-8"><strong>{{ invoice.student_name }}</strong></div></div>
+        <div class="row mb-2"><div class="col-4 text-muted">Class</div><div class="col-8">{{ invoice.class_name }}</div></div>
+        <div class="row mb-2"><div class="col-4 text-muted">Status</div>
+          <div class="col-8"><span class="badge bg-{{ 'success' if invoice.status=='paid' else 'warning text-dark' if invoice.status=='partial' else 'danger' }} fs-6">{{ invoice.status|title }}</span></div>
+        </div>
+        <div class="row mb-2"><div class="col-4 text-muted">Due Date</div><div class="col-8">{{ invoice.due_date.strftime('%d %b %Y') if invoice.due_date else '—' }}</div></div>
+        <hr>
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Item</th><th class="text-end">Amount</th></tr></thead>
+          <tbody>
+          {% for item in items %}
+          <tr><td>{{ item.description }}</td><td class="text-end">{{ '{:,.0f}'.format(item.amount) }}</td></tr>
+          {% endfor %}
+          </tbody>
+          <tfoot class="table-light">
+            <tr><th>Total</th><th class="text-end">{{ '{:,.0f}'.format(invoice.total_amount or 0) }}</th></tr>
+            <tr><th class="text-success">Paid</th><th class="text-end text-success">{{ '{:,.0f}'.format(invoice.paid_amount or 0) }}</th></tr>
+            <tr><th class="text-danger">Balance</th><th class="text-end text-danger">{{ '{:,.0f}'.format(invoice.balance or 0) }}</th></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Payment history -->
+    <div class="card shadow-sm">
+      <div class="card-header bg-light"><strong>Payment History</strong></div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Date</th><th>Receipt #</th><th>Method</th><th class="text-end">Amount</th><th>Received By</th></tr></thead>
+          <tbody>
+          {% for p in payments %}
+          <tr>
+            <td>{{ p.paid_at.strftime('%d %b %Y') if p.paid_at else '—' }}</td>
+            <td><code>{{ p.receipt_number }}</code></td>
+            <td>{{ p.payment_method|title }}</td>
+            <td class="text-end text-success fw-bold">{{ '{:,.0f}'.format(p.amount) }}</td>
+            <td>{{ p.received_by_name or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted py-3">No payments yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% if invoice.status != 'paid' %}
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-success">
+      <div class="card-header bg-success text-white"><strong>Record Payment</strong></div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('finance.record_payment', inv_id=invoice.id) }}">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Amount (UGX) *</label>
+            <input type="number" name="amount" class="form-control" required min="0.01" step="0.01"
+              max="{{ invoice.balance }}" placeholder="Enter amount">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Payment Method</label>
+            <select name="payment_method" class="form-select">
+              <option value="cash">Cash</option>
+              <option value="mobile_money">Mobile Money</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="cheque">Cheque</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Reference / Txn ID</label>
+            <input type="text" name="reference" class="form-control" placeholder="Optional">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Paid By</label>
+            <input type="text" name="paid_by" class="form-control" placeholder="Name of payer">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Notes</label>
+            <textarea name="notes" class="form-control" rows="2"></textarea>
+          </div>
+          <button type="submit" class="btn btn-success w-100 fw-bold">Record Payment</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

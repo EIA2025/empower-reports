@@ -1,39 +1,98 @@
-{% extends "base.html" %}{% block title %}{{ 'Edit' if user else 'Add' }} Staff{% endblock %}{% block content %}
-<div class="mb-3"><a href="{{ url_for('staff') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a></div>
-<div class="card" style="max-width:640px"><div class="card-header">{{ 'Edit' if user else 'Add' }} Staff Member</div>
-<div class="card-body"><form method="POST">
-<div class="row g-3">
-<div class="col-md-6"><label class="form-label">Full Name *</label><input type="text" name="name" class="form-control" value="{{ user.name if user else '' }}" required></div>
-<div class="col-md-6"><label class="form-label">Username/Email *</label><input type="text" name="email" class="form-control" value="{{ user.email if user else '' }}" required></div>
-<div class="col-md-6"><label class="form-label">Role *</label>
-<select name="role" class="form-select">
-<option value="teacher" {{ 'selected' if user and user.role=='teacher' else '' }}>Teacher</option>
-<option value="admin" {{ 'selected' if user and user.role=='admin' else '' }}>Admin</option>
-</select></div>
-<div class="col-md-6"><label class="form-label">Phone</label><input type="text" name="phone_number" class="form-control" value="{{ user.phone_number if user else '' }}" placeholder="+256XXXXXXXXX"></div>
-<div class="col-md-6"><label class="form-label">Gender</label>
-<select name="gender" class="form-select"><option value="">--</option>
-<option value="Male" {{ 'selected' if user and user.gender=='Male' }}>Male</option>
-<option value="Female" {{ 'selected' if user and user.gender=='Female' }}>Female</option>
-</select></div>
-<div class="col-md-6"><label class="form-label">Class Teacher For</label><input type="text" name="class_teacher_for" class="form-control" value="{{ user.class_teacher_for if user else '' }}" placeholder="e.g. S3A"></div>
-<div class="col-12"><label class="form-label">Subjects Taught (comma-separated)</label><input type="text" name="subjects_taught_raw" id="subs_input" class="form-control" placeholder="Mathematics, English, ..."><div id="subs_tags" class="mt-2 d-flex flex-wrap gap-1"></div><div id="subs_hidden"></div></div>
-<div class="col-12"><label class="form-label">Password {{ '(leave blank to keep)' if user else '*' }}</label><input type="password" name="password" class="form-control" {{ '' if user else 'required' }}></div>
-</div><hr>
-<button type="submit" class="btn btn-brand w-100">{{ 'Update' if user else 'Add' }} Staff</button>
-</form></div></div>
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if staff else 'Add' }} Staff{% endblock %}
+{% block page_title %}{{ 'Edit' if staff else 'Add' }} Staff Member{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('people.staff') }}" class="text-decoration-none text-muted">Staff</a></li><li class="breadcrumb-item active">{{ 'Edit' if staff else 'Add' }}</li>{% endblock %}
+{% block extra_css %}<style>
+.subj-btn { cursor:pointer; border-radius:20px; padding:4px 14px; font-size:.82rem; font-weight:500; border:2px solid var(--brand); color:var(--brand); background:#fff; transition:all .15s; }
+.subj-btn:hover, .subj-btn.selected { background:var(--brand); color:#fff; }
+</style>{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-lg-8">
+<form method="POST">
+  <div class="card mb-3"><div class="card-header"><i class="bi bi-person me-2"></i>Personal Info</div>
+  <div class="card-body"><div class="row g-3">
+    <div class="col-md-8"><label class="form-label fw-semibold">Full Name *</label><input type="text" name="name" class="form-control" value="{{ staff.name if staff else '' }}" required></div>
+    <div class="col-md-4"><label class="form-label fw-semibold">Gender</label><select name="gender" class="form-select">
+      {% for g in ['','Male','Female'] %}<option value="{{ g }}" {{ 'selected' if staff and staff.gender==g }}>{{ g or '— Select —' }}</option>{% endfor %}</select></div>
+    <div class="col-md-4"><label class="form-label fw-semibold">Date of Birth</label><input type="date" name="date_of_birth" class="form-control" value="{{ staff.date_of_birth if staff else '' }}"></div>
+    <div class="col-md-4"><label class="form-label fw-semibold">Phone</label><input type="text" name="phone" class="form-control" value="{{ staff.phone if staff else '' }}"></div>
+    <div class="col-md-4"><label class="form-label fw-semibold">Email / Username *</label><input type="text" name="email" class="form-control" value="{{ staff.email if staff else '' }}"></div>
+    <div class="col-12"><label class="form-label fw-semibold">Address</label><input type="text" name="address" class="form-control" value="{{ staff.address if staff else '' }}"></div>
+    <div class="col-md-4"><label class="form-label fw-semibold">National ID</label><input type="text" name="national_id" class="form-control" value="{{ staff.national_id if staff else '' }}"></div>
+  </div></div></div>
+
+  <div class="card mb-3"><div class="card-header"><i class="bi bi-briefcase me-2"></i>Employment</div>
+  <div class="card-body"><div class="row g-3">
+    <div class="col-md-4"><label class="form-label fw-semibold">Role / System Access</label>
+    <select name="role" class="form-select">
+      <option value="teacher" {{ 'selected' if not staff }}>Teacher</option>
+      <option value="admin">Admin</option>
+      <option value="bursar">Bursar</option>
+    </select></div>
+    <div class="col-md-4"><label class="form-label fw-semibold">Department</label><input type="text" name="department" class="form-control" value="{{ staff.department if staff else '' }}"></div>
+    <div class="col-md-4"><label class="form-label fw-semibold">Job Title</label><input type="text" name="job_title" class="form-control" value="{{ staff.job_title if staff else '' }}"></div>
+    <div class="col-md-4"><label class="form-label fw-semibold">Employment Type</label>
+    <select name="employment_type" class="form-select">
+      {% for t in ['Permanent','Contract','Part-time','Temporary'] %}
+      <option value="{{ t }}" {{ 'selected' if staff and staff.employment_type==t }}>{{ t }}</option>{% endfor %}</select></div>
+    <div class="col-md-4"><label class="form-label fw-semibold">Employment Date</label><input type="date" name="employment_date" class="form-control" value="{{ staff.employment_date if staff else '' }}"></div>
+    <div class="col-md-4"><label class="form-label fw-semibold">Class Teacher For</label>
+    <input type="text" name="class_teacher_for" class="form-control" list="class-list" value="{{ staff.class_teacher_for if staff else '' }}">
+    <datalist id="class-list">{% for c in classes %}<option value="{{ c }}">{% endfor %}</datalist></div>
+    <div class="col-12"><label class="form-label fw-semibold">Qualification</label><textarea name="qualification" class="form-control" rows="2">{{ staff.qualification if staff else '' }}</textarea></div>
+
+    <!-- Subjects -->
+    <div class="col-12"><label class="form-label fw-semibold">Subjects Taught</label>
+    <div class="p-3 rounded" style="border:2px dashed #cbd5e1;background:#f8fafc;">
+      <div class="d-flex gap-2 flex-wrap mb-2">
+        {% if staff and staff.subjects_taught %}
+          {% for s in staff.subjects_taught.split(',') if s.strip() %}
+          <span class="badge" style="background:var(--brand)">{{ s.strip() }}</span>
+          {% endfor %}
+        {% endif %}
+      </div>
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <small class="text-muted fw-semibold">Click to add:</small>
+        <input type="text" id="custom-subj" class="form-control form-control-sm" placeholder="Custom subject + Enter" style="max-width:200px;">
+      </div>
+      <div id="subj-buttons" class="d-flex flex-wrap gap-2">
+        {% for s in known_subjects %}
+        <button type="button" class="subj-btn" data-subject="{{ s }}" onclick="toggleSubject('{{ s }}')">{{ s }}</button>
+        {% endfor %}
+      </div>
+    </div>
+    <input type="hidden" name="subjects_taught" id="subjects-hidden" value="{{ staff.subjects_taught if staff else '' }}">
+    </div>
+
+    {% if not staff %}
+    <div class="col-md-6"><label class="form-label fw-semibold">Initial Password</label><input type="text" name="password" class="form-control" value="staff123" placeholder="Default: staff123"><small class="text-muted">Staff must change on first login</small></div>
+    {% else %}
+    <div class="col-md-6"><label class="form-label fw-semibold">New Password <small class="text-muted">(leave blank to keep)</small></label><input type="password" name="new_password" class="form-control"></div>
+    {% endif %}
+  </div></div></div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-brand btn-lg px-5"><i class="bi bi-save me-2"></i>{{ 'Update' if staff else 'Add Staff' }}</button>
+    <a href="{{ url_for('people.staff') }}" class="btn btn-outline-secondary btn-lg">Cancel</a>
+  </div>
+</form>
+</div></div>
 {% endblock %}
-{% block extra_js %}
-<script>
-const existingSubs = "{{ user.subjects_taught if user else '' }}".split(',').map(s=>s.trim()).filter(Boolean);
-let subs=[...existingSubs];
-function render(){
-  document.getElementById('subs_tags').innerHTML=subs.map((s,i)=>`<span class="badge bg-info">${s} <span style="cursor:pointer" onclick="rm(${i})">×</span></span>`).join('');
-  document.getElementById('subs_hidden').innerHTML=subs.map(s=>`<input type="hidden" name="subjects_taught" value="${s}">`).join('');
+{% block extra_js %}<script>
+const initial = (document.getElementById('subjects-hidden').value || '').split(',').map(s=>s.trim()).filter(Boolean);
+let selected = new Set(initial);
+function updateHidden() {
+  document.getElementById('subjects-hidden').value = [...selected].join(',');
+  document.querySelectorAll('.subj-btn').forEach(b => b.classList.toggle('selected', selected.has(b.dataset.subject)));
 }
-function rm(i){subs.splice(i,1);render();}
-document.getElementById('subs_input').addEventListener('keydown',function(e){
-  if(e.key==='Enter'||e.key===','){e.preventDefault();const v=this.value.trim().replace(/,$/,'');if(v&&!subs.includes(v)){subs.push(v);render();}this.value='';}
+function toggleSubject(s) { selected.has(s)?selected.delete(s):selected.add(s); updateHidden(); }
+document.getElementById('custom-subj').addEventListener('keydown', e => {
+  if (e.key==='Enter'||e.key===',') { e.preventDefault(); const v=e.target.value.trim(); if(!v) return;
+    selected.add(v); if(!document.querySelector(`.subj-btn[data-subject="${v}"]`)) {
+      const btn=document.createElement('button'); btn.type='button'; btn.className='subj-btn';
+      btn.dataset.subject=v; btn.textContent=v; btn.onclick=()=>toggleSubject(v);
+      document.getElementById('subj-buttons').appendChild(btn); }
+    e.target.value=''; updateHidden(); }
 });
-render();
+updateHidden();
 </script>{% endblock %}

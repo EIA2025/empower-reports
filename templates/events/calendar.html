@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block title %}Events Calendar{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold"><i class="bi bi-calendar-event me-2 text-primary"></i>School Events</h2>
+  {% if session.role in ['admin','master','teacher'] %}
+  <a href="{{ url_for('events.add_event') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Add Event</a>
+  {% endif %}
+</div>
+
+{% if upcoming %}
+<h5 class="text-muted mb-3">Upcoming Events</h5>
+<div class="row g-3 mb-4">
+  {% for e in upcoming %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card shadow-sm h-100 border-start border-4 border-{{ 'primary' if e.category=='academic' else 'success' if e.category=='sports' else 'warning' if e.category=='cultural' else 'info' }}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <span class="badge bg-{{ 'primary' if e.category=='academic' else 'success' if e.category=='sports' else 'warning text-dark' if e.category=='cultural' else 'info' }}">
+            {{ e.category|title if e.category else 'General' }}
+          </span>
+          {% if session.role in ['admin','master'] %}
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary py-0 px-1" data-bs-toggle="dropdown">⋮</button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="{{ url_for('events.edit_event', event_id=e.id) }}">Edit</a></li>
+              <li>
+                <form method="post" action="{{ url_for('events.delete_event', event_id=e.id) }}" onsubmit="return confirm('Delete event?')">
+                  <button class="dropdown-item text-danger">Delete</button>
+                </form>
+              </li>
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+        <h6 class="fw-bold">
+          <a href="{{ url_for('events.event_detail', event_id=e.id) }}" class="text-decoration-none text-dark">{{ e.title }}</a>
+        </h6>
+        <div class="text-muted small">
+          <i class="bi bi-calendar3 me-1"></i>
+          {{ e.start_date.strftime('%d %b %Y') if e.start_date else '' }}
+          {% if e.end_date and e.end_date != e.start_date %} – {{ e.end_date.strftime('%d %b %Y') }}{% endif %}
+        </div>
+        {% if e.start_time %}
+        <div class="text-muted small"><i class="bi bi-clock me-1"></i>{{ e.start_time }}{% if e.end_time %} – {{ e.end_time }}{% endif %}</div>
+        {% endif %}
+        {% if e.location %}
+        <div class="text-muted small"><i class="bi bi-geo-alt me-1"></i>{{ e.location }}</div>
+        {% endif %}
+        {% if e.description %}
+        <p class="small mt-2 text-secondary mb-0">{{ e.description[:120] }}{% if e.description|length > 120 %}…{% endif %}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info"><i class="bi bi-calendar-x me-2"></i>No upcoming events. {% if session.role in ['admin','master','teacher'] %}<a href="{{ url_for('events.add_event') }}">Create one</a>.{% endif %}</div>
+{% endif %}
+
+{% if past %}
+<h5 class="text-muted mb-3">Past Events</h5>
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light"><tr><th>Event</th><th>Date</th><th>Category</th><th>Location</th></tr></thead>
+      <tbody>
+      {% for e in past %}
+      <tr class="text-muted">
+        <td><a href="{{ url_for('events.event_detail', event_id=e.id) }}" class="text-muted text-decoration-none">{{ e.title }}</a></td>
+        <td>{{ e.start_date.strftime('%d %b %Y') if e.start_date else '—' }}</td>
+        <td>{{ e.category|title if e.category else '—' }}</td>
+        <td>{{ e.location or '—' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

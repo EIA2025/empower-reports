@@ -1,131 +1,131 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Edit' if student else 'Add' }} Student{% endblock %}
+{% block title %}{{ 'Edit' if student else 'Enrol' }} Student{% endblock %}
+{% block page_title %}{{ 'Edit' if student else 'Enrol New' }} Student{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('people.students') }}" class="text-decoration-none text-muted">Students</a></li>
+<li class="breadcrumb-item active">{{ 'Edit' if student else 'Enrol' }}</li>
+{% endblock %}
 
 {% block extra_css %}
 <style>
-.subject-pill {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: var(--brand); color: #fff;
-  border-radius: 20px; padding: 4px 12px;
-  font-size: .85rem; font-weight: 500;
-}
-.subject-pill button {
-  background: none; border: none; color: #fff;
-  font-size: 1rem; line-height: 1; padding: 0;
-  opacity: .8; cursor: pointer;
-}
-.subject-pill button:hover { opacity: 1; }
-#subject-picker {
-  border: 2px dashed #cbd5e1;
-  border-radius: 10px;
-  padding: 14px;
-  background: #f8fafc;
-}
-.subj-btn {
-  cursor: pointer; border-radius: 20px;
-  padding: 5px 14px; font-size: .83rem; font-weight: 500;
-  border: 2px solid var(--brand); color: var(--brand);
-  background: #fff; transition: all .15s;
-  white-space: nowrap;
-}
-.subj-btn:hover, .subj-btn.selected {
-  background: var(--brand); color: #fff;
-}
+.subj-btn { cursor:pointer; border-radius:20px; padding:4px 14px; font-size:.82rem; font-weight:500;
+  border:2px solid var(--brand); color:var(--brand); background:#fff; transition:all .15s; }
+.subj-btn:hover, .subj-btn.selected { background:var(--brand); color:#fff; }
+.pill { display:inline-flex; align-items:center; gap:5px; background:var(--brand); color:#fff;
+  border-radius:20px; padding:3px 12px; font-size:.82rem; font-weight:500; }
+.pill button { background:none; border:none; color:#fff; font-size:1rem; line-height:1; padding:0; cursor:pointer; opacity:.8; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="mb-3">
-  <a href="{{ url_for('students') }}" class="btn btn-outline-secondary btn-sm">
-    <i class="bi bi-arrow-left me-1"></i>Back to Students
-  </a>
-</div>
-
-<div class="card" style="max-width:680px">
-  <div class="card-header">{{ 'Edit' if student else 'Add New' }} Student</div>
-  <div class="card-body">
+<div class="row justify-content-center">
+  <div class="col-lg-8">
     <form method="POST">
-      <div class="row g-3">
-
-        <div class="col-md-8">
-          <label class="form-label fw-semibold">Full Name *</label>
-          <input type="text" name="name" class="form-control"
-                 value="{{ student.name if student else '' }}" required>
-        </div>
-
-        <div class="col-md-4">
-          <label class="form-label fw-semibold">Year</label>
-          <input type="number" name="year" class="form-control"
-                 value="{{ student.year if student else '' }}">
-        </div>
-
-        <div class="col-md-6">
-          <label class="form-label fw-semibold">Class *</label>
-          <input type="text" name="class_name" class="form-control"
-                 value="{{ student.class_name if student else '' }}" required>
-        </div>
-
-        <div class="col-md-6">
-          <label class="form-label fw-semibold">Registration No *</label>
-          <input type="text" name="registration_number" class="form-control"
-                 value="{{ student.registration_number if student else '' }}" required>
-        </div>
-
-        <div class="col-md-6">
-          <label class="form-label fw-semibold">Gender</label>
-          <select name="gender" class="form-select">
-            <option value="">-- Select --</option>
-            <option value="Male"   {{ 'selected' if student and student.gender=='Male' }}>Male</option>
-            <option value="Female" {{ 'selected' if student and student.gender=='Female' }}>Female</option>
-          </select>
-        </div>
-
-        <div class="col-md-6">
-          <label class="form-label fw-semibold">Enrollment Date</label>
-          <input type="date" name="enrollment_date" class="form-control"
-                 value="{{ student.enrollment_date if student else '' }}">
-        </div>
-
-        <!-- Subject picker -->
-        <div class="col-12">
-          <label class="form-label fw-semibold">Subjects</label>
-
-          <!-- Selected subjects shown as pills -->
-          <div id="pill-container" class="d-flex flex-wrap gap-2 mb-2 min-height-40">
-            <!-- filled by JS -->
-          </div>
-
-          <!-- Hidden inputs submitted with form -->
-          <div id="hidden-inputs"></div>
-
-          <!-- Dropdown picker -->
-          <div id="subject-picker">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <span class="text-muted small fw-semibold">Click to add subjects:</span>
-              <!-- Manual entry for subjects not in list -->
-              <input type="text" id="manual-input" class="form-control form-control-sm"
-                     placeholder="Or type custom subject + Enter"
-                     style="max-width:260px;">
+      <!-- Personal Info -->
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-person me-2"></i>Personal Information</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">Full Name *</label>
+              <input type="text" name="name" class="form-control" value="{{ student.name if student else '' }}" required>
             </div>
-            <div id="subject-buttons" class="d-flex flex-wrap gap-2">
-              {% for s in all_subjects %}
-              <button type="button" class="subj-btn" data-subject="{{ s }}" onclick="toggleSubject('{{ s }}')">
-                {{ s }}
-              </button>
-              {% endfor %}
-              {% if not all_subjects %}
-              <span class="text-muted small">No subjects found — add teachers with subjects first, or type below.</span>
-              {% endif %}
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Gender</label>
+              <select name="gender" class="form-select">
+                <option value="">— Select —</option>
+                {% for g in ['Male','Female'] %}
+                <option value="{{ g }}" {{ 'selected' if student and student.gender==g }}>{{ g }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Date of Birth</label>
+              <input type="date" name="date_of_birth" class="form-control" value="{{ student.date_of_birth if student else '' }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Nationality</label>
+              <input type="text" name="nationality" class="form-control" value="{{ student.nationality if student else '' }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Religion</label>
+              <input type="text" name="religion" class="form-control" value="{{ student.religion if student else '' }}">
             </div>
           </div>
         </div>
-
       </div>
-      <hr>
-      <button type="submit" class="btn btn-brand w-100 fw-semibold py-2">
-        <i class="bi bi-{{ 'pencil' if student else 'plus-lg' }} me-2"></i>
-        {{ 'Update Student' if student else 'Add Student' }}
-      </button>
+
+      <!-- Academic Info -->
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-mortarboard me-2"></i>Academic Information</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Class *</label>
+              <input type="text" name="class_name" class="form-control" list="class-list" value="{{ student.class_name if student else '' }}" required>
+              <datalist id="class-list">
+                {% for c in classes %}<option value="{{ c }}">{% endfor %}
+              </datalist>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Stream</label>
+              <input type="text" name="stream" class="form-control" placeholder="e.g. A, West" value="{{ student.stream if student else '' }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Year</label>
+              <input type="number" name="year" class="form-control" value="{{ student.year if student else '' }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Enrolment Date</label>
+              <input type="date" name="enrolment_date" class="form-control" value="{{ student.enrolment_date if student else '' }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Status</label>
+              <select name="enrolment_status" class="form-select">
+                {% for st in ['active','alumni','transferred','withdrawn'] %}
+                <option value="{{ st }}" {{ 'selected' if student and student.enrolment_status==st }}>{{ st.title() }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Previous School</label>
+              <input type="text" name="previous_school" class="form-control" value="{{ student.previous_school if student else '' }}">
+            </div>
+
+            <!-- Subjects picker -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">Subjects</label>
+              <div id="pill-container" class="d-flex flex-wrap gap-2 mb-2" style="min-height:32px;"></div>
+              <div id="hidden-inputs"></div>
+              <div class="p-3 rounded" style="border:2px dashed #cbd5e1;background:#f8fafc;">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <small class="text-muted fw-semibold">Click to add:</small>
+                  <input type="text" id="custom-subj" class="form-control form-control-sm" placeholder="Type custom subject + Enter" style="max-width:240px;">
+                </div>
+                <div id="subj-buttons" class="d-flex flex-wrap gap-2">
+                  {% for s in known_subjects %}
+                  <button type="button" class="subj-btn" data-subject="{{ s }}" onclick="toggleSubject('{{ s }}')">{{ s }}</button>
+                  {% endfor %}
+                  {% if not known_subjects %}<small class="text-muted">No subjects yet — type above to add.</small>{% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">Medical Notes</label>
+              <textarea name="medical_notes" class="form-control" rows="2" placeholder="Allergies, conditions, special needs…">{{ student.medical_notes if student else '' }}</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-brand btn-lg px-5">
+          <i class="bi bi-{{ 'save' if student else 'person-plus' }} me-2"></i>
+          {{ 'Update Student' if student else 'Enrol Student' }}
+        </button>
+        <a href="{{ url_for('people.students') }}" class="btn btn-outline-secondary btn-lg">Cancel</a>
+      </div>
     </form>
   </div>
 </div>
@@ -133,72 +133,37 @@
 
 {% block extra_js %}
 <script>
-// Seed from existing student subjects
 let selected = new Set({{ subjects | tojson }});
-
 function render() {
-  // Pills
   const pills = document.getElementById('pill-container');
   pills.innerHTML = '';
   selected.forEach(s => {
-    pills.innerHTML += `
-      <span class="subject-pill">
-        ${s}
-        <button type="button" onclick="removeSubject('${s}')" title="Remove">×</button>
-      </span>`;
+    pills.innerHTML += `<span class="pill">${s}<button type="button" onclick="removeSubject('${s}')">×</button></span>`;
   });
-
-  // Hidden inputs
-  const hidden = document.getElementById('hidden-inputs');
-  hidden.innerHTML = '';
-  selected.forEach(s => {
-    hidden.innerHTML += `<input type="hidden" name="subjects" value="${s}">`;
-  });
-
-  // Highlight buttons
-  document.querySelectorAll('.subj-btn').forEach(btn => {
-    btn.classList.toggle('selected', selected.has(btn.dataset.subject));
+  document.getElementById('hidden-inputs').innerHTML =
+    [...selected].map(s => `<input type="hidden" name="subjects" value="${s}">`).join('');
+  document.querySelectorAll('.subj-btn').forEach(b => {
+    b.classList.toggle('selected', selected.has(b.dataset.subject));
   });
 }
-
-function toggleSubject(s) {
-  if (selected.has(s)) {
-    selected.delete(s);
-  } else {
-    selected.add(s);
-  }
-  render();
-}
-
-function removeSubject(s) {
-  selected.delete(s);
-  render();
-}
-
-// Manual entry
-document.getElementById('manual-input').addEventListener('keydown', function(e) {
+function toggleSubject(s) { selected.has(s) ? selected.delete(s) : selected.add(s); render(); }
+function removeSubject(s) { selected.delete(s); render(); }
+document.getElementById('custom-subj').addEventListener('keydown', e => {
   if (e.key === 'Enter' || e.key === ',') {
     e.preventDefault();
-    const v = this.value.trim().replace(/,$/, '');
-    if (v) {
-      selected.add(v);
-      // Add a button for it if not already there
-      const existing = document.querySelector(`.subj-btn[data-subject="${v}"]`);
-      if (!existing) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'subj-btn';
-        btn.dataset.subject = v;
-        btn.textContent = v;
-        btn.onclick = () => toggleSubject(v);
-        document.getElementById('subject-buttons').appendChild(btn);
-      }
-      this.value = '';
-      render();
+    const v = e.target.value.trim().replace(/,$/, '');
+    if (!v) return;
+    selected.add(v);
+    if (!document.querySelector(`.subj-btn[data-subject="${v}"]`)) {
+      const btn = document.createElement('button');
+      btn.type='button'; btn.className='subj-btn'; btn.dataset.subject=v; btn.textContent=v;
+      btn.onclick=()=>toggleSubject(v);
+      document.getElementById('subj-buttons').appendChild(btn);
     }
+    e.target.value = '';
+    render();
   }
 });
-
 render();
 </script>
 {% endblock %}
