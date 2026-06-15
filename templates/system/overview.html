@@ -8,35 +8,40 @@
   </a>
 </div>
 
-<!-- Stats row -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
     <div class="card shadow-sm text-center p-3 border-primary">
-      <div class="fs-2 fw-bold text-primary">{{ stats.total_schools or 0 }}</div>
+      <div class="fs-2 fw-bold text-primary">{{ schools|length }}</div>
       <div class="small text-muted">Total Schools</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
     <div class="card shadow-sm text-center p-3 border-success">
-      <div class="fs-2 fw-bold text-success">{{ stats.active_schools or 0 }}</div>
+      <div class="fs-2 fw-bold text-success">{{ active_schools }}</div>
       <div class="small text-muted">Active</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
     <div class="card shadow-sm text-center p-3 border-info">
-      <div class="fs-2 fw-bold text-info">{{ stats.total_students or 0 }}</div>
+      <div class="fs-2 fw-bold text-info">{{ total_students }}</div>
       <div class="small text-muted">Total Students</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
     <div class="card shadow-sm text-center p-3 border-warning">
-      <div class="fs-2 fw-bold text-warning">{{ stats.total_users or 0 }}</div>
+      <div class="fs-2 fw-bold text-warning">{{ total_users }}</div>
       <div class="small text-muted">Total Users</div>
     </div>
   </div>
 </div>
 
-<!-- Schools table -->
+{% if announcements %}
+<div class="alert alert-info mb-4">
+  <strong><i class="bi bi-megaphone me-1"></i>Latest Announcement:</strong>
+  {{ announcements[0].title }}
+</div>
+{% endif %}
+
 <div class="card shadow-sm">
   <div class="card-header d-flex justify-content-between align-items-center">
     <strong>Schools</strong>
@@ -54,14 +59,11 @@
           <strong>{{ s.name }}</strong>
           {% if s.email %}<br><small class="text-muted">{{ s.email }}</small>{% endif %}
         </td>
-        <td>{{ s.student_count or 0 }}</td>
-        <td>{{ s.staff_count or 0 }}</td>
+        <td>{{ s.student_count if s.student_count is defined else '—' }}</td>
+        <td>{{ s.staff_count if s.staff_count is defined else '—' }}</td>
         <td>
-          {% if s.is_active %}
-          <span class="badge bg-success">Active</span>
-          {% else %}
-          <span class="badge bg-secondary">Inactive</span>
-          {% endif %}
+          {% if s.is_active %}<span class="badge bg-success">Active</span>
+          {% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
         </td>
         <td class="text-end">
           <a href="{{ url_for('system.school_detail', school_id=s.id) }}" class="btn btn-sm btn-outline-primary">Manage</a>
@@ -80,17 +82,23 @@
   </div>
 </div>
 
-{% if recent_activity %}
+{% if recent_logs %}
 <div class="card shadow-sm mt-4">
-  <div class="card-header"><strong>Recent Activity</strong></div>
+  <div class="card-header d-flex justify-content-between">
+    <strong>Recent Activity</strong>
+    <a href="{{ url_for('system.audit_logs') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+  </div>
   <div class="card-body p-0">
     <table class="table table-sm mb-0">
       <tbody>
-      {% for a in recent_activity %}
+      {% for a in recent_logs %}
       <tr>
-        <td class="text-muted small" style="width:160px">{{ a.created_at.strftime('%d %b %Y %H:%M') if a.created_at else '' }}</td>
+        <td class="text-muted small" style="width:160px">
+          {{ a.timestamp.strftime('%d %b %Y %H:%M') if a.timestamp else '' }}
+        </td>
         <td>{{ a.action }}</td>
-        <td class="text-muted small">{{ a.performed_by_name or '—' }}</td>
+        <td class="text-muted small">{{ a.user_name or '—' }}</td>
+        <td class="text-muted small">{{ a.school_name or 'System' }}</td>
       </tr>
       {% endfor %}
       </tbody>

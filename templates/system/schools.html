@@ -10,13 +10,13 @@
   <div class="card-body py-2">
     <form method="get" class="row g-2 align-items-center">
       <div class="col-md-6">
-        <input type="text" name="q" class="form-control" placeholder="Search school name…" value="{{ search or '' }}">
+        <input type="text" name="q" class="form-control" placeholder="Search school name…" value="{{ q or '' }}">
       </div>
       <div class="col-md-3">
         <select name="status" class="form-select" onchange="this.form.submit()">
           <option value="">All Status</option>
-          <option value="active" {% if status=='active' %}selected{% endif %}>Active</option>
-          <option value="inactive" {% if status=='inactive' %}selected{% endif %}>Inactive</option>
+          <option value="active" {% if selected_status=='active' %}selected{% endif %}>Active</option>
+          <option value="inactive" {% if selected_status=='inactive' %}selected{% endif %}>Inactive</option>
         </select>
       </div>
       <div class="col-md-3">
