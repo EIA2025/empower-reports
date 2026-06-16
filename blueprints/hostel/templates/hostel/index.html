@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}Hostel Management{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Hostel Management</h1>
+    <div class="alert alert-info">
+        <strong>Hostel Module:</strong> Manage dormitories, rooms, beds, and student allocations.
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header"><h5>Dormitories</h5></div>
+                <div class="card-body">
+                    <a href="{{ url_for('hostel.dormitories') }}" class="btn btn-primary">View Dormitories</a>
+                    <a href="{{ url_for('hostel.add_dormitory') }}" class="btn btn-success">Add Dormitory</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header"><h5>Occupancy</h5></div>
+                <div class="card-body">
+                    <a href="{{ url_for('hostel.occupancy') }}" class="btn btn-info">View Occupancy Stats</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

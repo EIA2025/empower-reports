@@ -19,6 +19,10 @@ def create_app():
     from blueprints.library.routes   import library_bp
     from blueprints.events.routes    import events_bp
     from blueprints.system.routes    import system_bp
+    from blueprints.health.routes    import health_bp
+    from blueprints.transport.routes import transport_bp
+    from blueprints.hostel.routes    import hostel_bp
+    from blueprints.materials.routes import materials_bp
     from auth                        import auth_bp
 
     app.register_blueprint(auth_bp)
@@ -29,6 +33,10 @@ def create_app():
     app.register_blueprint(library_bp,   url_prefix='/library')
     app.register_blueprint(events_bp,    url_prefix='/events')
     app.register_blueprint(system_bp,    url_prefix='/system')
+    app.register_blueprint(health_bp,    url_prefix='/health')
+    app.register_blueprint(transport_bp, url_prefix='/transport')
+    app.register_blueprint(hostel_bp,    url_prefix='/hostel')
+    app.register_blueprint(materials_bp, url_prefix='/materials')
 
     # ── Root redirect ─────────────────────────────────────────────────────────
     @app.route('/')

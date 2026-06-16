@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% block title %}Health Profile - {{ student.name }}{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>{{ student.name }} - Health Profile</h1>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <div class="row">
+        <div class="col-md-12">
+            <a href="{{ url_for('health.students') }}" class="btn btn-secondary mb-3">Back to Students</a>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Allergies <a href="{{ url_for('health.add_allergy', student_id=student.id) }}" class="btn btn-sm btn-primary float-end">+ Add</a></h5>
+                </div>
+                <div class="card-body">
+                    {% if allergies %}
+                        <div class="list-group">
+                            {% for allergy in allergies %}
+                                <div class="list-group-item">
+                                    <h6>{{ allergy.allergen }} <span class="badge bg-danger">{{ allergy.severity }}</span></h6>
+                                    <small>{{ allergy.symptoms }}</small>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No allergies recorded.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Medical Conditions <a href="{{ url_for('health.add_condition', student_id=student.id) }}" class="btn btn-sm btn-primary float-end">+ Add</a></h5>
+                </div>
+                <div class="card-body">
+                    {% if conditions %}
+                        <div class="list-group">
+                            {% for condition in conditions %}
+                                <div class="list-group-item">
+                                    <h6>{{ condition.condition }}</h6>
+                                    <small>Medication: {{ condition.medication or 'N/A' }}</small>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No medical conditions recorded.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Emergency Contacts <a href="{{ url_for('health.add_emergency_contact', student_id=student.id) }}" class="btn btn-sm btn-primary float-end">+ Add</a></h5>
+                </div>
+                <div class="card-body">
+                    {% if emergency_contacts %}
+                        <div class="list-group">
+                            {% for contact in emergency_contacts %}
+                                <div class="list-group-item">
+                                    <h6>{{ contact.name }} {% if contact.is_primary %}<span class="badge bg-success">Primary</span>{% endif %}</h6>
+                                    <small>{{ contact.relationship }} - {{ contact.phone }}</small>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No emergency contacts recorded.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Vaccinations <a href="{{ url_for('health.add_vaccination', student_id=student.id) }}" class="btn btn-sm btn-primary float-end">+ Add</a></h5>
+                </div>
+                <div class="card-body">
+                    {% if vaccinations %}
+                        <div class="list-group">
+                            {% for vac in vaccinations %}
+                                <div class="list-group-item">
+                                    <h6>{{ vac.vaccine_name }}</h6>
+                                    <small>Date: {{ vac.vaccination_date }}</small>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No vaccinations recorded.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Clinic Visits <a href="{{ url_for('health.add_clinic_visit', student_id=student.id) }}" class="btn btn-sm btn-primary float-end">+ Add</a></h5>
+                </div>
+                <div class="card-body">
+                    {% if clinic_visits %}
+                        <div class="list-group list-group-flush">
+                            {% for visit in clinic_visits[:5] %}
+                                <div class="list-group-item">
+                                    <h6>{{ visit.visit_date }}</h6>
+                                    <small>{{ visit.complaint }}</small>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No clinic visits recorded.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Medications <a href="{{ url_for('health.add_medication', student_id=student.id) }}" class="btn btn-sm btn-primary float-end">+ Add</a></h5>
+                </div>
+                <div class="card-body">
+                    {% if medications %}
+                        <div class="list-group list-group-flush">
+                            {% for med in medications[:5] %}
+                                <div class="list-group-item">
+                                    <h6>{{ med.medication_name }}</h6>
+                                    <small>{{ med.frequency }} - {{ med.dosage }}</small>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No medications recorded.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

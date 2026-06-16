@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Bus Routes{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Bus Routes</h1>
+    <a href="{{ url_for('transport.add_route') }}" class="btn btn-success mb-3">+ Add Route</a>
+    
+    {% if routes %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Route Name</th>
+                        <th>Departure</th>
+                        <th>Arrival</th>
+                        <th>Stops</th>
+                        <th>Assigned Students</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for route in routes %}
+                        <tr>
+                            <td>{{ route.name }}</td>
+                            <td>{{ route.departure_time }}</td>
+                            <td>{{ route.arrival_time }}</td>
+                            <td>{{ route.stops_count or 0 }}</td>
+                            <td>{{ route.assigned_students or 0 }}</td>
+                            <td><a href="{{ url_for('transport.route_detail', route_id=route.id) }}" class="btn btn-sm btn-info">View</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="text-muted">No routes found.</p>
+    {% endif %}
+</div>
+{% endblock %}

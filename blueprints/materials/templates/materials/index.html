@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}Learning Materials{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Learning Materials</h1>
+    <div class="alert alert-info">
+        <strong>Learning Materials Module:</strong> Upload lesson plans, assignments, schemes of work, and manage gradebook.
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header"><h5>Materials</h5></div>
+                <div class="card-body">
+                    <a href="{{ url_for('materials.learning_materials') }}" class="btn btn-primary">View Materials</a>
+                    <a href="{{ url_for('materials.add_material') }}" class="btn btn-success">Upload Material</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header"><h5>Assignments</h5></div>
+                <div class="card-body">
+                    <a href="{{ url_for('materials.assignments') }}" class="btn btn-primary">View Assignments</a>
+                    <a href="{{ url_for('materials.add_assignment') }}" class="btn btn-success">Create Assignment</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header"><h5>Lesson Plans</h5></div>
+                <div class="card-body">
+                    <a href="{{ url_for('materials.lesson_plans') }}" class="btn btn-primary">View Lesson Plans</a>
+                    <a href="{{ url_for('materials.add_lesson_plan') }}" class="btn btn-success">Add Lesson Plan</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header"><h5>Gradebook</h5></div>
+                <div class="card-body">
+                    <a href="{{ url_for('materials.gradebook') }}" class="btn btn-primary">View Gradebook</a>
+                    <a href="{{ url_for('materials.add_gradebook_entry') }}" class="btn btn-success">Add Entry</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

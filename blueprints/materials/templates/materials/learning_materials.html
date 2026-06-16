@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}Learning Materials{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Learning Materials</h1>
+    <a href="{{ url_for('materials.add_material') }}" class="btn btn-success mb-3">+ Upload Material</a>
+    
+    {% if materials %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Subject</th>
+                        <th>Class</th>
+                        <th>Type</th>
+                        <th>Size</th>
+                        <th>Downloads</th>
+                        <th>Added</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for material in materials %}
+                        <tr>
+                            <td>{{ material.title }}</td>
+                            <td>{{ material.subject or 'N/A' }}</td>
+                            <td>{{ material.class_name or 'N/A' }}</td>
+                            <td><span class="badge bg-info">{{ material.file_type }}</span></td>
+                            <td>{{ '%.1f' % (material.file_size / 1024 / 1024) }} MB</td>
+                            <td>{{ material.download_count }}</td>
+                            <td>{{ material.created_at[:10] }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="text-muted">No materials found.</p>
+    {% endif %}
+</div>
+{% endblock %}

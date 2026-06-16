@@ -482,3 +482,482 @@ class SystemSetting(Base):
     key        = Column(String(100), unique=True, nullable=False)
     value      = Column(Text)
     updated_at = Column(DateTime, default=datetime.now)
+
+
+# ── HEALTH & MEDICAL MODULE ──────────────────────────────────────────────────
+
+class StudentAllergy(Base):
+    """Student allergies"""
+    __tablename__ = 'student_allergies'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    student_id      = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'))
+    allergen        = Column(String(100), nullable=False)
+    severity        = Column(String(50), default='mild')  # mild, moderate, severe
+    symptoms        = Column(Text)
+    treatment       = Column(Text)
+    notes           = Column(Text)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class StudentMedicalCondition(Base):
+    """Student medical conditions"""
+    __tablename__ = 'student_medical_conditions'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    student_id      = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'))
+    condition       = Column(String(100), nullable=False)
+    diagnosed_date  = Column(String(20))
+    description     = Column(Text)
+    medication      = Column(Text)
+    restrictions    = Column(Text)
+    notes           = Column(Text)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class EmergencyContact(Base):
+    """Student emergency contacts"""
+    __tablename__ = 'emergency_contacts'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    student_id      = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'))
+    name            = Column(String(100), nullable=False)
+    relationship    = Column(String(50), nullable=False)
+    phone           = Column(String(20), nullable=False)
+    email           = Column(String(120))
+    address         = Column(Text)
+    is_primary      = Column(Boolean, default=False)
+    notes           = Column(Text)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class VaccinationRecord(Base):
+    """Student vaccination records"""
+    __tablename__ = 'vaccination_records'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    student_id      = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'))
+    vaccine_name    = Column(String(100), nullable=False)
+    vaccination_date= Column(String(20), nullable=False)
+    batch_number    = Column(String(50))
+    administered_by = Column(String(100))
+    facility        = Column(String(100))
+    next_dose_date  = Column(String(20))
+    certificate_uploaded = Column(Boolean, default=False)
+    notes           = Column(Text)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class ClinicVisit(Base):
+    """Clinic visit records"""
+    __tablename__ = 'clinic_visits'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    student_id      = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'))
+    visit_date      = Column(String(20), nullable=False)
+    complaint       = Column(Text, nullable=False)
+    diagnosis       = Column(Text)
+    treatment_given = Column(Text)
+    referred        = Column(Boolean, default=False)
+    referred_to     = Column(String(100))
+    follow_up_date  = Column(String(20))
+    notes           = Column(Text)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class MedicationAdministration(Base):
+    """Medication administration records"""
+    __tablename__ = 'medication_administration'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    student_id      = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'))
+    medication_name = Column(String(100), nullable=False)
+    dosage          = Column(String(100))
+    frequency       = Column(String(50))
+    start_date      = Column(String(20))
+    end_date        = Column(String(20))
+    prescribed_by   = Column(String(100))
+    given_by        = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'))
+    notes           = Column(Text)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+# ── TRANSPORT MODULE ──────────────────────────────────────────────────────────
+
+class Bus(Base):
+    """School bus"""
+    __tablename__ = 'buses'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    bus_number      = Column(String(20), nullable=False)
+    plate_number    = Column(String(20))
+    model           = Column(String(100))
+    capacity        = Column(Integer, default=50)
+    driver_id       = Column(Integer, ForeignKey('drivers.id', ondelete='SET NULL'))
+    is_active       = Column(Boolean, default=True)
+    notes           = Column(Text)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class Driver(Base):
+    """Bus driver"""
+    __tablename__ = 'drivers'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    name            = Column(String(100), nullable=False)
+    phone           = Column(String(20))
+    license_number  = Column(String(50))
+    license_expiry  = Column(String(20))
+    address         = Column(Text)
+    is_active       = Column(Boolean, default=True)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class BusRoute(Base):
+    """Bus route"""
+    __tablename__ = 'bus_routes'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    bus_id          = Column(Integer, ForeignKey('buses.id', ondelete='SET NULL'))
+    name            = Column(String(100), nullable=False)
+    description     = Column(Text)
+    departure_time  = Column(String(10))
+    arrival_time    = Column(String(10))
+    is_active       = Column(Boolean, default=True)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class BusStop(Base):
+    """Stop on a bus route"""
+    __tablename__ = 'bus_stops'
+    id              = Column(Integer, primary_key=True)
+    route_id        = Column(Integer, ForeignKey('bus_routes.id', ondelete='CASCADE'))
+    stop_number     = Column(Integer, default=1)
+    stop_name       = Column(String(100), nullable=False)
+    stop_location   = Column(String(255))
+    arrival_time    = Column(String(10))
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class BusAssignment(Base):
+    """Student assigned to a bus route"""
+    __tablename__ = 'bus_assignments'
+    id              = Column(Integer, primary_key=True)
+    student_id      = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'))
+    route_id        = Column(Integer, ForeignKey('bus_routes.id', ondelete='CASCADE'))
+    pickup_stop_id  = Column(Integer, ForeignKey('bus_stops.id', ondelete='SET NULL'))
+    dropoff_stop_id = Column(Integer, ForeignKey('bus_stops.id', ondelete='SET NULL'))
+    is_active       = Column(Boolean, default=True)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class BusAttendance(Base):
+    """Bus attendance record per trip"""
+    __tablename__ = 'bus_attendance'
+    id              = Column(Integer, primary_key=True)
+    assignment_id   = Column(Integer, ForeignKey('bus_assignments.id', ondelete='CASCADE'))
+    date            = Column(String(20), nullable=False)
+    trip_type       = Column(String(10), default='morning')
+    status          = Column(String(20), default='present')
+    notes           = Column(Text)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+# ── HOSTEL MODULE ─────────────────────────────────────────────────────────────
+
+class Dormitory(Base):
+    """Dormitory"""
+    __tablename__ = 'dormitories'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    name            = Column(String(100), nullable=False)
+    block           = Column(String(10))
+    total_rooms     = Column(Integer)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class Room(Base):
+    """Hostel room"""
+    __tablename__ = 'rooms'
+    id              = Column(Integer, primary_key=True)
+    dormitory_id    = Column(Integer, ForeignKey('dormitories.id', ondelete='CASCADE'))
+    room_number     = Column(String(20), nullable=False)
+    capacity        = Column(Integer, default=2)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class Bed(Base):
+    """Bed in hostel room"""
+    __tablename__ = 'beds'
+    id              = Column(Integer, primary_key=True)
+    room_id         = Column(Integer, ForeignKey('rooms.id', ondelete='CASCADE'))
+    bed_number      = Column(String(10))
+    is_occupied     = Column(Boolean, default=False)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class HostelAllocation(Base):
+    """Student hostel allocation"""
+    __tablename__ = 'hostel_allocations'
+    id              = Column(Integer, primary_key=True)
+    student_id      = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'))
+    bed_id          = Column(Integer, ForeignKey('beds.id', ondelete='CASCADE'))
+    allocation_date = Column(String(20), default=datetime.now)
+    release_date    = Column(String(20))
+    is_active       = Column(Boolean, default=True)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+# ── LEARNING MATERIALS MODULE ────────────────────────────────────────────────
+
+class LearningMaterial(Base):
+    """Learning Material uploaded by teacher"""
+    __tablename__ = 'learning_materials'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    title           = Column(String(255), nullable=False)
+    description     = Column(Text)
+    subject_id      = Column(Integer, ForeignKey('subjects.id', ondelete='SET NULL'))
+    class_id        = Column(Integer, ForeignKey('classes.id', ondelete='SET NULL'))
+    teacher_id      = Column(Integer, ForeignKey('staff.id', ondelete='SET NULL'))
+    file_path       = Column(String(500))
+    file_name       = Column(String(255))
+    file_size       = Column(Integer, default=0)
+    file_type       = Column(String(50))  # pdf, video, pptx, worksheet, notes
+    download_count  = Column(Integer, default=0)
+    is_active       = Column(Boolean, default=True)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class Assignment(Base):
+    """Student Assignment"""
+    __tablename__ = 'assignments'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    title           = Column(String(255), nullable=False)
+    instructions    = Column(Text)
+    subject_id      = Column(Integer, ForeignKey('subjects.id', ondelete='SET NULL'))
+    class_id        = Column(Integer, ForeignKey('classes.id', ondelete='SET NULL'))
+    teacher_id      = Column(Integer, ForeignKey('staff.id', ondelete='SET NULL'))
+    due_date        = Column(String(20))
+    max_score       = Column(Float, default=100)
+    attachment_path = Column(String(500))
+    file_name       = Column(String(255))
+    file_size       = Column(Integer, default=0)
+    download_count  = Column(Integer, default=0)
+    status          = Column(String(50), default='active')  # active, closed
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class AssignmentSubmission(Base):
+    """Student submission for an assignment"""
+    __tablename__ = 'assignment_submissions'
+    id              = Column(Integer, primary_key=True)
+    assignment_id   = Column(Integer, ForeignKey('assignments.id', ondelete='CASCADE'))
+    student_id      = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'))
+    submitted_at    = Column(String(20))
+    file_path       = Column(String(500))
+    content         = Column(Text)
+    score           = Column(Float)
+    teacher_comments= Column(Text)
+    status          = Column(String(50), default='submitted')  # submitted, graded, late, missing
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class LessonPlan(Base):
+    """Lesson Plan"""
+    __tablename__ = 'lesson_plans'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    title           = Column(String(255), nullable=False)
+    subject_id      = Column(Integer, ForeignKey('subjects.id', ondelete='SET NULL'))
+    class_id        = Column(Integer, ForeignKey('classes.id', ondelete='SET NULL'))
+    teacher_id      = Column(Integer, ForeignKey('staff.id', ondelete='SET NULL'))
+    lesson_date     = Column(String(20))
+    duration_minutes= Column(Integer, default=60)
+    objectives      = Column(Text)
+    activities      = Column(Text)
+    resources       = Column(Text)
+    homework        = Column(Text)
+    status          = Column(String(50), default='draft')  # draft, approved, completed
+    file_name       = Column(String(255))
+    file_size       = Column(Integer, default=0)
+    download_count  = Column(Integer, default=0)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class SchemeOfWork(Base):
+    """Scheme of Work"""
+    __tablename__ = 'schemes_of_work'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    subject_id      = Column(Integer, ForeignKey('subjects.id', ondelete='SET NULL'))
+    class_id        = Column(Integer, ForeignKey('classes.id', ondelete='SET NULL'))
+    teacher_id      = Column(Integer, ForeignKey('staff.id', ondelete='SET NULL'))
+    term_id         = Column(Integer, ForeignKey('terms.id', ondelete='SET NULL'))
+    topic           = Column(String(255), nullable=False)
+    subtopic        = Column(String(255))
+    week_number     = Column(Integer)
+    teaching_date   = Column(String(20))
+    status          = Column(String(50), default='pending')  # pending, in_progress, completed
+    file_name       = Column(String(255))
+    file_size       = Column(Integer, default=0)
+    download_count  = Column(Integer, default=0)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class GradeBookEntry(Base):
+    """Gradebook entry for continuous assessment"""
+    __tablename__ = 'gradebook_entries'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    student_id      = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'))
+    subject_id      = Column(Integer, ForeignKey('subjects.id', ondelete='SET NULL'))
+    teacher_id      = Column(Integer, ForeignKey('staff.id', ondelete='SET NULL'))
+    class_id        = Column(Integer, ForeignKey('classes.id', ondelete='SET NULL'))
+    assessment_type = Column(String(100))  # Homework, Quiz, CAT, Midterm, Final, Coursework, Project
+    title           = Column(String(255))
+    score           = Column(Float)
+    max_score       = Column(Float, default=100)
+    comments        = Column(Text)
+    date_recorded   = Column(String(20))
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+# ── ENHANCED EXAM & GRADING ───────────────────────────────────────────────────
+
+class Exam(Base):
+    """Exam with workflow state"""
+    __tablename__ = 'exams'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    term_id         = Column(Integer, ForeignKey('terms.id', ondelete='CASCADE'))
+    subject_id      = Column(Integer, ForeignKey('subjects.id', ondelete='SET NULL'))
+    name            = Column(String(100), nullable=False)
+    exam_type       = Column(String(50))  # midterm, final, unit_test
+    grading_system  = Column(String(50), default='percentage')  # percentage, gpa, cambridge, ib
+    total_marks     = Column(Float, default=100.0)
+    passing_marks   = Column(Float, default=40.0)
+    scheduled_date  = Column(String(20))
+    created_by      = Column(Integer, ForeignKey('staff.id', ondelete='SET NULL'))
+    is_locked       = Column(Boolean, default=False)
+    is_approved     = Column(Boolean, default=False)
+    is_published    = Column(Boolean, default=False)
+    locked_at       = Column(String(20))
+    approved_at     = Column(String(20))
+    published_at    = Column(String(20))
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class ExamMark(Base):
+    """Student exam marks"""
+    __tablename__ = 'exam_marks'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    exam_id         = Column(Integer, ForeignKey('exams.id', ondelete='CASCADE'))
+    student_id      = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'))
+    class_id        = Column(Integer, ForeignKey('classes.id', ondelete='SET NULL'))
+    marks_obtained  = Column(Float)
+    is_absent       = Column(Boolean, default=False)
+    comments        = Column(Text)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+# ── ENHANCED FINANCE ──────────────────────────────────────────────────────────
+
+class Scholarship(Base):
+    """Scholarship"""
+    __tablename__ = 'scholarships'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    student_id      = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'))
+    name            = Column(String(100), nullable=False)
+    percentage      = Column(Float)
+    amount          = Column(Numeric(12, 2))
+    start_date      = Column(String(20), nullable=False)
+    end_date        = Column(String(20))
+    reason          = Column(Text)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class Receipt(Base):
+    """Payment receipt"""
+    __tablename__ = 'receipts'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    payment_id      = Column(Integer, ForeignKey('payments.id', ondelete='CASCADE'))
+    receipt_number  = Column(String(50), nullable=False)
+    receipt_date    = Column(String(20), default=datetime.now)
+    issued_by       = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'))
+    amount          = Column(Numeric(12, 2), nullable=False)
+    payment_method  = Column(String(50))
+    reference_number= Column(String(100))
+    currency        = Column(String(3), default='UGX')
+    email_sent      = Column(Boolean, default=False)
+    email_sent_date = Column(String(20))
+    notes           = Column(Text)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class FinancialReport(Base):
+    """Financial reports"""
+    __tablename__ = 'financial_reports'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    academic_year_id= Column(Integer, ForeignKey('academic_years.id', ondelete='SET NULL'))
+    report_type     = Column(String(50))  # revenue, outstanding, collection, cash_flow, summary
+    generated_date  = Column(String(20), default=datetime.now)
+    generated_by    = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'))
+    period_start    = Column(String(20))
+    period_end      = Column(String(20))
+    total_invoiced  = Column(Numeric(12, 2), default=0)
+    total_collected = Column(Numeric(12, 2), default=0)
+    total_outstanding=Column(Numeric(12, 2), default=0)
+    total_discounts = Column(Numeric(12, 2), default=0)
+    collection_rate = Column(Float)
+    report_data     = Column(Text)  # JSON
+    currency        = Column(String(3), default='UGX')
+    notes           = Column(Text)
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+# ── REPORT CARD & PERFORMANCE ────────────────────────────────────────────────
+
+class ReportCard(Base):
+    """Student Report Card"""
+    __tablename__ = 'report_cards'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    student_id      = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'))
+    term_id         = Column(Integer, ForeignKey('terms.id', ondelete='CASCADE'))
+    class_teacher_id= Column(Integer, ForeignKey('staff.id', ondelete='SET NULL'))
+    teacher_comment = Column(Text)
+    head_teacher_comment = Column(Text)
+    principal_comment= Column(Text)
+    conduct         = Column(String(50))  # Excellent, Good, Fair, Poor
+    attendance_days = Column(Integer)
+    days_present    = Column(Integer)
+    position_in_class=Column(Integer)
+    total_students  = Column(Integer)
+    overall_average = Column(Float)
+    status          = Column(String(50), default='draft')  # draft, submitted, approved, published
+    submitted_at    = Column(String(20))
+    approved_at     = Column(String(20))
+    approved_by_id  = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'))
+    generated_at    = Column(String(20))
+    created_at      = Column(DateTime, default=datetime.now)
+
+
+class Subscription(Base):
+    """Subscription for recurring payments"""
+    __tablename__ = 'subscriptions'
+    id              = Column(Integer, primary_key=True)
+    school_id       = Column(Integer, ForeignKey('schools.id', ondelete='CASCADE'))
+    student_id      = Column(Integer, ForeignKey('students.id', ondelete='CASCADE'))
+    service_name    = Column(String(100), nullable=False)
+    amount          = Column(Numeric(12, 2), nullable=False)
+    frequency       = Column(String(50))  # monthly, quarterly, annual
+    start_date      = Column(String(20))
+    end_date        = Column(String(20))
+    is_active       = Column(Boolean, default=True)
+    created_at      = Column(DateTime, default=datetime.now)

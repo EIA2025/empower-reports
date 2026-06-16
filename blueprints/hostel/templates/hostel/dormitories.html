@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}Dormitories{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Dormitories</h1>
+    <a href="{{ url_for('hostel.add_dormitory') }}" class="btn btn-success mb-3">+ Add Dormitory</a>
+    
+    {% if dormitories %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Block</th>
+                        <th>Rooms</th>
+                        <th>Total Beds</th>
+                        <th>Occupied Beds</th>
+                        <th>Occupancy Rate</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dorm in dormitories %}
+                        <tr>
+                            <td>{{ dorm.name }}</td>
+                            <td>{{ dorm.block }}</td>
+                            <td>{{ dorm.rooms_created or 0 }}</td>
+                            <td>{{ dorm.total_beds or 0 }}</td>
+                            <td>{{ dorm.occupied_beds or 0 }}</td>
+                            <td>{% if dorm.total_beds %}{{ '%.0f' % ((dorm.occupied_beds or 0) / dorm.total_beds * 100) }}%{% else %}N/A{% endif %}</td>
+                            <td><a href="{{ url_for('hostel.dormitory_detail', dorm_id=dorm.id) }}" class="btn btn-sm btn-info">View</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="text-muted">No dormitories found.</p>
+    {% endif %}
+</div>
+{% endblock %}

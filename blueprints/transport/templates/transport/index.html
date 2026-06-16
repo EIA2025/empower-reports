@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Transport Management{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Transport Management</h1>
+    <div class="alert alert-info">
+        <strong>Transport Module:</strong> Manage bus routes, drivers, student assignments, and attendance.
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header"><h5>Bus Routes</h5></div>
+                <div class="card-body">
+                    <a href="{{ url_for('transport.routes') }}" class="btn btn-primary">View Routes</a>
+                    <a href="{{ url_for('transport.add_route') }}" class="btn btn-success">Add Route</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header"><h5>Buses & Drivers</h5></div>
+                <div class="card-body">
+                    <a href="{{ url_for('transport.buses') }}" class="btn btn-primary">View Buses</a>
+                    <a href="{{ url_for('transport.drivers') }}" class="btn btn-primary">View Drivers</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

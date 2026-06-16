@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Add Condition - {{ student.name }}{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Add Medical Condition for {{ student.name }}</h1>
+    <a href="{{ url_for('health.student_health_profile', student_id=student.id) }}" class="btn btn-secondary mb-3">Back</a>
+    
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" class="needs-validation">
+                <div class="mb-3">
+                    <label class="form-label">Condition</label>
+                    <input type="text" class="form-control" name="condition" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Diagnosed Date</label>
+                    <input type="date" class="form-control" name="diagnosed_date">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" name="description" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Medication</label>
+                    <textarea class="form-control" name="medication" rows="2"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Restrictions</label>
+                    <textarea class="form-control" name="restrictions" rows="2"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Notes</label>
+                    <textarea class="form-control" name="notes" rows="2"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Condition</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

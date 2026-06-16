@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Health Management{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Health Management</h1>
+    <div class="alert alert-info">
+        <strong>Health Module:</strong> Manage student health records, allergies, medical conditions, vaccinations, clinic visits, and medications.
+    </div>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Student Health Records</h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" class="mb-3">
+                        <div class="input-group">
+                            <input type="text" name="q" class="form-control" placeholder="Search students..." value="{{ search or '' }}">
+                            <button class="btn btn-primary" type="submit">Search</button>
+                        </div>
+                    </form>
+                    <a href="{{ url_for('health.students') }}" class="btn btn-primary mb-3">View All Students</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
