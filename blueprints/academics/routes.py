@@ -268,7 +268,7 @@ def marks():
         subject = request.args.get('subject', '')
 
         classes = db.execute(text(
-            "SELECT DISTINCT class_name FROM students WHERE school_id=:sid AND status='active' ORDER BY class_name"
+            "SELECT DISTINCT class_name FROM students WHERE school_id=:sid AND enrolment_status='active' ORDER BY class_name"
         ), {'sid': school_id}).fetchall()
 
         # Teacher sees only their subjects
@@ -286,7 +286,7 @@ def marks():
 
         if term_id and class_name:
             students = db.execute(text(
-                "SELECT id, first_name, last_name, student_number FROM students WHERE school_id=:sid AND class_name=:cn AND status='active' ORDER BY last_name, first_name"
+                "SELECT id, name, admission_number FROM students WHERE school_id=:sid AND class_name=:cn AND enrolment_status='active' ORDER BY name"
             ), {'sid': school_id, 'cn': class_name}).fetchall()
 
             all_marks = db.execute(text(
@@ -409,7 +409,7 @@ def attendance():
         att_date = request.args.get('date', date.today().isoformat())
 
         classes = db.execute(text(
-            "SELECT DISTINCT class_name FROM students WHERE school_id=:sid AND status='active' ORDER BY class_name"
+            "SELECT DISTINCT class_name FROM students WHERE school_id=:sid AND enrolment_status='active' ORDER BY class_name"
         ), {'sid': school_id}).fetchall()
 
         students = []
@@ -417,7 +417,7 @@ def attendance():
 
         if class_name and term_id:
             students = db.execute(text(
-                "SELECT id, first_name, last_name, student_number FROM students WHERE school_id=:sid AND class_name=:cn AND status='active' ORDER BY last_name, first_name"
+                "SELECT id, name, admission_number FROM students WHERE school_id=:sid AND class_name=:cn AND enrolment_status='active' ORDER BY name"
             ), {'sid': school_id, 'cn': class_name}).fetchall()
 
             att_rows = db.execute(text(
@@ -505,7 +505,7 @@ def behaviour():
         class_name = request.args.get('class_name', '')
 
         classes = db.execute(text(
-            "SELECT DISTINCT class_name FROM students WHERE school_id=:sid AND status='active' ORDER BY class_name"
+            "SELECT DISTINCT class_name FROM students WHERE school_id=:sid AND enrolment_status='active' ORDER BY class_name"
         ), {'sid': school_id}).fetchall()
 
         components = db.execute(text(
@@ -517,7 +517,7 @@ def behaviour():
 
         if class_name and term_id:
             students = db.execute(text(
-                "SELECT id, first_name, last_name, student_number FROM students WHERE school_id=:sid AND class_name=:cn AND status='active' ORDER BY last_name, first_name"
+                "SELECT id, name, admission_number FROM students WHERE school_id=:sid AND class_name=:cn AND enrolment_status='active' ORDER BY name"
             ), {'sid': school_id, 'cn': class_name}).fetchall()
 
             b_rows = db.execute(text(
@@ -685,13 +685,13 @@ def reports():
         class_name = request.args.get('class_name', '')
 
         classes = db.execute(text(
-            "SELECT DISTINCT class_name FROM students WHERE school_id=:sid AND status='active' ORDER BY class_name"
+            "SELECT DISTINCT class_name FROM students WHERE school_id=:sid AND enrolment_status='active' ORDER BY class_name"
         ), {'sid': school_id}).fetchall()
 
         students = []
         if class_name and term_id:
             students = db.execute(text(
-                "SELECT s.*, (SELECT COUNT(*) FROM marks m WHERE m.student_id=s.id AND m.term_id=:tid) AS subject_count FROM students s WHERE s.school_id=:sid AND s.class_name=:cn AND s.status='active' ORDER BY s.last_name, s.first_name"
+                "SELECT s.*, (SELECT COUNT(*) FROM marks m WHERE m.student_id=s.id AND m.term_id=:tid) AS subject_count FROM students s WHERE s.school_id=:sid AND s.class_name=:cn AND s.enrolment_status='active' ORDER BY s.name"
             ), {'sid': school_id, 'tid': term_id, 'cn': class_name}).fetchall()
 
         return render_template('academics/reports.html',
