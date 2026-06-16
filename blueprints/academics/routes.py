@@ -48,7 +48,7 @@ def terms():
         """), {'sid': school_id}).fetchall()
 
         years = db.execute(text(
-            "SELECT * FROM academic_years WHERE school_id=:sid ORDER BY year_label DESC"
+            "SELECT * FROM academic_years WHERE school_id=:sid ORDER BY name DESC"
         ), {'sid': school_id}).fetchall()
 
         return render_template('academics/terms.html', terms=rows, years=years)
