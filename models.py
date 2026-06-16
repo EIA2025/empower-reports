@@ -21,10 +21,16 @@ class School(Base):
     email           = Column(String(100))
     website         = Column(String(150))
     logo_data       = Column(Text)          # base64 PNG stored in DB
+    motto           = Column(String(300))
     primary_color   = Column(String(20), default='#1e3a8a')
     report_footer   = Column(Text)
     country         = Column(String(100))
     currency        = Column(String(10), default='UGX')
+    plan            = Column(String(50), default='trial')
+    plan_expires    = Column(String(20))
+    max_students    = Column(Integer, default=500)
+    max_staff       = Column(Integer, default=50)
+    notes           = Column(Text)
     is_active       = Column(Boolean, default=True)
     created_at      = Column(DateTime, default=datetime.now)
 
@@ -454,3 +460,25 @@ class Event(Base):
     target_classes  = Column(String(500))   # 'all' or comma list
     is_public       = Column(Boolean, default=True)
     created_at      = Column(DateTime, default=datetime.now)
+
+
+# ── SYSTEM TABLES ─────────────────────────────────────────────────────────────
+
+class SystemAnnouncement(Base):
+    __tablename__ = 'system_announcements'
+    id          = Column(Integer, primary_key=True)
+    created_by  = Column(Integer)
+    title       = Column(String(300), nullable=False)
+    body        = Column(Text)
+    target      = Column(String(50), default='all')   # all|admin|teacher
+    is_active   = Column(Boolean, default=True)
+    expires_at  = Column(String(20))
+    created_at  = Column(DateTime, default=datetime.now)
+
+
+class SystemSetting(Base):
+    __tablename__ = 'system_settings'
+    id         = Column(Integer, primary_key=True)
+    key        = Column(String(100), unique=True, nullable=False)
+    value      = Column(Text)
+    updated_at = Column(DateTime, default=datetime.now)

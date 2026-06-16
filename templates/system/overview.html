@@ -8,27 +8,28 @@
   </a>
 </div>
 
+<!-- Stats -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
-    <div class="card shadow-sm text-center p-3 border-primary">
+    <div class="card shadow-sm text-center p-3 border-top border-primary border-3">
       <div class="fs-2 fw-bold text-primary">{{ schools|length }}</div>
       <div class="small text-muted">Total Schools</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card shadow-sm text-center p-3 border-success">
+    <div class="card shadow-sm text-center p-3 border-top border-success border-3">
       <div class="fs-2 fw-bold text-success">{{ active_schools }}</div>
-      <div class="small text-muted">Active</div>
+      <div class="small text-muted">Active Schools</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card shadow-sm text-center p-3 border-info">
+    <div class="card shadow-sm text-center p-3 border-top border-info border-3">
       <div class="fs-2 fw-bold text-info">{{ total_students }}</div>
       <div class="small text-muted">Total Students</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card shadow-sm text-center p-3 border-warning">
+    <div class="card shadow-sm text-center p-3 border-top border-warning border-3">
       <div class="fs-2 fw-bold text-warning">{{ total_users }}</div>
       <div class="small text-muted">Total Users</div>
     </div>
@@ -36,37 +37,48 @@
 </div>
 
 {% if announcements %}
-<div class="alert alert-info mb-4">
-  <strong><i class="bi bi-megaphone me-1"></i>Latest Announcement:</strong>
-  {{ announcements[0].title }}
+<div class="alert alert-info d-flex align-items-center mb-4">
+  <i class="bi bi-megaphone-fill me-2 fs-5"></i>
+  <div><strong>{{ announcements[0].title }}</strong>
+    {% if announcements[0].body %} — {{ announcements[0].body[:100] }}{% endif %}
+  </div>
+  <a href="{{ url_for('system.announcements') }}" class="ms-auto btn btn-sm btn-outline-info">All</a>
 </div>
 {% endif %}
 
-<div class="card shadow-sm">
+<!-- Schools table -->
+<div class="card shadow-sm mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <strong>Schools</strong>
+    <strong>All Schools</strong>
     <a href="{{ url_for('system.schools') }}" class="btn btn-sm btn-outline-primary">View All</a>
   </div>
   <div class="card-body p-0">
     <table class="table table-hover mb-0">
       <thead class="table-light">
-        <tr><th>School</th><th>Students</th><th>Staff</th><th>Status</th><th class="text-end">Actions</th></tr>
+        <tr><th>School</th><th>Contact</th><th>Plan</th><th>Status</th><th class="text-end">Actions</th></tr>
       </thead>
       <tbody>
       {% for s in schools %}
       <tr>
         <td>
           <strong>{{ s.name }}</strong>
-          {% if s.email %}<br><small class="text-muted">{{ s.email }}</small>{% endif %}
+          {% if s.subtitle %}<br><small class="text-muted fst-italic">{{ s.subtitle }}</small>{% endif %}
         </td>
-        <td>{{ s.student_count if s.student_count is defined else '—' }}</td>
-        <td>{{ s.staff_count if s.staff_count is defined else '—' }}</td>
+        <td>
+          {% if s.email %}<div class="small">{{ s.email }}</div>{% endif %}
+          {% if s.phone %}<div class="small text-muted">{{ s.phone }}</div>{% endif %}
+        </td>
+        <td>
+          {% if s.plan %}<span class="badge bg-info">{{ s.plan|title }}</span>{% else %}—{% endif %}
+        </td>
         <td>
           {% if s.is_active %}<span class="badge bg-success">Active</span>
           {% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
         </td>
         <td class="text-end">
-          <a href="{{ url_for('system.school_detail', school_id=s.id) }}" class="btn btn-sm btn-outline-primary">Manage</a>
+          <a href="{{ url_for('system.school_detail', school_id=s.id) }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-gear me-1"></i>Manage
+          </a>
         </td>
       </tr>
       {% else %}
@@ -82,23 +94,27 @@
   </div>
 </div>
 
+<!-- Recent Activity -->
 {% if recent_logs %}
-<div class="card shadow-sm mt-4">
-  <div class="card-header d-flex justify-content-between">
+<div class="card shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center">
     <strong>Recent Activity</strong>
-    <a href="{{ url_for('system.audit_logs') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+    <a href="{{ url_for('system.audit_logs') }}" class="btn btn-sm btn-outline-secondary">Full Log</a>
   </div>
   <div class="card-body p-0">
     <table class="table table-sm mb-0">
+      <thead class="table-light">
+        <tr><th>Time</th><th>Action</th><th>User</th><th>School</th></tr>
+      </thead>
       <tbody>
-      {% for a in recent_logs %}
+      {% for log in recent_logs %}
       <tr>
-        <td class="text-muted small" style="width:160px">
-          {{ a.timestamp.strftime('%d %b %Y %H:%M') if a.timestamp else '' }}
+        <td class="text-muted small text-nowrap">
+          {{ log.timestamp.strftime('%d %b %H:%M') if log.timestamp else '—' }}
         </td>
-        <td>{{ a.action }}</td>
-        <td class="text-muted small">{{ a.user_name or '—' }}</td>
-        <td class="text-muted small">{{ a.school_name or 'System' }}</td>
+        <td class="small">{{ log.action or '—' }}</td>
+        <td class="small text-muted">{{ log.user_name or '—' }}</td>
+        <td class="small text-muted">{{ log.school_name or 'System' }}</td>
       </tr>
       {% endfor %}
       </tbody>

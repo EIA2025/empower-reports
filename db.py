@@ -109,6 +109,26 @@ def _create_tables(cur):
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""")
 
+    # Add missing columns to schools table (safe migration)
+    for col_sql in [
+        "ALTER TABLE schools ADD COLUMN IF NOT EXISTS motto VARCHAR(300)",
+        "ALTER TABLE schools ADD COLUMN IF NOT EXISTS plan VARCHAR(50) DEFAULT 'trial'",
+        "ALTER TABLE schools ADD COLUMN IF NOT EXISTS plan_expires VARCHAR(20)",
+        "ALTER TABLE schools ADD COLUMN IF NOT EXISTS max_students INTEGER DEFAULT 500",
+        "ALTER TABLE schools ADD COLUMN IF NOT EXISTS max_staff INTEGER DEFAULT 50",
+        "ALTER TABLE schools ADD COLUMN IF NOT EXISTS notes TEXT",
+        "ALTER TABLE system_users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(200)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_pw BOOLEAN DEFAULT false",
+    ]:
+        try:
+            cur.execute(col_sql)
+        except Exception:
+            pass
+
+
+
     cur.execute("""
     CREATE TABLE IF NOT EXISTS system_users (
         id SERIAL PRIMARY KEY,
