@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block title %}System Admin Dashboard{% endblock %}
+{% block content %}
+
+<div class="container-fluid">
+  <h2 class="fw-bold mb-4"><i class="bi bi-gear me-2"></i>System Administrator Dashboard</h2>
+
+  <!-- System Statistics -->
+  <div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card">
+        <div class="card-body text-center">
+          <i class="bi bi-building text-primary" style="font-size: 2rem;"></i>
+          <h2 class="mt-3">{{ total_schools }}</h2>
+          <p class="text-muted mb-0">Schools</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card">
+        <div class="card-body text-center">
+          <i class="bi bi-people text-success" style="font-size: 2rem;"></i>
+          <h2 class="mt-3">{{ total_users }}</h2>
+          <p class="text-muted mb-0">Users</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card">
+        <div class="card-body text-center">
+          <i class="bi bi-mortarboard text-info" style="font-size: 2rem;"></i>
+          <h2 class="mt-3">{{ total_students }}</h2>
+          <p class="text-muted mb-0">Students</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card">
+        <div class="card-body text-center">
+          <i class="bi bi-person-fill text-warning" style="font-size: 2rem;"></i>
+          <h2 class="mt-3">{{ total_teachers }}</h2>
+          <p class="text-muted mb-0">Teachers</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Schools List -->
+  <div class="row mb-4">
+    <div class="col">
+      <div class="card">
+        <div class="card-header">
+          <h6 class="mb-0">Recent Schools</h6>
+        </div>
+        <div class="card-body">
+          {% if schools %}
+          <div class="table-responsive">
+            <table class="table table-sm">
+              <thead class="table-light">
+                <tr><th>School Name</th><th>Users</th><th>Students</th><th>Actions</th></tr>
+              </thead>
+              <tbody>
+              {% for school in schools %}
+                <tr>
+                  <td>{{ school.name }}</td>
+                  <td>{{ school.user_count or 0 }}</td>
+                  <td>{{ school.student_count or 0 }}</td>
+                  <td><a href="/system/schools/{{ school.id }}/edit" class="btn btn-sm btn-outline-primary">Edit</a></td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <a href="/system/schools" class="btn btn-sm btn-primary mt-2">View All Schools</a>
+          {% else %}
+          <p class="text-muted">No schools created yet</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Users -->
+  <div class="row">
+    <div class="col">
+      <div class="card">
+        <div class="card-header">
+          <h6 class="mb-0">Recent Users</h6>
+        </div>
+        <div class="card-body">
+          {% if recent_users %}
+          <ul class="list-unstyled">
+          {% for user in recent_users %}
+            <li class="mb-2 pb-2 border-bottom">
+              <strong>{{ user.name }}</strong><br>
+              <small class="text-muted">{{ user.email }}</small>
+            </li>
+          {% endfor %}
+          </ul>
+          {% else %}
+          <p class="text-muted">No users yet</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

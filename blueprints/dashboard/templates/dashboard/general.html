@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+
+<div class="container-fluid">
+  <div class="alert alert-info">
+    <h4><i class="bi bi-info-circle me-2"></i>Welcome</h4>
+    <p>Your user role has not been assigned yet. Please contact your administrator to assign a role to your account.</p>
+  </div>
+
+  <div class="row">
+    <div class="col">
+      <div class="card">
+        <div class="card-body">
+          <h5>Available Resources</h5>
+          <ul>
+            <li><a href="/communications/inbox">Messages</a></li>
+            <li><a href="/people/profile">My Profile</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,183 @@
+<!-- Role-Based Navigation Menu -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+  <div class="container-fluid">
+    <!-- Brand/Logo -->
+    <a class="navbar-brand fw-bold" href="{{ url_for('dashboard.index') }}">
+      <i class="bi bi-mortarboard me-2"></i>
+      {% if session.get('school_name') %}{{ session.get('school_name') }}{% else %}Empower Reports{% endif %}
+    </a>
+
+    <!-- Toggler for mobile -->
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <!-- Navigation items -->
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+
+        <!-- SYSTEM ADMIN MENU -->
+        {% if session.role|lower == 'master' %}
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard.master_admin_dashboard') }}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="/system/schools"><i class="bi bi-building me-1"></i>Schools</a></li>
+        <li class="nav-item"><a class="nav-link" href="/system/users"><i class="bi bi-people me-1"></i>Users</a></li>
+        <li class="nav-item"><a class="nav-link" href="/system/audit-logs"><i class="bi bi-clock-history me-1"></i>Audit Logs</a></li>
+
+        <!-- SCHOOL ADMIN MENU -->
+        {% elif session.role|lower == 'admin' %}
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard.admin_dashboard') }}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="academicsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-book me-1"></i>Academics
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="academicsDropdown">
+            <li><a class="dropdown-item" href="/academics/terms"><i class="bi bi-calendar me-1"></i>Terms</a></li>
+            <li><a class="dropdown-item" href="/people/classes"><i class="bi bi-door-open me-1"></i>Classes</a></li>
+            <li><a class="dropdown-item" href="/people/subjects"><i class="bi bi-bookmark me-1"></i>Subjects</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="/academics/timetable"><i class="bi bi-calendar2-week me-1"></i>Timetable</a></li>
+          </ul>
+        </li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="staffDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-person-badge me-1"></i>Staff
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="staffDropdown">
+            <li><a class="dropdown-item" href="/people/teachers"><i class="bi bi-person-check me-1"></i>Teachers</a></li>
+            <li><a class="dropdown-item" href="/people/users"><i class="bi bi-people me-1"></i>Users</a></li>
+          </ul>
+        </li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="studentDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-mortarboard me-1"></i>Students
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="studentDropdown">
+            <li><a class="dropdown-item" href="/people/students"><i class="bi bi-person-lines-fill me-1"></i>All Students</a></li>
+            <li><a class="dropdown-item" href="/academics/results"><i class="bi bi-graph-up me-1"></i>Results</a></li>
+          </ul>
+        </li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="operationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-gear me-1"></i>Operations
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="operationsDropdown">
+            <li><a class="dropdown-item" href="/health/students"><i class="bi bi-heart-pulse me-1"></i>Health</a></li>
+            <li><a class="dropdown-item" href="/transport/routes"><i class="bi bi-bus-front me-1"></i>Transport</a></li>
+            <li><a class="dropdown-item" href="/hostel/dormitories"><i class="bi bi-house me-1"></i>Hostel</a></li>
+            <li><a class="dropdown-item" href="/library/books"><i class="bi bi-book me-1"></i>Library</a></li>
+          </ul>
+        </li>
+        <li class="nav-item"><a class="nav-link" href="/finance/invoices"><i class="bi bi-cash-coin me-1"></i>Finance</a></li>
+        <li class="nav-item"><a class="nav-link" href="/system/overview"><i class="bi bi-gear me-1"></i>Settings</a></li>
+
+        <!-- TEACHER MENU -->
+        {% elif session.role|lower == 'teacher' %}
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard.teacher_dashboard') }}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="teacherAcademicsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-book me-1"></i>Academics
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="teacherAcademicsDropdown">
+            <li><a class="dropdown-item" href="/academics/marks"><i class="bi bi-pencil-square me-1"></i>Grade Students</a></li>
+            <li><a class="dropdown-item" href="/academics/terms"><i class="bi bi-calendar me-1"></i>Terms</a></li>
+            <li><a class="dropdown-item" href="/people/classes"><i class="bi bi-door-open me-1"></i>My Classes</a></li>
+          </ul>
+        </li>
+        <li class="nav-item"><a class="nav-link" href="/materials/materials"><i class="bi bi-file-earmark-pdf me-1"></i>Materials</a></li>
+        <li class="nav-item"><a class="nav-link" href="/materials/assignments"><i class="bi bi-clipboard-check me-1"></i>Assignments</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="teacherPlanningDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-pencil me-1"></i>Planning
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="teacherPlanningDropdown">
+            <li><a class="dropdown-item" href="/materials/lesson-plans"><i class="bi bi-diagram-3 me-1"></i>Lesson Plans</a></li>
+            <li><a class="dropdown-item" href="/materials/schemes"><i class="bi bi-list-check me-1"></i>Schemes of Work</a></li>
+          </ul>
+        </li>
+        <li class="nav-item"><a class="nav-link" href="/communications/inbox"><i class="bi bi-chat-left-text me-1"></i>Messages</a></li>
+
+        <!-- STUDENT MENU -->
+        {% elif session.role|lower == 'student' %}
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard.student_dashboard') }}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="studentAcademicsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-book me-1"></i>Academics
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="studentAcademicsDropdown">
+            <li><a class="dropdown-item" href="/academics/results"><i class="bi bi-graph-up me-1"></i>My Results</a></li>
+            <li><a class="dropdown-item" href="/academics/timetable"><i class="bi bi-calendar2-week me-1"></i>Timetable</a></li>
+            <li><a class="dropdown-item" href="/academics/attendance"><i class="bi bi-clipboard-check me-1"></i>Attendance</a></li>
+          </ul>
+        </li>
+        <li class="nav-item"><a class="nav-link" href="/materials/materials"><i class="bi bi-file-earmark-pdf me-1"></i>Materials</a></li>
+        <li class="nav-item"><a class="nav-link" href="/materials/assignments"><i class="bi bi-clipboard-check me-1"></i>Assignments</a></li>
+        <li class="nav-item"><a class="nav-link" href="/finance/my-fees"><i class="bi bi-cash-coin me-1"></i>My Fees</a></li>
+        <li class="nav-item"><a class="nav-link" href="/communications/inbox"><i class="bi bi-chat-left-text me-1"></i>Messages</a></li>
+
+        <!-- PARENT MENU -->
+        {% elif session.role|lower == 'parent' %}
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard.parent_dashboard') }}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="/people/students"><i class="bi bi-mortarboard me-1"></i>My Children</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="parentChildrenDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-graph-up me-1"></i>Progress
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="parentChildrenDropdown">
+            <li><a class="dropdown-item" href="/academics/results"><i class="bi bi-bar-chart me-1"></i>Results</a></li>
+            <li><a class="dropdown-item" href="/academics/attendance"><i class="bi bi-calendar-check me-1"></i>Attendance</a></li>
+            <li><a class="dropdown-item" href="/finance/my-fees"><i class="bi bi-cash-coin me-1"></i>Fees</a></li>
+          </ul>
+        </li>
+        <li class="nav-item"><a class="nav-link" href="/health/students"><i class="bi bi-heart-pulse me-1"></i>Health</a></li>
+        <li class="nav-item"><a class="nav-link" href="/communications/inbox"><i class="bi bi-chat-left-text me-1"></i>Messages</a></li>
+
+        <!-- ACCOUNTANT/BURSAR MENU -->
+        {% elif session.role|lower in ['accountant', 'bursar'] %}
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard.accountant_dashboard') }}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="financeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-cash-coin me-1"></i>Finance
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="financeDropdown">
+            <li><a class="dropdown-item" href="/finance/invoices"><i class="bi bi-file-earmark-text me-1"></i>Invoices</a></li>
+            <li><a class="dropdown-item" href="/finance/payments"><i class="bi bi-credit-card me-1"></i>Payments</a></li>
+            <li><a class="dropdown-item" href="/finance/receipts"><i class="bi bi-receipt me-1"></i>Receipts</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="/finance/reports"><i class="bi bi-graph-up me-1"></i>Reports</a></li>
+          </ul>
+        </li>
+        <li class="nav-item"><a class="nav-link" href="/people/students"><i class="bi bi-mortarboard me-1"></i>Students</a></li>
+
+        <!-- LIBRARIAN MENU -->
+        {% elif session.role|lower == 'librarian' %}
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard.librarian_dashboard') }}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="libraryDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-book me-1"></i>Library
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="libraryDropdown">
+            <li><a class="dropdown-item" href="/library/books"><i class="bi bi-book me-1"></i>Books</a></li>
+            <li><a class="dropdown-item" href="/library/borrowings"><i class="bi bi-arrow-left-right me-1"></i>Borrowings</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="/library/reports"><i class="bi bi-graph-up me-1"></i>Reports</a></li>
+          </ul>
+        </li>
+
+        {% endif %}
+
+        <!-- PROFILE & LOGOUT (All users) -->
+        <li class="nav-item dropdown ms-lg-2">
+          <a class="nav-link dropdown-toggle" href="#" id="profileDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-person-circle me-1"></i>{{ session.get('user_name', 'User') }}
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="profileDropdown">
+            <li><a class="dropdown-item" href="/people/profile"><i class="bi bi-gear me-1"></i>Profile Settings</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="/auth/logout"><i class="bi bi-box-arrow-right me-1"></i>Logout</a></li>
+          </ul>
+        </li>
+
+      </ul>
+    </div>
+  </div>
+</nav>

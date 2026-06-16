@@ -40,11 +40,11 @@ def terms():
     db = SessionLocal()
     try:
         rows = db.execute(text("""
-            SELECT t.*, ay.year_label
+            SELECT t.*, ay.name as year_label
             FROM terms t
             LEFT JOIN academic_years ay ON ay.id = t.academic_year_id
             WHERE t.school_id = :sid
-            ORDER BY ay.year_label DESC, t.term_number ASC
+            ORDER BY ay.name DESC, t.term_number ASC
         """), {'sid': school_id}).fetchall()
 
         years = db.execute(text(
@@ -67,23 +67,23 @@ def add_term():
     db = SessionLocal()
     try:
         years = db.execute(text(
-            "SELECT * FROM academic_years WHERE school_id=:sid ORDER BY year_label DESC"
+            "SELECT * FROM academic_years WHERE school_id=:sid ORDER BY name DESC"
         ), {'sid': school_id}).fetchall()
 
         if request.method == 'POST':
             # Create academic year if needed
-            year_label = request.form.get('year_label', '').strip()
+            year_name = request.form.get('year_label', '').strip()
             ay = db.execute(text(
-                "SELECT id FROM academic_years WHERE school_id=:sid AND year_label=:y"
-            ), {'sid': school_id, 'y': year_label}).fetchone()
+                "SELECT id FROM academic_years WHERE school_id=:sid AND name=:y"
+            ), {'sid': school_id, 'y': year_name}).fetchone()
             if not ay:
                 db.execute(text(
-                    "INSERT INTO academic_years (school_id, year_label) VALUES (:sid, :y)"
-                ), {'sid': school_id, 'y': year_label})
+                    "INSERT INTO academic_years (school_id, name) VALUES (:sid, :y)"
+                ), {'sid': school_id, 'y': year_name})
                 db.commit()
                 ay = db.execute(text(
-                    "SELECT id FROM academic_years WHERE school_id=:sid AND year_label=:y"
-                ), {'sid': school_id, 'y': year_label}).fetchone()
+                    "SELECT id FROM academic_years WHERE school_id=:sid AND name=:y"
+                ), {'sid': school_id, 'y': year_name}).fetchone()
 
             # Deactivate all if setting active
             is_active = bool(request.form.get('is_active'))
@@ -126,14 +126,14 @@ def edit_term(term_id):
     db = SessionLocal()
     try:
         term = db.execute(text(
-            "SELECT t.*, ay.year_label FROM terms t LEFT JOIN academic_years ay ON ay.id=t.academic_year_id WHERE t.id=:tid AND t.school_id=:sid"
+            "SELECT t.*, ay.name as year_label FROM terms t LEFT JOIN academic_years ay ON ay.id=t.academic_year_id WHERE t.id=:tid AND t.school_id=:sid"
         ), {'tid': term_id, 'sid': school_id}).fetchone()
         if not term:
             flash('Term not found.', 'danger')
             return redirect(url_for('academics.terms'))
 
         years = db.execute(text(
-            "SELECT * FROM academic_years WHERE school_id=:sid ORDER BY year_label DESC"
+            "SELECT * FROM academic_years WHERE school_id=:sid ORDER BY name DESC"
         ), {'sid': school_id}).fetchall()
 
         if request.method == 'POST':
@@ -832,7 +832,7 @@ def generate_report_pdf(student_id):
         ), {'stid': student_id, 'tid': term_id}).fetchall()
 
         term = db.execute(text(
-            "SELECT t.*, ay.year_label FROM terms t LEFT JOIN academic_years ay ON ay.id=t.academic_year_id WHERE t.id=:tid"
+            "SELECT t.*, ay.name as year_label FROM terms t LEFT JOIN academic_years ay ON ay.id=t.academic_year_id WHERE t.id=:tid"
         ), {'tid': term_id}).fetchone()
 
         school = db.execute(text("SELECT * FROM schools WHERE id=:sid"), {'sid': school_id}).fetchone()

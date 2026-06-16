@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% block title %}Student Dashboard{% endblock %}
+{% block content %}
+
+<div class="container-fluid">
+  <!-- Welcome Section -->
+  <div class="row mb-4">
+    <div class="col">
+      <h2 class="fw-bold"><i class="bi bi-mortarboard me-2"></i>Welcome, {{ student.name if student else 'Student' }}!</h2>
+      {% if current_term %}<p class="text-muted">{{ current_term.name }} - {{ current_term.academic_year_id }}</p>{% endif %}
+    </div>
+  </div>
+
+  <!-- Quick Stats -->
+  <div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <h5 class="card-title text-muted">Attendance</h5>
+          <h2 class="text-success">{{ attendance_percentage }}%</h2>
+          <small class="text-muted">Current Term</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <h5 class="card-title text-muted">Pending Assignments</h5>
+          <h2 class="text-primary">{{ pending_assignments|length }}</h2>
+          <small class="text-muted">To Submit</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <h5 class="card-title text-muted">Fee Balance</h5>
+          <h2 class="text-danger">{{ fees_balance }}</h2>
+          <small class="text-muted">Outstanding</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <h5 class="card-title text-muted">Recent Grades</h5>
+          <h2 class="text-info">{{ latest_results|length }}</h2>
+          <small class="text-muted">Results Available</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="row">
+    <!-- Latest Results -->
+    <div class="col-lg-6 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-light">
+          <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Latest Grades</h5>
+        </div>
+        <div class="card-body">
+          {% if latest_results %}
+          <div class="table-responsive">
+            <table class="table table-sm">
+              <thead class="table-light">
+                <tr><th>Subject</th><th>Marks</th><th>Grade</th></tr>
+              </thead>
+              <tbody>
+              {% for result in latest_results[:5] %}
+                <tr>
+                  <td>{{ result.subject_name }}</td>
+                  <td>{{ result.marks }}/{{ result.max_marks }}</td>
+                  <td><span class="badge bg-primary">{{ result.grade }}</span></td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <a href="/academics/results" class="btn btn-sm btn-outline-primary mt-2">View All Results</a>
+          {% else %}
+          <p class="text-muted">No grades yet</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Pending Assignments -->
+    <div class="col-lg-6 mb-4">
+      <div class="card h-100">
+        <div class="card-header bg-light">
+          <h5 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>Pending Assignments</h5>
+        </div>
+        <div class="card-body">
+          {% if pending_assignments %}
+          <div class="list-group">
+          {% for assignment in pending_assignments[:5] %}
+            <a href="/materials/assignments/{{ assignment.id }}" class="list-group-item list-group-item-action">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <h6 class="mb-0">{{ assignment.name }}</h6>
+                  <small class="text-muted">{{ assignment.subject_name }}</small>
+                </div>
+                <small class="badge bg-warning">Due: {{ assignment.due_date }}</small>
+              </div>
+            </a>
+          {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted">No pending assignments</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Links -->
+  <div class="row">
+    <div class="col">
+      <div class="card">
+        <div class="card-header bg-light">
+          <h5 class="mb-0"><i class="bi bi-link-45deg me-2"></i>Quick Links</h5>
+        </div>
+        <div class="card-body">
+          <a href="/academics/results" class="btn btn-sm btn-outline-primary me-2 mb-2"><i class="bi bi-graph-up me-1"></i>My Results</a>
+          <a href="/academic/timetable" class="btn btn-sm btn-outline-primary me-2 mb-2"><i class="bi bi-calendar-week me-1"></i>Timetable</a>
+          <a href="/materials/materials" class="btn btn-sm btn-outline-primary me-2 mb-2"><i class="bi bi-file-earmark-pdf me-1"></i>Materials</a>
+          <a href="/finance/my-fees" class="btn btn-sm btn-outline-primary me-2 mb-2"><i class="bi bi-cash-coin me-1"></i>Fees</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

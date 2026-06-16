@@ -224,6 +224,29 @@
       <a href="{{ url_for('communications.inbox') }}" class="{{ 'active' if 'communications.' in (request.endpoint or '') }}"><i class="bi bi-envelope"></i> Messages</a>
       <a href="{{ url_for('events.calendar') }}" class="{{ 'active' if 'events.' in (request.endpoint or '') }}"><i class="bi bi-calendar-event"></i> Events</a>
 
+      {% if role in ['admin','teacher','student','parent'] %}
+        <div class="sidebar-section">Learning</div>
+        <a href="{{ url_for('materials.index') if 'materials' in config.get('blueprints', []) else '#' }}" class="{{ 'active' if 'materials.' in (request.endpoint or '') }}"><i class="bi bi-file-earmark-pdf"></i> Materials</a>
+        {% if role != 'parent' %}
+        <a href="{{ url_for('academics.marks') }}" class="{{ 'active' if request.endpoint=='academics.marks' }}"><i class="bi bi-pencil-square"></i> Results</a>
+        {% endif %}
+      {% endif %}
+
+      {% if role in ['admin','teacher','student'] %}
+        <div class="sidebar-section">Health & Support</div>
+        <a href="{{ url_for('health.index') if 'health' in config.get('blueprints', []) else '#' }}" class="{{ 'active' if 'health.' in (request.endpoint or '') }}"><i class="bi bi-heart-pulse"></i> Health</a>
+      {% endif %}
+
+      {% if role in ['admin','student','parent'] %}
+        <div class="sidebar-section">Transport</div>
+        <a href="{{ url_for('transport.index') if 'transport' in config.get('blueprints', []) else '#' }}" class="{{ 'active' if 'transport.' in (request.endpoint or '') }}"><i class="bi bi-bus-front"></i> Transport</a>
+      {% endif %}
+
+      {% if role in ['admin','student'] %}
+        <div class="sidebar-section">Accommodation</div>
+        <a href="{{ url_for('hostel.index') if 'hostel' in config.get('blueprints', []) else '#' }}" class="{{ 'active' if 'hostel.' in (request.endpoint or '') }}"><i class="bi bi-house"></i> Hostel</a>
+      {% endif %}
+
       <div class="sidebar-section">Library</div>
       <a href="{{ url_for('library.books') }}" class="{{ 'active' if 'library.' in (request.endpoint or '') }}"><i class="bi bi-book"></i> Library</a>
     {% endif %}

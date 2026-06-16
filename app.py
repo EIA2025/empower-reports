@@ -23,9 +23,11 @@ def create_app():
     from blueprints.transport.routes import transport_bp
     from blueprints.hostel.routes    import hostel_bp
     from blueprints.materials.routes import materials_bp
+    from blueprints.dashboard.routes import dashboard_bp
     from auth                        import auth_bp
 
     app.register_blueprint(auth_bp)
+    app.register_blueprint(dashboard_bp,  url_prefix='/dashboard')
     app.register_blueprint(people_bp,    url_prefix='/people')
     app.register_blueprint(academics_bp, url_prefix='/academics')
     app.register_blueprint(finance_bp,   url_prefix='/finance')
@@ -49,12 +51,7 @@ def create_app():
     def dashboard():
         if not session.get('user_id'):
             return redirect(url_for('auth.login'))
-        role = session.get('user_role')
-        if role == 'master_admin':
-            return redirect(url_for('system.overview'))
-        return render_template('dashboard.html',
-                               role=role,
-                               school_name=session.get('school_name',''))
+        return redirect(url_for('dashboard.index'))
 
     # ── Error handlers ────────────────────────────────────────────────────────
     @app.errorhandler(404)

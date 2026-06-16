@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Librarian Dashboard{% endblock %}
+{% block content %}
+
+<div class="container-fluid">
+  <h2 class="fw-bold mb-4"><i class="bi bi-book me-2"></i>Library Dashboard</h2>
+
+  <!-- Library Statistics -->
+  <div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card">
+        <div class="card-body text-center">
+          <h2 class="text-primary">{{ total_books }}</h2>
+          <p class="text-muted mb-0">Books in Library</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card">
+        <div class="card-body text-center">
+          <h2 class="text-success">{{ issued_today }}</h2>
+          <p class="text-muted mb-0">Issued Today</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card">
+        <div class="card-body text-center">
+          <h2 class="text-danger">{{ overdue_books }}</h2>
+          <p class="text-muted mb-0">Overdue Books</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card">
+        <div class="card-body text-center">
+          <h2 class="text-warning">{{ pending_returns }}</h2>
+          <p class="text-muted mb-0">Due Soon</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Most Borrowed Books -->
+  <div class="row">
+    <div class="col">
+      <div class="card">
+        <div class="card-header">
+          <h6 class="mb-0">Most Popular Books</h6>
+        </div>
+        <div class="card-body">
+          {% if popular_books %}
+          <ul class="list-unstyled">
+          {% for book in popular_books %}
+            <li class="mb-2 pb-2 border-bottom d-flex justify-content-between">
+              <div>
+                <strong>{{ book.title }}</strong><br>
+                <small class="text-muted">ISBN: {{ book.isbn }}</small>
+              </div>
+              <span class="badge bg-primary">{{ book.borrow_count }} borrows</span>
+            </li>
+          {% endfor %}
+          </ul>
+          {% else %}
+          <p class="text-muted">No borrowing data yet</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
